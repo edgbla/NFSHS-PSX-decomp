@@ -5,14 +5,18 @@
     python tools/build_iso.py --skip-compile  # reuse build/**/*.o
     python tools/build_iso.py --restore       # put the retail files back, rebuild the image
     python tools/build_iso.py --no-iso        # stop after staging the two binaries
+    python tools/build_iso.py --no-ninja      # the sequential scripts even when ninja is installed
 
 Steps:
-  1. compile  tools/build.py --skip-asm       -- recon-lane objects + asm/data blobs
+  1-3 with ninja on PATH (the default):  python configure.py && ninja   -- incremental and parallel; the same
+              compile / link / cut as below, only what changed is redone (see configure.py)
+  1-3 without ninja, or with --no-ninja / --tolerant / --skip-compile / --skip-link:
+  1. compile  tools/build.py --skip-asm       -- recon objects + asm/header.s
   2. link     tools/full_link.py              -> build/full_link/full.elf
   3. cut      tools/elf_to_exe.py --split     -> build/full_link/disc/{NFS4.EXE,FRONT.BIN}
   4. stage    copy both into build/cd/<NAME>/ -- the retail originals are saved
               once into build/cd/orig/ and restored by --restore
-  5. iso      tools/psxiso/mkpsxiso.exe -y -o build/cd/<NAME>.bin
+  5. iso      tools/psxiso/mkpsxiso[.exe] -y -o build/cd/<NAME>.bin
                                              -c build/cd/<NAME>.cue  build/cd/<NAME>.xml
   6. verify   read the .bin back (MODE2/2352, user data at offset 24) and confirm
               the two staged files are really in it
@@ -32,9 +36,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain as tc  # noqa: E402
 CD = ROOT / "build" / "cd"
 DISC = ROOT / "build" / "full_link" / "disc"
-MKPSXISO = ROOT / "tools" / "psxiso" / "mkpsxiso.exe"
+MKPSXISO = Path(os.environ.get("NFS4_MKPSXISO") or ROOT / "tools" / "psxiso" / f"mkpsxiso{tc.EXE}")
 FILES = ("NFS4.EXE", "FRONT.BIN")
 SECTOR, USER_OFF, USER = 2352, 24, 2048
 
@@ -100,10 +106,22 @@ def main():
                     help="stage the retail NFS4.EXE/FRONT.BIN instead of ours")
     ap.add_argument("--tolerant", action="store_true",
                     help="let individual TUs fail (build.py default); off by default")
+    ap.add_argument("--no-ninja", action="store_true",
+                    help="use the sequential build.py / full_link.py path even if ninja is installed")
+    ap.add_argument("-j", "--jobs", type=int, help="parallel jobs for ninja (default: ninja's own)")
     a = ap.parse_args()
 
     py = sys.executable
-    if not a.restore:
+    ninja = shutil.which("ninja") or shutil.which("ninja-build")
+    use_ninja = bool(ninja) and not (a.no_ninja or a.tolerant or a.skip_compile or a.skip_link)
+    if not a.restore and use_ninja:
+        print(f"[iso] ninja: {ninja}")
+        # build.ninja regenerates itself when it is stale; configure.py only has to write the first one
+        if not (ROOT / "build.ninja").is_file() and run([py, "configure.py"]):
+            sys.exit("[iso] configure.py failed")
+        if run([ninja, *(["-j", str(a.jobs)] if a.jobs else []), "disc"]):
+            sys.exit("[iso] ninja build failed")
+    elif not a.restore:
         if not a.skip_compile:
             env = dict(os.environ)
             if not a.tolerant:
@@ -125,6 +143,8 @@ def main():
     cue = CD / f"{a.name}.cue"
     if not MKPSXISO.is_file():
         sys.exit(f"[iso] {MKPSXISO} not found")
+    if not tc.IS_WINDOWS and not os.access(MKPSXISO, os.X_OK):
+        MKPSXISO.chmod(MKPSXISO.stat().st_mode | 0o111)      # a fresh checkout may lack the x bit
     if run([MKPSXISO, "-y", "-o", out, "-c", cue, xml]):
         sys.exit("[iso] mkpsxiso failed")
     print(f"[iso] {out}  {out.stat().st_size} bytes")

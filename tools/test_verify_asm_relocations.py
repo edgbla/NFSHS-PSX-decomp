@@ -2,7 +2,7 @@
 
 Load the real normalizer functions through AST, avoiding verify_asm's CLI
 compile side effects. Fixtures model unlinked objdump output; linked-address
-correctness is independently checked by honest_measure, not these tests.
+correctness is checked by the full link (full_link.py + elf_to_exe.py), not these tests.
 """
 import ast
 from pathlib import Path

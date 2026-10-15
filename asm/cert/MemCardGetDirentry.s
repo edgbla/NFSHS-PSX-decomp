@@ -11,8 +11,8 @@ MemCardGetDirentry:
 	sw	$22,0x80($29)
 	addu	$22,$6,$0
 	sw	$19,0x74($29)
-	lui	$19,%hi(D_80147518)
-	addiu	$19,$19,%lo(D_80147518)
+	lui	$19,%hi(mc)
+	addiu	$19,$19,%lo(mc)
 	sw	$31,0x8C($29)
 	sw	$30,0x88($29)
 	sw	$21,0x7C($29)
@@ -24,9 +24,9 @@ MemCardGetDirentry:
 	lw	$30,0xA0($29)
 	beqz	$2,.L800FB8F0
 	addu	$4,$23,$0
-	lui	$4,%hi(D_800574C0)
+	lui	$4,%hi($LC5)
 	jal	printf
-	addiu	$4,$4,%lo(D_800574C0)
+	addiu	$4,$4,%lo($LC5)
 	j	.L800FBAB8
 	addiu	$2,$0,-0x1
 .L800FB8F0:
@@ -40,13 +40,13 @@ MemCardGetDirentry:
 	addiu	$3,$0,0x1
 	sw	$0,0x58($29)
 	lw	$4,0xC($19)
-	lui	$2,%hi(D_80147514)
-	lw	$2,%lo(D_80147514)($2)
+	lui	$2,%hi(_mc_present)
+	lw	$2,%lo(_mc_present)($2)
 	lw	$8,0xA4($29)
 	sllv	$3,$3,$4
 	or	$2,$2,$3
-	lui	$1,%hi(D_80147514)
-	sw	$2,%lo(D_80147514)($1)
+	lui	$1,%hi(_mc_present)
+	sw	$2,%lo(_mc_present)($1)
 	addu	$2,$30,$8
 	blez	$2,.L800FBAA4
 	addu	$21,$0,$0
@@ -78,13 +78,13 @@ MemCardGetDirentry:
 	jal	MemCardCallback
 	addu	$4,$0,$0
 	lw	$3,0x0($19)
-	lui	$1,%hi(D_8014756C)
-	sw	$2,%lo(D_8014756C)($1)
+	lui	$1,%hi(_mc_save_cb)
+	sw	$2,%lo(_mc_save_cb)($1)
 	blez	$3,.L800FB9CC
 	addiu	$8,$0,0x2
-	lui	$4,%hi(D_80057370)
+	lui	$4,%hi($LC0)
 	jal	printf
-	addiu	$4,$4,%lo(D_80057370)
+	addiu	$4,$4,%lo($LC0)
 	j	.L800FB9F0
 	addu	$4,$0,$0
 .L800FB9CC:
@@ -93,16 +93,16 @@ MemCardGetDirentry:
 	sw	$8,0x0($19)
 	sw	$0,0x4($19)
 	sw	$0,0x8($19)
-	lui	$1,%hi(D_80147524)
+	lui	$1,%hi(mc+12)
 	jal	UserFuncOpen
-	sw	$23,%lo(D_80147524)($1)
+	sw	$23,%lo(mc+12)($1)
 	addu	$4,$0,$0
 .L800FB9F0:
 	addu	$5,$0,$0
 	jal	MemCardSync
 	addiu	$6,$29,0x58
-	lui	$4,%hi(D_8014756C)
-	lw	$4,%lo(D_8014756C)($4)
+	lui	$4,%hi(_mc_save_cb)
+	lw	$4,%lo(_mc_save_cb)($4)
 	jal	MemCardCallback
 	nop
 	lw	$2,0x58($29)

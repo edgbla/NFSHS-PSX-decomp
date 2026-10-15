@@ -16,8 +16,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BIN = 'C:/Tools/mips-ps1/mips/bin/mipsel-none-elf-'
-SDK = Path('C:/Temp/nfs4-clean/psyq43/extracted')
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import os  # noqa: E402
+import toolchain as tc  # noqa: E402
+OBJDUMP, OBJCOPY = str(tc.mips('objdump')), str(tc.mips('objcopy'))
+# Needs the (proprietary, not redistributable) PsyQ 4.3 SDK libraries; override the location with NFS4_PSYQ_SDK.
+SDK = Path(os.environ.get('NFS4_PSYQ_SDK', 'C:/Temp/nfs4-clean/psyq43/extracted'))
 rows = json.load(open(ROOT / 'linkers' / 'link_stripped.json'))['functions']
 retail = set()
 for ln in open(ROOT / 'configs' / 'symbol_addrs.txt', errors='replace'):
@@ -33,16 +37,16 @@ for obj, lst in sorted(by_obj.items()):
     if not o.is_file():
         print('MISSING OBJECT', obj); bad += 1; continue
     syms = {}
-    for ln in subprocess.run([BIN + 'objdump.exe', '-t', str(o)], capture_output=True, text=True).stdout.splitlines():
+    for ln in subprocess.run([OBJDUMP, '-t', str(o)], capture_output=True, text=True).stdout.splitlines():
         p = ln.split()
         if len(p) >= 6 and p[-3] == '.text.strip' and 'F' in p[1:4] and not p[-1].startswith('.'):
             syms[p[-1]] = (int(p[0], 16), int(p[-2], 16))
     tmp = ROOT / 'build' / 'tmp' / 'strip_sec.bin'
     tmp.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([BIN + 'objcopy.exe', '-O', 'binary', '-j', '.text.strip', str(o), str(tmp)], capture_output=True)
+    subprocess.run([OBJCOPY, '-O', 'binary', '-j', '.text.strip', str(o), str(tmp)], capture_output=True)
     sec = tmp.read_bytes() if tmp.exists() else b''
     rel = {}
-    for ln in subprocess.run([BIN + 'objdump.exe', '-r', '-j', '.text.strip', str(o)], capture_output=True, text=True).stdout.splitlines():
+    for ln in subprocess.run([OBJDUMP, '-r', '-j', '.text.strip', str(o)], capture_output=True, text=True).stdout.splitlines():
         m = re.match(r'^([0-9a-f]{8})\s+(R_MIPS_\w+)', ln)
         if m:
             rel[int(m.group(1), 16)] = m.group(2)
@@ -57,7 +61,9 @@ for obj, lst in sorted(by_obj.items()):
             print('HAS A RETAIL ADDRESS (retail kept it): %s' % fn); bad += 1
         off, size = syms[fn]
         verdict = 'no SDK reference'
-        if r.get('sdk'):
+        if r.get('sdk') and not SDK.is_dir():
+            verdict = 'SDK %s: not compared (no PsyQ SDK at %s; set NFS4_PSYQ_SDK)' % (r['sdk'], SDK)
+        elif r.get('sdk'):
             lib, name = r['sdk'].split('/')
             blob = (SDK / lib / 'functions' / (name + '.bin')).read_bytes()
             if r.get('sdk_slice'):      # [offset, size] inside the blob: the SDK index lumps a member's STATIC functions into the

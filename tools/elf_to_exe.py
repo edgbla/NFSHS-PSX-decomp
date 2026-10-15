@@ -8,10 +8,11 @@
     python tools/elf_to_exe.py [IN.elf [OUT.exe]] [--rom PATH | --no-compare] [--split]
 
 Why not `objcopy -O binary` (or psxsdk's elf2exe, which is objcopy plus a
-hard-coded header): nfs4_recon.ld gives every code/data section LMA == VMA
-(0x8001xxxx) while `.header` sits at LMA 0, so a flat binary spans
-0x00000000..0x8014xxxx = ~2 GB.  elf2exe would also hard-code pc0 = 0x80010000,
-which in NFS4 is .rodata_front, not the entry point (0x800E402C).
+hard-coded header): the natural link script (tools/gen_natural_ld.py) gives every
+main section LMA == VMA (0x8001xxxx), the front-end overlay a VMA over bigBuf, and
+`.header` sits at LMA 0, so a flat binary spans 0x00000000..0x8014xxxx = ~2 GB.
+elf2exe would also hard-code pc0 = 0x80010000, which in NFS4 is .rdata (bigBuf),
+not the entry point.
 
 What this does instead (the same image full_link.py compares, written out):
   * the 0x800-byte PS-X EXE header is the ELF's own `.header` section
@@ -19,15 +20,15 @@ What this does instead (the same image full_link.py compares, written out):
   * the load image is t_addr .. t_addr+t_size taken FROM THAT HEADER, so the
     exe has exactly the retail size and needs no ROM to be produced;
   * every allocated, non-NOBITS section is copied at its VMA, in section-table
-    order (later sections win on overlap -- the same order full_link's
-    `objdump -s` walk uses); anything outside the load image is skipped
-    (e.g. the dead jump-table blobs placed past the end, or an orphan section
-    that ld dropped at VA 0 next to the header).
+    order: the main sections first, then the front-end overlay's sections, which
+    land in bigBuf (zeros in NFS4.EXE) -- the merged image; anything outside the
+    load image is skipped.
 
 The result matches rom/nfs4-f.exe, a debug merge: NFS4.EXE with FRONT.BIN
 written into the zero hole the main exe reserves for the front-end overlay.
 --split also writes the two disc files, cut from that image:
-  * FRONT.BIN = VA 0x80010000..0x80054548 (raw, no header, loads at 0x80010000);
+  * FRONT.BIN = VA _front_obj.._front_objend (linker symbols: the overlay group,
+    raw, no header, its .bss included as zeros);
   * NFS4.EXE  = the same exe with that range zeroed.
 Cutting rom/nfs4-f.exe this way gives exactly the retail disc files (sha1
 below).  They go to a `disc/` subdirectory: on Windows NFS4.EXE and nfs4.exe
@@ -47,8 +48,6 @@ HDR = 0x800
 SHT_NOBITS = 8
 SHF_ALLOC = 0x2
 
-FRONT_VA = 0x80010000
-FRONT_SIZE = 0x44548
 DISC_SHA1 = {
     "NFS4.EXE": "c5c60d450baccfa9076419d023a631eea22bea0c",
     "FRONT.BIN": "d6c5b5d16e55afb09300199c413520041159dfe8",
@@ -78,6 +77,25 @@ def sections(elf: bytes):
         yield name(s_name), s_addr, elf[s_off:s_off + s_size]
 
 
+def symbols(elf: bytes, wanted):
+    """{name: value} for the wanted names, read from .symtab."""
+    e_shoff, = struct.unpack_from("<I", elf, 0x20)
+    e_shentsize, e_shnum, _ = struct.unpack_from("<HHH", elf, 0x2E)
+    hdrs = [struct.unpack_from("<IIIIIIIIII", elf, e_shoff + i * e_shentsize) for i in range(e_shnum)]
+    out = {}
+    for h in hdrs:
+        if h[1] != 2:                       # SHT_SYMTAB
+            continue
+        stroff = hdrs[h[6]][4]
+        for k in range(h[5] // 16):
+            st_name, st_value = struct.unpack_from("<II", elf, h[4] + 16 * k)
+            end = elf.index(b"\0", stroff + st_name)
+            n = elf[stroff + st_name:end].decode("ascii", "replace")
+            if n in wanted:
+                out[n] = st_value
+    return out
+
+
 def build(elf_path: Path):
     elf = elf_path.read_bytes()
     secs = list(sections(elf))
@@ -105,34 +123,32 @@ def build(elf_path: Path):
         exe[HDR + lo - t_addr: HDR + hi - t_addr] = data[lo - vma: hi - vma]
         covered[lo - t_addr: hi - t_addr] = b"\1" * (hi - lo)
         placed.append((lo, hi, name))
-    return bytes(exe), dict(pc0=pc0, gp0=gp0, t_addr=t_addr, t_size=t_size), \
+    sym = symbols(elf, {"_front_obj", "_front_objend"})
+    front = (sym["_front_obj"], sym["_front_objend"] - sym["_front_obj"]) if len(sym) == 2 else None
+    return bytes(exe), dict(pc0=pc0, gp0=gp0, t_addr=t_addr, t_size=t_size, front=front), \
         covered, skipped, overlaps(placed)
 
 
-TEXT_SEC = re.compile(r"\.t\d+$")
-
-
 def overlaps(placed):
-    """Code sections that claim the same addresses.  nfs4_recon.ld pins every
-    object at its retail address, so a .text section that grew past its slot
-    (an edit costing an extra instruction, say) silently loses its tail to the
-    next object instead of failing the link -- report that.  Data sections are
-    left out: a raw blob deliberately overlaps the owner that supersedes it."""
+    """Sections that claim the same addresses.  In a natural link only the front-end
+    overlay may lie on top of something (bigBuf, in .rdata); anything else
+    overlapping means a broken link script -- report it."""
     out = []
-    placed = sorted(p for p in placed if TEXT_SEC.match(p[2]))
-    for (lo, hi, n), (lo2, hi2, n2) in zip(placed, placed[1:]):
+    main = sorted(p for p in placed if not p[2].startswith("front."))
+    for (lo, hi, n), (lo2, hi2, n2) in zip(main, main[1:]):
         if lo2 < hi:
             out.append((lo2, min(hi, hi2), n, n2))
     return out
 
 
-def split(exe: bytes, t_addr: int):
+def split(exe: bytes, t_addr: int, front):
     """Cut the merged image into the two disc files: (NFS4.EXE, FRONT.BIN)."""
-    lo = HDR + FRONT_VA - t_addr
-    front = exe[lo:lo + FRONT_SIZE]
+    va, size = front
+    lo = HDR + va - t_addr
+    fr = exe[lo:lo + size]
     main = bytearray(exe)
-    main[lo:lo + FRONT_SIZE] = bytes(FRONT_SIZE)
-    return bytes(main), front
+    main[lo:lo + size] = bytes(size)
+    return bytes(main), fr
 
 
 def compare(label: str, ours: bytes, rom: bytes, skip: int = 0):
@@ -172,13 +188,15 @@ def main():
               f"(e.g. {', '.join('%s@%#x' % (n, a) for n, a, _ in skipped[:3])})")
     for lo, hi, n, n2 in over:
         print(f"[exe] WARNING overlap {lo:#010x}..{hi:#010x} ({hi - lo} bytes): "
-              f"{n} runs into {n2} -- the first section no longer fits its slot")
+              f"{n} runs into {n2}")
 
     pieces = {}
     if a.split:
+        if not h["front"]:
+            sys.exit("[elf_to_exe] --split needs the linker symbols _front_obj/_front_objend")
         disc = out_path.parent / "disc"
         disc.mkdir(exist_ok=True)
-        pieces["NFS4.EXE"], pieces["FRONT.BIN"] = split(exe, h["t_addr"])
+        pieces["NFS4.EXE"], pieces["FRONT.BIN"] = split(exe, h["t_addr"], h["front"])
         for name, data in pieces.items():
             (disc / name).write_bytes(data)
             sha = hashlib.sha1(data).hexdigest()
@@ -199,7 +217,7 @@ def main():
     if exe == rom:
         print("[cmp] MATCH (byte-identical)")
     if pieces:
-        rom_main, rom_front = split(rom, h["t_addr"])
+        rom_main, rom_front = split(rom, h["t_addr"], h["front"])
         compare("NFS4.EXE", pieces["NFS4.EXE"], rom_main)
         compare("FRONT.BIN", pieces["FRONT.BIN"], rom_front)
 

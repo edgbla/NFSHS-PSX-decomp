@@ -1,12 +1,14 @@
+/* PS-X EXE header.  pc0 / t_addr / t_size are linker symbols (tools/gen_natural_ld.py), so the
+ * header follows the natural link instead of restating retail numbers. */
 .section .data
 
 .ascii "PS-X EXE"      /* Magic number */
 .word 0x00000000       /* .text vram address */
 .word 0x00000000       /* .data vram address */
-.word 0x800E402C       /* Initial PC */
+.word __SN_ENTRY_POINT /* Initial PC: the entry point, wherever the link put it */
 .word 0x00000000       /* Initial $gp/r28 */
-.word 0x80010000       /* .text start */
-.word 0x0012E000       /* .text size */
+.word __exe_t_addr     /* .text start (load address; linker script) */
+.word __exe_t_size     /* .text size: text group end - load address, rounded up to 2048 (linker script) */
 .word 0x00000000       /* .data start */
 .word 0x00000000       /* .data size */
 .word 0x00000000       /* .bss start */

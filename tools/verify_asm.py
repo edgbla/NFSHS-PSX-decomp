@@ -208,7 +208,7 @@ def ours(fn, oracle_va=None):
         # Platform_InitMemory has a high addend of 4 (5 with a signed-low
         # carry). Normalize only a real HI16-relocated LUI, symmetrically
         # with oracle %hi(SYM)->0. Literal LUIs and register/opcode differences
-        # remain visible. Linked addresses still require honest_measure;
+        # remain visible. Linked addresses are checked by the full link (full_link.py + elf_to_exe.py);
         # this changes comparison text, never source/objects/link output.
         # Backup: scratchpad/verify_hi16_addend_20260928/verify_asm.py.
         # Tests: tools/test_verify_asm_relocations.py (positive/negative cases).

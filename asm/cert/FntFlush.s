@@ -33,9 +33,9 @@ FntFlush:
 	sll	$2,$4,1
 	addu	$2,$2,$4
 	sll	$2,$2,4
-	lui	$1,%hi(D_80135E7C)
+	lui	$1,%hi(Font+0x24)
 	addu	$1,$1,$2
-	lw	$2,%lo(D_80135E7C)($1)
+	lw	$2,%lo(Font+0x24)($1)
 	nop
 	bnez	$2,.L800F6DAC
 	sll	$2,$4,1

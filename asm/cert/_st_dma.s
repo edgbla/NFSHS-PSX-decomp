@@ -39,8 +39,8 @@ _st_dma:
 .L800F883C:
 	bne	$17,$2,.L800F8880
 	nop
-	lui	$3,%hi(D_80136AB4)
-	lw	$3,%lo(D_80136AB4)($3)
+	lui	$3,%hi(_dicr)
+	lw	$3,%lo(_dicr)($3)
 	nop
 	lbu	$4,0x2($3)
 	sllv	$2,$2,$16
@@ -56,16 +56,16 @@ _st_dma:
 	j	.L800F883C
 	addiu	$2,$0,0x1
 .L800F8880:
-	lui	$3,%hi(D_80136AB4)
-	lw	$3,%lo(D_80136AB4)($3)
+	lui	$3,%hi(_dicr)
+	lw	$3,%lo(_dicr)($3)
 	sllv	$2,$2,$16
 	lbu	$4,0x2($3)
 	nor	$2,$0,$2
 	and	$2,$4,$2
 .L800F8898:
 	sb	$2,0x2($3)
-	lui	$2,%hi(D_80136AB4)
-	lw	$2,%lo(D_80136AB4)($2)
+	lui	$2,%hi(_dicr)
+	lw	$2,%lo(_dicr)($2)
 	nop
 	lw	$2,0x0($2)
 	nop
@@ -78,8 +78,8 @@ _st_dma:
 	ori	$5,$5,(0x1F801080 & 0xFFFF)
 	sll	$2,$16,4
 	addu	$5,$2,$5
-	lui	$4,%hi(D_80136AB0)
-	lw	$4,%lo(D_80136AB0)($4)
+	lui	$4,%hi(_dpcr)
+	lw	$4,%lo(_dpcr)($4)
 	sll	$2,$19,16
 	lw	$6,0x0($4)
 	or	$2,$2,$20
@@ -88,8 +88,8 @@ _st_dma:
 	sw	$18,0x0($5)
 	addiu	$5,$5,0x4
 	sw	$2,0x0($5)
-	lui	$3,%hi(D_80136A98)
-	lw	$3,%lo(D_80136A98)($3)
+	lui	$3,%hi(_cd_idx)
+	lw	$3,%lo(_cd_idx)($3)
 	nop
 	lbu	$2,0x0($3)
 	nop

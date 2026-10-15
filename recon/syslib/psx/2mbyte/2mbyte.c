@@ -52,6 +52,19 @@ __asm__(
 extern void __main(void) { }
 #endif
 
+/* stup2's $ra scratch cell (the stack is not set up yet when it is written): a 4-byte .sbss
+ * word OWNED by this object.  Retail placed it as 2MBYTE.OBJ's .sbss chunk -- between the last
+ * game object's and the first EA-library object's .sbss, exactly where the link order puts it. */
+#if defined(__mips__)
+__asm__(
+    "\t.section .sbss,\"aw\",@nobits\n"
+    "\t.align 2\n"
+    "_ra_save:\n"
+    "\t.space 4\n"
+    "\t.text\n"
+);
+#endif
+
 /* @0x800E402C (stup2 / __SN_ENTRY_POINT): zero the BSS region [_bss_obj, __last_org). */
 #if defined(__mips__)
 __asm__(
@@ -89,7 +102,7 @@ __asm__(
     "\taddiu      $4, $4, %lo(D_800E40D8)\n"
     "\taddu       $4, $4, $2\n"
     "\tlw         $2, 0($4)\n"
-    "\tlui        $8, %hi(D_80000004)\n"
+    "\tlui        $8, %hi(0x80000004)\n"
     "\tor         $29, $2, $8\n"
     "\tlui        $4, %hi(__last_org)\n"
     "\taddiu      $4, $4, %lo(__last_org)\n"
@@ -101,15 +114,15 @@ __asm__(
     "\tsubu       $5, $2, $3\n"
     "\tsubu       $5, $5, $4\n"
     "\tor         $4, $4, $8\n"
-    "\tlui        $1, %hi(D_8013DE5C)\n"
-    "\tsw         $31, %lo(D_8013DE5C)($1)\n"
+    "\tlui        $1, %hi(_ra_save)\n"
+    "\tsw         $31, %lo(_ra_save)($1)\n"
     "\tlui        $28, %hi(_gp)\n"
     "\taddiu      $28, $28, %lo(_gp)\n"
     "\taddu       $30, $29, $0\n"
     "\tjal        InitHeap\n"
-    "\taddi      $4, $4, %lo(D_80000004)\n"
-    "\tlui        $31, %hi(D_8013DE5C)\n"
-    "\tlw         $31, %lo(D_8013DE5C)($31)\n"
+    "\taddi      $4, $4, %lo(0x80000004)\n"
+    "\tlui        $31, %hi(_ra_save)\n"
+    "\tlw         $31, %lo(_ra_save)($31)\n"
     /* w48-a7: stup1's SYM span is 0x78 = 30 insns and ENDS at the `lw $ra` -- the load-delay
      * nop @0x800E40C8 is a PAD word between stup1 and stup0, not part of stup1.  Label it so the
      * byte stays in the image (retail layout preserved) while the symbol block is 30 insns.     */

@@ -1,0 +1,1021 @@
+# linkers/link_order.txt -- the NATURAL link order of NFS4.EXE / FRONT.BIN (Route A).
+#
+# tools/gen_natural_ld.py turns this into build/full_link/nfs4_natural.ld; tools/full_link.py links
+# with it.  Nothing here is an address: every input section is placed right after the previous
+# one, so addresses follow from this order and from the object sizes, exactly like the original
+# SN link (game objects in the order of the link script, library members in the order the linker
+# pulled them in).  Edit a source and everything behind it moves; add an object and list it here.
+#
+# Line format:   <output section>  <source>  <input section>  [attributes]
+#   <source>         recon/... source file; its object is build/<source>.o
+#   pad=16           the section's size is rounded up to 16 bytes, measured from its own start
+#                    (Sony library members: PsyQ's assembler pads every section to 16)
+#   align=N          the section starts on an N-byte boundary (default: 4 in [main], 8 in [front])
+#   tail=N           N zero bytes follow the section (bytes of the original object no source owns)
+#
+# [main]  = NFS4.EXE: text group .rdata .text .data .sdata at 0x80010000 (bigBuf, the front-end
+#           overlay's reservation, comes first), then the bss group .sbss .bss.
+# [front] = FRONT.BIN: the overlay linked over bigBuf at 0x80010000 (front.rdata front.text
+#           front.data front.bss); SN aligned each object's chunk to 8 (`section.8 front.*`).
+# Everything ending in .strip (functions retail's /strip link removed) or _legacy is discarded.
+
+[main]
+.rdata       recon/frontend/psx/bigbuf.c                          .rodata
+.rdata       recon/frontend/psx/address.c                         .rodata
+.rdata       recon/game/common/ai.cpp                             .rodata
+.rdata       recon/game/common/aidelaycar.cpp                     .rodata
+.rdata       recon/game/common/aihigh.cpp                         .rodata
+.rdata       recon/game/common/aih_basicperp.cpp                  .rodata
+.rdata       recon/game/common/aih_basiccop.cpp                   .rodata
+.rdata       recon/game/common/aih_btccop.cpp                     .rodata
+.rdata       recon/game/common/aih_btcperp.cpp                    .rodata
+.rdata       recon/game/common/aih_play.cpp                       .rodata
+.rdata       recon/game/common/aih_hum.cpp                        .rodata
+.rdata       recon/game/common/aih_opp.cpp                        .rodata
+.rdata       recon/game/common/aih_cop.cpp                        .rodata
+.rdata       recon/game/common/aih_traf.cpp                       .rodata
+.rdata       recon/game/common/aicop.cpp                          .rodata
+.rdata       recon/game/common/aiinit.cpp                         .rodata
+.rdata       recon/game/common/ailife.cpp                         .rodata
+.rdata       recon/game/common/aiperson.cpp                       .rodata
+.rdata       recon/game/common/aiphysic.cpp                       .rodata
+.rdata       recon/game/common/aidatarecord.cpp                   .rodata
+.rdata       recon/game/common/aispeeds.cpp                       .rodata
+.rdata       recon/game/common/aistate.cpp                        .rodata
+.rdata       recon/game/common/aispeech.cpp                       .rodata
+.rdata       recon/game/common/aitriger.cpp                       .rodata
+.rdata       recon/game/common/aitune.cpp                         .rodata
+.rdata       recon/game/common/AIWORLD.cpp                        .rodata
+.rdata       recon/game/common/anim.cpp                           .rodata
+.rdata       recon/game/common/audioclc.cpp                       .rodata
+.rdata       recon/game/common/audiocmn.cpp                       .rodata
+.rdata       recon/game/common/audiomus.cpp                       .rodata
+.rdata       recon/game/common/audedit.cpp                        .rodata
+.rdata       recon/game/common/audioeng.cpp                       .rodata
+.rdata       recon/game/common/audiotrk.cpp                       .rodata
+.rdata       recon/game/common/bworld.cpp                         .rodata
+.rdata       recon/game/common/bworldSm.cpp                       .rodata
+.rdata       recon/game/common/camera.cpp                         .rodata
+.rdata       recon/game/common/cars.cpp                           .rodata
+.rdata       recon/game/common/chunk.cpp                          .rodata
+.rdata       recon/game/common/chunkvis.cpp                       .rodata
+.rdata       recon/game/common/clock.cpp                          .rodata
+.rdata       recon/game/common/collide.cpp                        .rodata
+.rdata       recon/game/common/color.cpp                          .rodata
+.rdata       recon/game/common/control.cpp                        .rodata
+.rdata       recon/game/common/hudpmx.cpp                         .rodata
+.rdata       recon/game/common/speech.cpp                         .rodata
+.rdata       recon/game/common/copspeak.cpp                       .rodata
+.rdata       recon/game/common/dashhud.cpp                        .rodata
+.rdata       recon/game/common/genericpmx.cpp                     .rodata
+.rdata       recon/game/common/gmesetup.cpp                       .rodata
+.rdata       recon/game/common/group.cpp                          .rodata
+.rdata       recon/game/common/input.cpp                          .rodata
+.rdata       recon/game/common/mpause.cpp                         .rodata
+.rdata       recon/game/common/newton.cpp                         .rodata
+.rdata       recon/game/common/nfs3.cpp                           .rodata
+.rdata       recon/game/common/object.cpp                         .rodata
+.rdata       recon/game/common/paths.cpp                          .rodata
+.rdata       recon/game/common/pausemenu.cpp                      .rodata
+.rdata       recon/game/common/physics.cpp                        .rodata
+.rdata       recon/game/common/r3dcar.cpp                         .rodata
+.rdata       recon/game/common/render.cpp                         .rodata
+.rdata       recon/game/common/replay.cpp                         .rodata
+.rdata       recon/game/common/scene.cpp                          .rodata
+.rdata       recon/game/common/sim.cpp                            .rodata
+.rdata       recon/game/common/simplemem.cpp                      .rodata
+.rdata       recon/game/common/simqueue.cpp                       .rodata
+.rdata       recon/game/common/souffle.cpp                        .rodata
+.rdata       recon/game/common/stats.cpp                          .rodata
+.rdata       recon/game/common/textsys.cpp                        .rodata
+.rdata       recon/game/common/track.cpp                          .rodata
+.rdata       recon/game/common/trgsfx.cpp                         .rodata
+.rdata       recon/game/common/udff.cpp                           .rodata
+.rdata       recon/game/common/aidebug.cpp                        .rodata
+.rdata       recon/game/psx/audio.cpp                             .rodata
+.rdata       recon/game/psx/cario.cpp                             .rodata
+.rdata       recon/game/psx/device.cpp                            .rodata
+.rdata       recon/game/psx/drawc.cpp                             .rodata
+.rdata       recon/game/psx/drawdbg.cpp                           .rodata
+.rdata       recon/game/psx/draww.cpp                             .rodata
+.rdata       recon/game/psx/force.cpp                             .rodata
+.rdata       recon/game/psx/flare.cpp                             .rodata
+.rdata       recon/game/psx/hrzsku.cpp                            .rodata
+.rdata       recon/game/psx/hud.cpp                               .rodata
+.rdata       recon/game/psx/overlays.cpp                          .rodata
+.rdata       recon/game/psx/loading.cpp                           .rodata
+.rdata       recon/game/psx/night.cpp                             .rodata
+.rdata       recon/game/psx/platform.cpp                          .rodata
+.rdata       recon/game/psx/psxcontroller.cpp                     .rodata
+.rdata       recon/game/psx/sfx.cpp                               .rodata
+.rdata       recon/game/psx/skidmark.cpp                          .rodata
+.rdata       recon/game/psx/texture.cpp                           .rodata
+.rdata       recon/game/psx/textureprocess.cpp                    .rodata
+.rdata       recon/game/psx/trackspec.cpp                         .rodata
+.rdata       recon/game/psx/trsproj.cpp                           .rodata
+.rdata       recon/game/psx/weather.cpp                           .rodata
+.rdata       recon/syslib/psx/libc/SPRINTF.c                      .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/TYPE.c                        .rodata                      pad=16
+.rdata       recon/eaclib/psx/spchpsxz/spchbank.c                 .rodata
+.rdata       recon/eaclib/psx/eacpsxz/nfile.c                     .rodata
+.rdata       recon/eaclib/psx/eacpsxz/fixdatan.c                  .rodata
+.rdata       recon/syslib/psx/libgpu/SYS.c                        .rodata                      pad=16
+.rdata       recon/syslib/psx/libpad/PADENTRY.c                   .rodata                      pad=16
+.rdata       recon/eaclib/psx/eacpsxz/primate.c                   .rodata
+.rdata       recon/eaclib/psx/eacpsxz/nasync.c                    .rodata
+.rdata       recon/syslib/psx/libetc/VSYNC.c                      .rodata                      pad=16
+.rdata       recon/syslib/psx/libetc/INTR.c                       .rodata                      pad=16
+.rdata       recon/eaclib/psx/eacpsxz/fileroot.c                  .rodata
+.rdata       recon/eaclib/psx/eacpsxz/vramfxya.c                  .rodata
+.rdata       recon/syslib/psx/libgpu/FONT.c                       .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/cdcont.c                      .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/stcdint.c                     .rodata                      pad=16
+.rdata       recon/syslib/psx/libpress/LIBPRESS.c                 .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/iso9660.c                     .rodata                      pad=16
+.rdata       recon/syslib/psx/libmcrd/LIBMCRD.c                   .rodata                      pad=16
+.rdata       recon/eaclib/psx/eacpsxz/cluttype.c                  .rodata
+.rdata       recon/eaclib/psx/eacpsxz/shptype.c                   .rodata
+.rdata       recon/eaclib/psx/eacpsxz/threads.c                   .rodata
+.rdata       recon/syslib/psx/libetc/INTR_DMA.c                   .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/drv.c                         .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/cdread.c                      .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/event.c                       .rodata                      pad=16
+.rdata       recon/syslib/psx/libcd/toc.c                         .rodata                      pad=16
+.rdata       recon/syslib/psx/libmcrd/USERFUNC.c                  .rodata                      pad=16
+.rdata       recon/eaclib/psx/spchpsxz/spchrule.c                 .rodata
+.text        recon/game/common/ai.cpp                             .text
+.text        recon/game/common/aidelaycar.cpp                     .text
+.text        recon/game/common/aihigh.cpp                         .text
+.text        recon/game/common/aih_basicperp.cpp                  .text
+.text        recon/game/common/aih_basiccop.cpp                   .text
+.text        recon/game/common/aih_btccop.cpp                     .text
+.text        recon/game/common/aih_btcperp.cpp                    .text
+.text        recon/game/common/aih_play.cpp                       .text
+.text        recon/game/common/aih_hum.cpp                        .text
+.text        recon/game/common/aih_opp.cpp                        .text
+.text        recon/game/common/aih_cop.cpp                        .text
+.text        recon/game/common/aih_traf.cpp                       .text
+.text        recon/game/common/aicop.cpp                          .text
+.text        recon/game/common/aiinit.cpp                         .text
+.text        recon/game/common/ailife.cpp                         .text
+.text        recon/game/common/aiperson.cpp                       .text
+.text        recon/game/common/aiphysic.cpp                       .text
+.text        recon/game/common/aidatarecord.cpp                   .text
+.text        recon/game/common/aispeeds.cpp                       .text
+.text        recon/game/common/aiscript.cpp                       .text
+.text        recon/game/common/aistate.cpp                        .text
+.text        recon/game/common/aitriger.cpp                       .text
+.text        recon/game/common/aitune.cpp                         .text
+.text        recon/game/common/AIWORLD.cpp                        .text
+.text        recon/game/common/anim.cpp                           .text
+.text        recon/game/common/audioclc.cpp                       .text
+.text        recon/game/common/audiocmn.cpp                       .text
+.text        recon/game/common/audiomus.cpp                       .text
+.text        recon/game/common/audedit.cpp                        .text
+.text        recon/game/common/audioeng.cpp                       .text
+.text        recon/game/common/audiotrk.cpp                       .text
+.text        recon/game/common/bworld.cpp                         .text
+.text        recon/game/common/bworldSm.cpp                       .text
+.text        recon/game/common/camera.cpp                         .text
+.text        recon/game/common/cars.cpp                           .text
+.text        recon/game/common/chunk.cpp                          .text
+.text        recon/game/common/clock.cpp                          .text
+.text        recon/game/common/collide.cpp                        .text
+.text        recon/game/common/color.cpp                          .text
+.text        recon/game/common/control.cpp                        .text
+.text        recon/game/common/hudpmx.cpp                         .text
+.text        recon/game/common/speech.cpp                         .text
+.text        recon/game/common/copspeak.cpp                       .text
+.text        recon/game/common/dashhud.cpp                        .text
+.text        recon/game/common/fastrand.cpp                       .text
+.text        recon/game/common/genericpmx.cpp                     .text
+.text        recon/game/common/gmesetup.cpp                       .text
+.text        recon/game/common/group.cpp                          .text
+.text        recon/game/common/input.cpp                          .text
+.text        recon/game/common/mathnfs.cpp                        .text
+.text        recon/game/common/mpause.cpp                         .text
+.text        recon/game/common/newton.cpp                         .text
+.text        recon/game/common/new.cpp                            .text
+.text        recon/game/common/nfs3.cpp                           .text
+.text        recon/game/common/object.cpp                         .text
+.text        recon/game/common/paths.cpp                          .text
+.text        recon/game/common/pausemenu.cpp                      .text
+.text        recon/game/common/physics.cpp                        .text
+.text        recon/game/common/quatern.cpp                        .text
+.text        recon/game/common/r3dcar.cpp                         .text
+.text        recon/game/common/render.cpp                         .text
+.text        recon/game/common/replay.cpp                         .text
+.text        recon/game/common/scene.cpp                          .text
+.text        recon/game/common/schedule.cpp                       .text
+.text        recon/game/common/sim.cpp                            .text
+.text        recon/game/common/simplemem.cpp                      .text
+.text        recon/game/common/simqueue.cpp                       .text
+.text        recon/game/common/souffle.cpp                        .text
+.text        recon/game/common/stats.cpp                          .text
+.text        recon/game/common/textsys.cpp                        .text
+.text        recon/game/common/track.cpp                          .text
+.text        recon/game/common/trgsfx.cpp                         .text
+.text        recon/game/common/udff.cpp                           .text
+.text        recon/game/psx/audio.cpp                             .text
+.text        recon/game/psx/cario.cpp                             .text
+.text        recon/game/psx/device.cpp                            .text
+.text        recon/game/psx/draw.cpp                              .text
+.text        recon/game/psx/drawc.cpp                             .text
+.text        recon/game/psx/draww.cpp                             .text
+.text        recon/game/psx/force.cpp                             .text
+.text        recon/game/psx/font.cpp                              .text
+.text        recon/game/psx/flare.cpp                             .text
+.text        recon/game/psx/hrzsku.cpp                            .text
+.text        recon/game/psx/hud.cpp                               .text
+.text        recon/game/psx/overlays.cpp                          .text
+.text        recon/game/psx/loading.cpp                           .text
+.text        recon/game/psx/night.cpp                             .text
+.text        recon/game/psx/platform.cpp                          .text
+.text        recon/game/psx/psxcontroller.cpp                     .text
+.text        recon/game/psx/rpause.cpp                            .text
+.text        recon/game/psx/sfx.cpp                               .text
+.text        recon/game/psx/skidmark.cpp                          .text
+.text        recon/game/psx/texture.cpp                           .text
+.text        recon/game/psx/textureprocess.cpp                    .text
+.text        recon/game/psx/trackspec.cpp                         .text
+.text        recon/game/psx/trsproj.cpp                           .text
+.text        recon/game/psx/weather.cpp                           .text
+.text        recon/game/psx/textpix.c                             .text
+.text        recon/game/psx/textpsx.c                             .text
+.text        recon/game/psx/unpack.c                              .text
+.text        recon/syslib/psx/2mbyte/2mbyte.c                     .text
+.text        recon/eaclib/psx/pad.c                               .text
+.text        recon/syslib/psx/libc/C43.c                          .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/fixdmult.c                  .text
+.text        recon/syslib/psx/libsn/PUREV.c                       .text
+.text        recon/eaclib/psx/eacpsxz/trnspos.c                   .text
+.text        recon/eaclib/psx/eacpsxz/fixddiv.c                   .text
+.text        recon/syslib/psx/libapi/A39.c                        .text                        pad=16
+.text        recon/syslib/psx/libc/SPRINTF.c                      .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/memstd.c                    .text
+.text        recon/eaclib/psx/eacpsxz/nsync.c                     .text
+.text        recon/eaclib/psx/eacpsxz/xform.c                     .text
+.text        recon/syslib/psx/libc/C25.c                          .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/atanfunc.c                  .text
+.text        recon/eaclib/psx/eacpsxz/nloadpk.c                   .text
+.text        recon/syslib/psx/libc/C23.c                          .text                        pad=16
+.text        recon/syslib/psx/libc/QSORT.c                        .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/locatbig.c                  .text
+.text        recon/syslib/psx/libc/C36.c                          .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/blkmov.c                    .text
+.text        recon/eaclib/psx/sndpsxz/sbremove.c                  .text
+.text        recon/eaclib/psx/sndpsxz/splysdef.c                  .text
+.text        recon/eaclib/psx/sndpsxz/span.c                      .text
+.text        recon/eaclib/psx/sndpsxz/svol.c                      .text
+.text        recon/eaclib/psx/eacpsxz/systask.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sstsetpr.c                  .text
+.text        recon/eaclib/psx/sndpsxz/seffect.c                   .text
+.text        recon/eaclib/psx/spchpsxz/spchevnt.c                 .text
+.text        recon/eaclib/psx/eacpsxz/random.c                    .text
+.text        recon/syslib/psx/libc/C21.c                          .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/sbend.c                     .text
+.text        recon/eaclib/psx/sndpsxz/splay.c                     .text
+.text        recon/eaclib/psx/sndpsxz/sover.c                     .text
+.text        recon/eaclib/psx/sndpsxz/sbhdrsze.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sbhdrcpy.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sdmemlu.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sbadd.c                     .text
+.text        recon/eaclib/psx/sndpsxz/sstop.c                     .text
+.text        recon/eaclib/psx/sndpsxz/spitch.c                    .text
+.text        recon/eaclib/psx/sndpsxz/smasterv.c                  .text
+.text        recon/syslib/psx/libc/A63.c                          .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/s3dlow.c                    .text
+.text        recon/eaclib/psx/sndpsxz/sstopall.c                  .text
+.text        recon/eaclib/psx/eacpsxz/timer.c                     .text
+.text        recon/eaclib/psx/sndpsxz/sautovol.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sstgetv.c                   .text
+.text        recon/syslib/psx/libcd/TYPE.c                        .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/sststat.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sstrstat.c                  .text
+.text        recon/eaclib/psx/eacpsxz/wildcard.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sst.c                       .text
+.text        recon/eaclib/psx/sndpsxz/spvoices.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sstsetgl.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sstsetgs.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sstautov.c                  .text
+.text        recon/syslib/psx/libapi/COUNTER.c                    .text
+.text        recon/syslib/psx/libc/C27.c                          .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/slimits.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sstovrhd.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sstvol.c                    .text
+.text        recon/eaclib/psx/sndpsxz/sserver.c                   .text
+.text        recon/eaclib/psx/eacpsxz/syncfile.c                  .text
+.text        recon/syslib/psx/libc/C42.c                          .text                        pad=16
+.text        recon/syslib/psx/libc/C47.c                          .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/crossprd.c                  .text
+.text        recon/syslib/psx/libgte/REG13.c                      .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/fxform.c                    .text
+.text        recon/eaclib/psx/eacpsxz/asinfunc.c                  .text
+.text        recon/eaclib/psx/eacpsxz/isincos.c                   .text
+.text        recon/eaclib/psx/eacpsxz/trnsfrm.c                   .text
+.text        recon/eaclib/psx/eacpsxz/addtimer.c                  .text
+.text        recon/eaclib/psx/eacpsxz/savegp.c                    .text
+.text        recon/eaclib/psx/eacpsxz/fixdsqrt.c                  .text
+.text        recon/syslib/psx/libc/C16.c                          .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/locatshp.c                  .text
+.text        recon/syslib/psx/libc/C24.c                          .text                        pad=16
+.text        recon/eaclib/psx/spchpsxz/spchbank.c                 .text
+.text        recon/eaclib/psx/spchpsxz/spchinit.c                 .text
+.text        recon/syslib/psx/libmath/FLTSIDF.c                   .text                        pad=16
+.text        recon/syslib/psx/libmath/LTDF2.c                     .text                        pad=16
+.text        recon/eaclib/psx/spchpsxz/spchrand.c                 .text
+.text        recon/eaclib/psx/spchpsxz/spchrslv.c                 .text
+.text        recon/eaclib/psx/eacpsxz/nfile.c                     .text
+.text        recon/eaclib/psx/sndpsxz/stimerem.c                  .text
+.text        recon/eaclib/psx/eacpsxz/fixdinv.c                   .text
+.text        recon/eaclib/psx/eacpsxz/fixdsin.c                   .text
+.text        recon/eaclib/psx/eacpsxz/fixdatan.c                  .text
+.text        recon/syslib/psx/libgpu/SYS.c                        .text                        pad=16
+.text        recon/syslib/psx/libpad/PADENTRY.c                   .text                        tail=8
+.text        recon/eaclib/psx/eacpsxz/matrix.c                    .text
+.text        recon/syslib/psx/libmath/GTDF2.c                     .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/primate.c                   .text
+.text        recon/eaclib/psx/eacpsxz/movf.c                      .text
+.text        recon/eaclib/psx/eacpsxz/shpsubs.c                   .text
+.text        recon/eaclib/psx/eacpsxz/nasync.c                    .text
+.text        recon/syslib/psx/libetc/VMODE.c                      .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/blkfill.c                   .text
+.text        recon/eaclib/psx/eacpsxz/sinfunc.c                   .text
+.text        recon/eaclib/psx/eacpsxz/resize.c                    .text
+.text        recon/syslib/psx/libgte/MSC02.c                      .text
+.text        recon/syslib/psx/libgpu/P00.c                        .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/loadshp.c                   .text
+.text        recon/eaclib/psx/eacpsxz/exit.c                      .text
+.text        recon/eaclib/psx/sndpsxz/ssysinit.c                  .text
+.text        recon/eaclib/psx/sndpsxz/ssysreal.c                  .text
+.text        recon/syslib/psx/libgte/MSC00.c                      .text                        pad=16
+.text        recon/syslib/psx/libgpu/EXT.c                        .text                        pad=16
+.text        recon/syslib/psx/libetc/VSYNC.c                      .text                        pad=16
+.text        recon/syslib/psx/libgte/FGO_01.c                     .text                        pad=16
+.text        recon/syslib/psx/libgte/REG11.c                      .text                        pad=16
+.text        recon/syslib/psx/libgte/FOG_01.c                     .text                        pad=16
+.text        recon/syslib/psx/libetc/INTR.c                       .text
+.text        recon/eaclib/psx/eacpsxz/textset.c                   .text
+.text        recon/eaclib/psx/eacpsxz/getm.c                      .text
+.text        recon/eaclib/psx/eacpsxz/textcrnt.c                  .text
+.text        recon/syslib/psx/libgpu/P10.c                        .text                        pad=16
+.text        recon/syslib/psx/libgte/FGO_06.c                     .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/isqrt.c                     .text
+.text        recon/syslib/psx/libgpu/P19.c                        .text                        pad=16
+.text        recon/syslib/psx/libmath/MULSF3.c                    .text                        pad=16
+.text        recon/syslib/psx/libgpu/P12.c                        .text                        pad=16
+.text        recon/syslib/psx/libgpu/P16.c                        .text                        pad=16
+.text        recon/syslib/psx/libgpu/P18.c                        .text                        pad=16
+.text        recon/syslib/psx/libgpu/P17.c                        .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/fsincos.c                   .text
+.text        recon/syslib/psx/libgte/COR_02.c                     .text                        pad=16
+.text        recon/syslib/psx/libgte/COR_03.c                     .text                        pad=16
+.text        recon/syslib/psx/libmath/FIXSFSI.c                   .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/joystkn.c                   .text
+.text        recon/eaclib/psx/eacpsxz/fileroot.c                  .text
+.text        recon/eaclib/psx/eacpsxz/meminit.c                   .text
+.text        recon/eaclib/psx/eacpsxz/inittmr.c                   .text
+.text        recon/syslib/psx/libapi/C68.c                        .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/shpdepth.c                  .text
+.text        recon/syslib/psx/libgpu/P01.c                        .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/textfor.c                   .text
+.text        recon/eaclib/psx/eacpsxz/unhuff.c                    .text
+.text        recon/eaclib/psx/eacpsxz/unref.c                     .text
+.text        recon/eaclib/psx/eacpsxz/unbtree.c                   .text
+.text        recon/syslib/psx/libmath/EXTSFDF2.c                  .text                        pad=16
+.text        recon/syslib/psx/libmath/TRUDFSF2.c                  .text                        pad=16
+.text        recon/syslib/psx/libmath/ADDDF3.c                    .text                        pad=16
+.text        recon/syslib/psx/libmath/DIVDF3.c                    .text                        pad=16
+.text        recon/syslib/psx/libc/C26.c                          .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/nullfunc.c                  .text
+.text        recon/syslib/psx/libgpu/P11.c                        .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/crc.c                       .text
+.text        recon/syslib/psx/libc/C30.c                          .text                        pad=16
+.text        recon/syslib/psx/libmath/FLTSISF.c                   .text                        pad=16
+.text        recon/syslib/psx/libmath/MULDF3.c                    .text                        pad=16
+.text        recon/syslib/psx/libmath/DIVSF3.c                    .text                        pad=16
+.text        recon/syslib/psx/libmath/FIXDFSI.c                   .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/vramfxya.c                  .text
+.text        recon/eaclib/psx/eacpsxz/shpclut.c                   .text
+.text        recon/syslib/psx/libgpu/FONT.c                       .text
+.text        recon/syslib/psx/libpress/VLC.c                      .text                        align=16 pad=16
+.text        recon/syslib/psx/libcd/cdcont.c                      .text
+.text        recon/syslib/psx/libcd/stcdint.c                     .text                        pad=16
+.text        recon/syslib/psx/libcd/C_002.c                       .text                        pad=16
+.text        recon/syslib/psx/libpress/LIBPRESS.c                 .text                        pad=16
+.text        recon/syslib/psx/libcd/C_003.c                       .text                        pad=16
+.text        recon/syslib/psx/libcd/cdread2.c                     .text                        pad=16
+.text        recon/syslib/psx/libcd/C_005.c                       .text                        pad=16
+.text        recon/syslib/psx/libcd/iso9660.c                     .text                        pad=16
+.text        recon/syslib/psx/libcd/CDROM.c                       .text                        pad=16
+.text        recon/syslib/psx/libcd/C_009.c                       .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/cdfs.c                      .text
+.text        recon/syslib/psx/libcd/C_007.c                       .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/scdvol.c                    .text
+.text        recon/syslib/psx/libmcrd/LIBMCRD.c                   .text
+.text        recon/eaclib/psx/eacpsxz/cluttype.c                  .text
+.text        recon/eaclib/psx/eacpsxz/shptype.c                   .text
+.text        recon/eaclib/psx/eacpsxz/stream.c                    .text
+.text        recon/syslib/psx/libapi/C57.c                        .text                        pad=16
+.text        recon/syslib/psx/libpad/PADPORTD.c                   .text                        pad=16
+.text        recon/syslib/psx/libc/C46.c                          .text                        pad=16
+.text        recon/syslib/psx/libc/MEMMOVE.c                      .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/threads.c                   .text
+.text        recon/eaclib/psx/eacpsxz/math64a.c                   .text
+.text        recon/eaclib/psx/eacpsxz/stricmp.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sdasync.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sbirmpat.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sbvalid.c                   .text
+.text        recon/eaclib/psx/sndpsxz/salloc.c                    .text
+.text        recon/eaclib/psx/sndpsxz/s3dpos.c                    .text
+.text        recon/eaclib/psx/sndpsxz/spatkey.c                   .text
+.text        recon/eaclib/psx/sndpsxz/slib.c                      .text
+.text        recon/eaclib/psx/sndpsxz/sdriver.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sdfx.c                      .text
+.text        recon/eaclib/psx/sndpsxz/sfxlevel.c                  .text
+.text        recon/eaclib/psx/spchpsxz/spchpick.c                 .text
+.text        recon/eaclib/psx/sndpsxz/sclcptch.c                  .text
+.text        recon/eaclib/psx/sndpsxz/stagpat.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sbdload.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sballoc.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sgetvol.c                   .text
+.text        recon/syslib/psx/libc/C63.c                          .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/spktplay.c                  .text
+.text        recon/eaclib/psx/sndpsxz/smath64.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sstgetrp.c                  .text
+.text        recon/syslib/psx/libc/C31.c                          .text                        pad=16
+.text        recon/syslib/psx/libc/C38.c                          .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/spat2hdr.c                  .text
+.text        recon/syslib/psx/libc/MEMCMP.c                       .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/sdpacket.c                  .text
+.text        recon/eaclib/psx/sndpsxz/ssysserv.c                  .text
+.text        recon/syslib/psx/libmath/DBSHIFTU.c                  .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/sdtimrem.c                  .text
+.text        recon/syslib/psx/libapi/C73.c                        .text                        pad=16
+.text        recon/syslib/psx/libpad/PADMAIN.c                    .text
+.text        recon/syslib/psx/libpad/PADCMD.c                     .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/trnsmult.c                  .text
+.text        recon/eaclib/psx/eacpsxz/fastmovf.c                  .text
+.text        recon/eaclib/psx/sndpsxz/smemman.c                   .text
+.text        recon/syslib/psx/libgte/PATCHGTE.c                   .text                        pad=16
+.text        recon/syslib/psx/libetc/INTR_VB.c                    .text                        pad=16
+.text        recon/syslib/psx/libapi/A91.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/L10.c                        .text                        pad=16
+.text        recon/syslib/psx/libgte/REG03.c                      .text
+.text        recon/syslib/psx/libc/C19.c                          .text                        pad=16
+.text        recon/syslib/psx/libapi/A25.c                        .text                        pad=16
+.text        recon/syslib/psx/libetc/INTR_DMA.c                   .text                        pad=16
+.text        recon/syslib/psx/libapi/C114.c                       .text                        pad=16
+.text        recon/syslib/psx/libapi/A37.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A23.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A36.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A24.c                        .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/textcode.c                  .text
+.text        recon/syslib/psx/libmath/FERR.c                      .text                        pad=16
+.text        recon/syslib/psx/libgte/COR_01.c                     .text                        pad=16
+.text        recon/syslib/psx/libsn/READ.c                        .text                        pad=16
+.text        recon/syslib/psx/libsn/OPEN.c                        .text                        pad=16
+.text        recon/syslib/psx/libsn/FSINIT.c                      .text
+.text        recon/syslib/psx/libsn/CREAT.c                       .text                        pad=16
+.text        recon/eaclib/psx/eacpsxz/devsys.c                    .text
+.text        recon/syslib/psx/libsn/LSEEK.c                       .text
+.text        recon/syslib/psx/libsn/CLOSE.c                       .text                        pad=16
+.text        recon/syslib/psx/libsn/WRITE.c                       .text                        pad=16
+.text        recon/syslib/psx/libapi/A12.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A08.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A13.c                        .text                        pad=16
+.text        recon/syslib/psx/libmath/DBSHIFT.c                   .text                        pad=16
+.text        recon/syslib/psx/libmath/MAINASU.c                   .text                        pad=16
+.text        recon/syslib/psx/libmath/ADDMANT.c                   .text                        pad=16
+.text        recon/syslib/psx/libgpu/P09.c                        .text                        pad=16
+.text        recon/syslib/psx/libgpu/P06.c                        .text                        pad=16
+.text        recon/syslib/psx/libcd/drv.c                         .text
+.text        recon/syslib/psx/libcd/C_008.c                       .text                        pad=16
+.text        recon/syslib/psx/libcd/C_004.c                       .text
+.text        recon/syslib/psx/libds/DSCB.c                        .text
+.text        recon/syslib/psx/libcd/C_010.c                       .text                        pad=16
+.text        recon/syslib/psx/libcd/cdread.c                      .text                        pad=16
+.text        recon/syslib/psx/libc/C37.c                          .text                        pad=16
+.text        recon/syslib/psx/libcd/event.c                       .text                        pad=16
+.text        recon/syslib/psx/libc/BSEARCH.c                      .text                        pad=16
+.text        recon/syslib/psx/libcd/toc.c                         .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/sdcdvol.c                   .text
+.text        recon/syslib/psx/libmcrd/BIOS.c                      .text                        pad=16
+.text        recon/syslib/psx/libmcrd/USERFUNC.c                  .text                        pad=16
+.text        recon/syslib/psx/libcard/C171.c                      .text                        pad=16
+.text        recon/syslib/psx/libcard/CARD.c                      .text                        pad=16
+.text        recon/syslib/psx/libcard/C172.c                      .text                        pad=16
+.text        recon/syslib/psx/libapi/A50.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A54.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A51.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A52.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A53.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/FIRST.c                      .text                        pad=16
+.text        recon/syslib/psx/libapi/A67.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A69.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A65.c                        .text                        pad=16
+.text        recon/syslib/psx/libcard/A80.c                       .text                        pad=16
+.text        recon/syslib/psx/libcard/A78.c                       .text                        pad=16
+.text        recon/syslib/psx/libpad/PADSEQD.c                    .text                        pad=16
+.text        recon/syslib/psx/libc/C40.c                          .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/sdmemman.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sdma.c                      .text
+.text        recon/eaclib/psx/sndpsxz/saetodv.c                   .text
+.text        recon/eaclib/psx/sndpsxz/saetolrv.c                  .text
+.text        recon/eaclib/psx/spchpsxz/spchrule.c                 .text
+.text        recon/eaclib/psx/spchpsxz/spchsamp.c                 .text
+.text        recon/eaclib/psx/sndpsxz/sdresolv.c                  .text
+.text        recon/eaclib/psx/sndpsxz/sdplapat.c                  .text
+.text        recon/eaclib/psx/sndpsxz/srrange.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sgettag.c                   .text
+.text        recon/eaclib/psx/sndpsxz/srandom.c                   .text
+.text        recon/eaclib/psx/sndpsxz/sdspuirq.c                  .text
+.text        recon/syslib/psx/libapi/L03.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/L02.c                        .text                        pad=16
+.text        recon/syslib/psx/libpad/WAITRC2.c                    .text                        pad=16
+.text        recon/syslib/psx/libpad/PADIF.c                      .text                        pad=16
+.text        recon/syslib/psx/libgpu/P34.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A07.c                        .text                        pad=16
+.text        recon/syslib/psx/libsn/SNREAD.c                      .text
+.text        recon/syslib/psx/libsn/SNWRITE.c                     .text
+.text        recon/eaclib/psx/sndpsxz/spvtolrv.c                  .text
+.text        recon/syslib/psx/libcard/INIT.c                      .text                        pad=16
+.text        recon/syslib/psx/libapi/C112.c                       .text                        pad=16
+.text        recon/syslib/psx/libapi/A09.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A11.c                        .text                        pad=16
+.text        recon/syslib/psx/libapi/A66.c                        .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/saelib.c                    .text
+.text        recon/eaclib/psx/sndpsxz/sgetdata.c                  .text
+.text        recon/syslib/psx/libapi/PAD.c                        .text                        pad=16
+.text        recon/syslib/psx/libcard/A74.c                       .text                        pad=16
+.text        recon/syslib/psx/libcard/PATCH.c                     .text                        pad=16
+.text        recon/syslib/psx/libcard/A75.c                       .text                        pad=16
+.text        recon/syslib/psx/libcard/A76.c                       .text                        pad=16
+.text        recon/syslib/psx/libcard/END.c                       .text                        pad=16
+.text        recon/eaclib/psx/sndpsxz/ssine.c                     .text
+.data        recon/game/common/ai.cpp                             .data
+.data        recon/game/common/aihigh.cpp                         .data
+.data        recon/game/common/aih_basicperp.cpp                  .data
+.data        recon/game/common/aih_btccop.cpp                     .data
+.data        recon/game/common/aih_btcperp.cpp                    .data
+.data        recon/game/common/aih_play.cpp                       .data
+.data        recon/game/common/aih_cop.cpp                        .data
+.data        recon/game/common/aicop.cpp                          .data
+.data        recon/game/common/aiinit.cpp                         .data
+.data        recon/game/common/aiperson.cpp                       .data
+.data        recon/game/common/aiphysic.cpp                       .data
+.data        recon/game/common/aispeeds.cpp                       .data
+.data        recon/game/common/aitune.cpp                         .data
+.data        recon/game/common/AIWORLD.cpp                        .data
+.data        recon/game/common/anim.cpp                           .data
+.data        recon/game/common/audioclc.cpp                       .data
+.data        recon/game/common/audiocmn.cpp                       .data
+.data        recon/game/common/bworld.cpp                         .data
+.data        recon/game/common/bworldSm.cpp                       .data
+.data        recon/game/common/camera.cpp                         .data
+.data        recon/game/common/cars.cpp                           .data
+.data        recon/game/common/clock.cpp                          .data
+.data        recon/game/common/collide.cpp                        .data
+.data        recon/game/common/hudpmx.cpp                         .data
+.data        recon/game/common/speech.cpp                         .data
+.data        recon/game/common/copspeak.cpp                       .data
+.data        recon/game/common/dashhud.cpp                        .data
+.data        recon/game/common/fei.cpp                            .data
+.data        recon/game/common/genericpmx.cpp                     .data
+.data        recon/game/common/gmesetup.cpp                       .data
+.data        recon/game/common/input.cpp                          .data
+.data        recon/game/common/newton.cpp                         .data
+.data        recon/game/common/nfs3.cpp                           .data
+.data        recon/game/common/object.cpp                         .data
+.data        recon/game/common/paths.cpp                          .data
+.data        recon/game/common/physics.cpp                        .data
+.data        recon/game/common/r3dcar.cpp                         .data
+.data        recon/game/common/render.cpp                         .data
+.data        recon/game/common/replay.cpp                         .data.replay_camera_list
+.data        recon/game/common/replay.cpp                         .data.replay_interface
+.data        recon/game/common/replay.cpp                         .data.replay_camera
+.data        recon/game/common/replay.cpp                         .data.replay_control_data
+.data        recon/game/common/replay.cpp                         .data.replay_buffer
+.data        recon/game/common/replay.cpp                         .data.replay_compressed
+.data        recon/game/common/replay.cpp                         .data.replay_uncompressed
+.data        recon/game/common/replay.cpp                         .data.replay_camera_slots
+.data        recon/game/common/schedule.cpp                       .data
+.data        recon/game/common/sim.cpp                            .data
+.data        recon/game/common/stats.cpp                          .data
+.data        recon/game/common/textsys.cpp                        .data
+.data        recon/game/common/track.cpp                          .data
+.data        recon/game/common/trgsfx.cpp                         .data
+.data        recon/game/psx/audio.cpp                             .data
+.data        recon/game/psx/cario.cpp                             .data
+.data        recon/game/psx/device.cpp                            .data
+.data        recon/game/psx/draw.cpp                              .data
+.data        recon/game/psx/drawc.cpp                             .data
+.data        recon/game/psx/draww.cpp                             .data
+.data        recon/game/psx/force.cpp                             .data
+.data        recon/game/psx/font.cpp                              .data
+.data        recon/game/psx/flare.cpp                             .data
+.data        recon/game/psx/hrzsku.cpp                            .data
+.data        recon/game/psx/hud.cpp                               .data
+.data        recon/game/psx/overlays.cpp                          .data
+.data        recon/game/psx/loading.cpp                           .data
+.data        recon/game/psx/night.cpp                             .data
+.data        recon/game/psx/psxcontroller.cpp                     .data
+.data        recon/game/psx/texture.cpp                           .data
+.data        recon/game/psx/textureprocess.cpp                    .data
+.data        recon/game/psx/trackspec.cpp                         .data
+.data        recon/game/psx/weather.cpp                           .data
+.data        recon/syslib/psx/libc/SPRINTF.c                      .data                        pad=16
+.data        recon/eaclib/psx/eacpsxz/random.c                    .data
+.data        recon/syslib/psx/libapi/COUNTER.c                    .data                        pad=16
+.data        recon/eaclib/psx/sndpsxz/slimits.c                   .data
+.data        recon/eaclib/psx/eacpsxz/savegp.c                    .data
+.data        recon/eaclib/psx/eacpsxz/fixdsqrt.c                  .data
+.data        recon/eaclib/psx/spchpsxz/spchrand.c                 .data
+.data        recon/eaclib/psx/eacpsxz/vars.c                      .data
+.data        recon/syslib/psx/libgpu/SYS.c                        .data                        pad=16
+.data        recon/eaclib/psx/eacpsxz/matrix.c                    .data
+.data        recon/syslib/psx/libpress/TABLE.c                    .data                        pad=16
+.data        recon/syslib/psx/libetc/VMODE.c                      .data
+.data        recon/syslib/psx/libgte/MSC02.c                      .data
+.data        recon/eaclib/psx/eacpsxz/exit.c                      .data
+.data        recon/eaclib/psx/sndpsxz/ssysinit.c                  .data
+.data        recon/eaclib/psx/sndpsxz/ssysreal.c                  .data
+.data        recon/syslib/psx/libgte/MSC00.c                      .data                        pad=16
+.data        recon/syslib/psx/libetc/VSYNC.c                      .data                        pad=16
+.data        recon/syslib/psx/libetc/INTR.c                       .data                        pad=16
+.data        recon/eaclib/psx/eacpsxz/textset.c                   .data
+.data        recon/eaclib/psx/eacpsxz/crc.c                       .data
+.data        recon/syslib/psx/libgpu/FONT.c                       .data                        pad=16
+.data        recon/syslib/psx/libpress/VLC.c                      .data                        pad=16
+.data        recon/syslib/psx/libcd/cdcont.c                      .data                        pad=16
+.data        recon/syslib/psx/libcd/stcdint.c                     .data                        pad=16
+.data        recon/syslib/psx/libcd/C_002.c                       .data                        pad=16
+.data        recon/syslib/psx/libpress/LIBPRESS.c                 .data                        pad=16
+.data        recon/syslib/psx/libcd/C_003.c                       .data                        pad=16
+.data        recon/syslib/psx/libcd/C_005.c                       .data                        pad=16
+.data        recon/syslib/psx/libcd/iso9660.c                     .data                        pad=16
+.data        recon/syslib/psx/libcd/CDROM.c                       .data                        pad=16
+.data        recon/syslib/psx/libcd/C_009.c                       .data                        pad=16
+.data        recon/eaclib/psx/eacpsxz/cdfs.c                      .data
+.data        recon/syslib/psx/libcd/C_007.c                       .data                        pad=16
+.data        recon/eaclib/psx/sndpsxz/scdvol.c                    .data
+.data        recon/syslib/psx/libmcrd/LIBMCRD.c                   .data                        pad=16
+.data        recon/syslib/psx/libsn/SNDEF.c                       .data
+.data        recon/syslib/psx/libpad/PADPORTD.c                   .data                        pad=16
+.data        recon/eaclib/psx/eacpsxz/atantbl.c                   .data
+.data        recon/eaclib/psx/sndpsxz/salloc.c                    .data
+.data        recon/eaclib/psx/sndpsxz/slib.c                      .data
+.data        recon/eaclib/psx/sndpsxz/sdfx.c                      .data
+.data        recon/eaclib/psx/spchpsxz/spchdata.c                 .data
+.data        recon/eaclib/psx/sndpsxz/sclcptch.c                  .data
+.data        recon/eaclib/psx/sndpsxz/stagpat.c                   .data
+.data        recon/syslib/psx/libc/CTYPE0.c                       .data                        pad=16
+.data        recon/eaclib/psx/eacpsxz/asintbl.c                   .data
+.data        recon/eaclib/psx/eacpsxz/sintbl.c                    .data
+.data        recon/eaclib/psx/eacpsxz/fatantbl.c                  .data
+.data        recon/syslib/psx/libpad/PADMAIN.c                    .data                        pad=16
+.data        recon/syslib/psx/libetc/INTR_VB.c                    .data                        pad=16
+.data        recon/syslib/psx/libgte/CSTBL.c                      .data                        pad=16
+.data        recon/syslib/psx/libetc/INTR_DMA.c                   .data                        pad=16
+.data        recon/eaclib/psx/eacpsxz/textcode.c                  .data
+.data        recon/eaclib/psx/eacpsxz/isqrttbl.c                  .data
+.data        recon/syslib/psx/libmath/FERR.c                      .data                        pad=16
+.data        recon/syslib/psx/libgte/COR_01.c                     .data                        pad=16
+.data        recon/syslib/psx/libcd/drv.c                         .data                        pad=16
+.data        recon/syslib/psx/libcd/C_008.c                       .data                        pad=16
+.data        recon/syslib/psx/libcd/C_004.c                       .data                        pad=16
+.data        recon/syslib/psx/libcd/C_010.c                       .data                        pad=16
+.data        recon/syslib/psx/libcd/cdread.c                      .data                        pad=16
+.data        recon/syslib/psx/libcd/event.c                       .data                        pad=16
+.data        recon/syslib/psx/libmcrd/USERFUNC.c                  .data                        pad=16
+.data        recon/eaclib/psx/sndpsxz/srandom.c                   .data
+.data        recon/syslib/psx/libpad/PADIF.c                      .data                        pad=16
+.data        recon/syslib/psx/libcard/INIT.c                      .data                        pad=16
+.data        recon/syslib/psx/libapi/PAD.c                        .data                        pad=16
+.data        recon/eaclib/psx/sndpsxz/ssine.c                     .data
+.sdata       recon/game/common/ai.cpp                             .sdata
+.sdata       recon/game/common/aihigh.cpp                         .sdata
+.sdata       recon/game/common/aih_btccop.cpp                     .sdata
+.sdata       recon/game/common/aih_play.cpp                       .sdata
+.sdata       recon/game/common/aicop.cpp                          .sdata
+.sdata       recon/game/common/aiinit.cpp                         .sdata
+.sdata       recon/game/common/ailife.cpp                         .sdata
+.sdata       recon/game/common/aiphysic.cpp                       .sdata
+.sdata       recon/game/common/aidatarecord.cpp                   .sdata
+.sdata       recon/game/common/aispeeds.cpp                       .sdata
+.sdata       recon/game/common/aistate.cpp                        .sdata
+.sdata       recon/game/common/aitriger.cpp                       .sdata
+.sdata       recon/game/common/aitune.cpp                         .sdata
+.sdata       recon/game/common/anim.cpp                           .sdata
+.sdata       recon/game/common/audioclc.cpp                       .sdata
+.sdata       recon/game/common/audiocmn.cpp                       .sdata
+.sdata       recon/game/common/audiomus.cpp                       .sdata
+.sdata       recon/game/common/audedit.cpp                        .sdata
+.sdata       recon/game/common/audioeng.cpp                       .sdata
+.sdata       recon/game/common/audiotrk.cpp                       .sdata
+.sdata       recon/game/common/bworld.cpp                         .sdata
+.sdata       recon/game/common/bworldSm.cpp                       .sdata
+.sdata       recon/game/common/camera.cpp                         .sdata
+.sdata       recon/game/common/cars.cpp                           .sdata
+.sdata       recon/game/common/chunk.cpp                          .sdata
+.sdata       recon/game/common/clock.cpp                          .sdata
+.sdata       recon/game/common/collide.cpp                        .sdata
+.sdata       recon/game/common/hudpmx.cpp                         .sdata
+.sdata       recon/game/common/speech.cpp                         .sdata
+.sdata       recon/game/common/copspeak.cpp                       .sdata
+.sdata       recon/game/common/fastrand.cpp                       .sdata
+.sdata       recon/game/common/genericpmx.cpp                     .sdata
+.sdata       recon/game/common/input.cpp                          .sdata
+.sdata       recon/game/common/mpause.cpp                         .sdata
+.sdata       recon/game/common/new.cpp                            .sdata
+.sdata       recon/game/common/nfs3.cpp                           .sdata
+.sdata       recon/game/common/object.cpp                         .sdata
+.sdata       recon/game/common/paths.cpp                          .sdata
+.sdata       recon/game/common/pausemenu.cpp                      .sdata
+.sdata       recon/game/common/physics.cpp                        .sdata
+.sdata       recon/game/common/r3dcar.cpp                         .sdata
+.sdata       recon/game/common/render.cpp                         .sdata
+.sdata       recon/game/common/replay.cpp                         .sdata
+.sdata       recon/game/common/scene.cpp                          .sdata
+.sdata       recon/game/common/sim.cpp                            .sdata
+.sdata       recon/game/common/simqueue.cpp                       .sdata
+.sdata       recon/game/common/souffle.cpp                        .sdata
+.sdata       recon/game/common/textsys.cpp                        .sdata
+.sdata       recon/game/common/track.cpp                          .sdata
+.sdata       recon/game/common/trgsfx.cpp                         .sdata
+.sdata       recon/game/common/aidebug.cpp                        .sdata
+.sdata       recon/game/psx/audio.cpp                             .sdata
+.sdata       recon/game/psx/cario.cpp                             .sdata
+.sdata       recon/game/psx/device.cpp                            .sdata
+.sdata       recon/game/psx/draw.cpp                              .sdata
+.sdata       recon/game/psx/drawc.cpp                             .sdata
+.sdata       recon/game/psx/drawdbg.cpp                           .sdata
+.sdata       recon/game/psx/draww.cpp                             .sdata
+.sdata       recon/game/psx/force.cpp                             .sdata
+.sdata       recon/game/psx/font.cpp                              .sdata
+.sdata       recon/game/psx/flare.cpp                             .sdata
+.sdata       recon/game/psx/hrzsku.cpp                            .sdata
+.sdata       recon/game/psx/hud.cpp                               .sdata
+.sdata       recon/game/psx/overlays.cpp                          .sdata
+.sdata       recon/game/psx/loading.cpp                           .sdata
+.sdata       recon/game/psx/night.cpp                             .sdata
+.sdata       recon/game/psx/platform.cpp                          .sdata
+.sdata       recon/game/psx/psxcontroller.cpp                     .sdata
+.sdata       recon/game/psx/skidmark.cpp                          .sdata
+.sdata       recon/game/psx/texture.cpp                           .sdata
+.sdata       recon/game/psx/textureprocess.cpp                    .sdata
+.sdata       recon/game/psx/trackspec.cpp                         .sdata
+.sdata       recon/game/psx/trsproj.cpp                           .sdata
+.sdata       recon/game/psx/weather.cpp                           .sdata
+.sdata       recon/eaclib/psx/eacpsxz/memstd.c                    .sdata
+.sdata       recon/eaclib/psx/eacpsxz/locatbig.c                  .sdata
+.sdata       recon/eaclib/psx/eacpsxz/systask.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/timer.c                     .sdata
+.sdata       recon/eaclib/psx/eacpsxz/wildcard.c                  .sdata
+.sdata       recon/eaclib/psx/eacpsxz/nfile.c                     .sdata
+.sdata       recon/eaclib/psx/eacpsxz/vars.c                      .sdata
+.sdata       recon/eaclib/psx/eacpsxz/primate.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/loadshp.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/textcrnt.c                  .sdata
+.sdata       recon/eaclib/psx/eacpsxz/joystkn.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/fileroot.c                  .sdata
+.sdata       recon/eaclib/psx/eacpsxz/meminit.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/inittmr.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/textfor.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/threads.c                   .sdata
+.sdata       recon/eaclib/psx/eacpsxz/callback.c                  .sdata
+.sdata       recon/eaclib/psx/eacpsxz/window.c                    .sdata
+.sdata       recon/eaclib/psx/eacpsxz/pageflip.c                  .sdata
+.sbss        recon/game/common/aistate.cpp                        .sbss
+.sbss        recon/game/common/audiocmn.cpp                       .sbss
+.sbss        recon/game/common/camera.cpp                         .sbss
+.sbss        recon/game/common/collide.cpp                        .sbss
+.sbss        recon/game/common/hudpmx.cpp                         .sbss
+.sbss        recon/game/common/dashhud.cpp                        .sbss
+.sbss        recon/game/common/mpause.cpp                         .sbss
+.sbss        recon/game/common/pausemenu.cpp                      .sbss
+.sbss        recon/game/common/simqueue.cpp                       .sbss
+.sbss        recon/game/common/track.cpp                          .sbss
+.sbss        recon/game/common/aidebug.cpp                        .sbss
+.sbss        recon/game/psx/device.cpp                            .sbss
+.sbss        recon/game/psx/draw.cpp                              .sbss
+.sbss        recon/game/psx/font.cpp                              .sbss
+.sbss        recon/game/psx/hrzsku.cpp                            .sbss
+.sbss        recon/game/psx/hud.cpp                               .sbss
+.sbss        recon/game/psx/weather.cpp                           .sbss
+.sbss        recon/syslib/psx/2mbyte/2mbyte.c                     .sbss
+.sbss        recon/eaclib/psx/eacpsxz/locatbig.c                  .sbss
+.sbss        recon/eaclib/psx/eacpsxz/primate.c                   .sbss
+.sbss        recon/eaclib/psx/eacpsxz/nasync.c                    .sbss
+.sbss        recon/eaclib/psx/eacpsxz/inittmr.c                   .sbss
+.sbss        recon/eaclib/psx/eacpsxz/unbtree.c                   .sbss
+.sbss        recon/eaclib/psx/eacpsxz/stream.c                    .sbss
+.bss         recon/game/common/ai.cpp                             .bss
+.bss         recon/game/common/aidatarecord.cpp                   .bss
+.bss         recon/game/common/bworldSm.cpp                       .bss
+.bss         recon/game/common/camera.cpp                         .bss
+.bss         recon/game/common/collide.cpp                        .bss
+.bss         recon/game/common/copspeak.cpp                       .bss
+.bss         recon/game/common/mpause.cpp                         .bss
+.bss         recon/game/common/newton.cpp                         .bss.newton_dummy_124
+.bss         recon/game/common/newton.cpp                         .bss.newton_dummy_133        align=8
+.bss         recon/game/common/simqueue.cpp                       .bss.simqueue_input_queue
+.bss         recon/game/common/track.cpp                          .bss
+.bss         recon/game/psx/hrzsku.cpp                            .bss
+.bss         recon/game/psx/hud.cpp                               .bss
+.bss         recon/game/psx/textureprocess.cpp                    .bss
+.bss         recon/eaclib/psx/pad.c                               .bss
+.bss         recon/eaclib/psx/eacpsxz/memstd.c                    .bss
+.bss         recon/eaclib/psx/eacpsxz/locatbig.c                  .bss
+.bss         recon/eaclib/psx/eacpsxz/systask.c                   .bss
+.bss         recon/eaclib/psx/sndpsxz/sst.c                       .bss
+.bss         recon/eaclib/psx/eacpsxz/nfile.c                     .bss
+.bss         recon/syslib/psx/libgpu/SYS.c                        .bss.sys_8013EAB0            pad=16
+.bss         recon/eaclib/psx/eacpsxz/fileroot.c                  .bss
+.bss         recon/syslib/psx/libgpu/FONT.c                       .bss                         pad=16
+.bss         recon/syslib/psx/libcd/stcdint.c                     .bss                         pad=16
+.bss         recon/syslib/psx/libcd/C_005.c                       .bss.st_80144874
+.bss         recon/syslib/psx/libcd/iso9660.c                     .bss                         pad=16
+.bss         recon/syslib/psx/libcd/CDROM.c                       .bss.st_80146C7C
+.bss         recon/eaclib/psx/eacpsxz/cdfs.c                      .bss
+.bss         recon/syslib/psx/libmcrd/LIBMCRD.c                   .bss                         pad=16
+.bss         recon/syslib/psx/libpad/PADPORTD.c                   .bss                         pad=16
+.bss         recon/eaclib/psx/eacpsxz/threads.c                   .bss
+.bss         recon/eaclib/psx/sndpsxz/sdata.c                     .bss
+.bss         recon/eaclib/psx/sndpsxz/salloc.c                    .bss
+.bss         recon/eaclib/psx/sndpsxz/slib.c                      .bss
+.bss         recon/eaclib/psx/spchpsxz/spchdata.c                 .bss
+.bss         recon/eaclib/psx/spchpsxz/spchpick.c                 .bss
+.bss         recon/eaclib/psx/sndpsxz/spktplay.c                  .bss
+.bss         recon/eaclib/psx/sndpsxz/sdpacket.c                  .bss
+.bss         recon/syslib/psx/libpad/PADMAIN.c                    .bss                         pad=16
+.bss         recon/syslib/psx/libpad/PADCMD.c                     .bss                         pad=16
+.bss         recon/eaclib/psx/eacpsxz/window.c                    .bss
+.bss         recon/eaclib/psx/sndpsxz/smemman.c                   .bss
+.bss         recon/syslib/psx/libgte/PATCHGTE.c                   .bss                         pad=16
+.bss         recon/syslib/psx/libcd/drv.c                         .bss                         pad=16
+.bss         recon/syslib/psx/libcd/drv.c                         .bss.st_801489CC
+.bss         recon/syslib/psx/libcd/C_004.c                       .bss.ds_801489D0             pad=16
+.bss         recon/syslib/psx/libds/DSCB.c                        .bss
+.bss         recon/syslib/psx/libmcrd/BIOS.c                      .data                        pad=16
+.bss         recon/syslib/psx/libmcrd/USERFUNC.c                  .bss                         pad=16
+.bss         recon/syslib/psx/libapi/FIRST.c                      .bss                         pad=16
+.bss         recon/syslib/psx/libpad/WAITRC2.c                    .bss
+.bss         recon/syslib/psx/libapi/PAD.c                        .bss                         pad=16
+.bss         recon/syslib/psx/libcard/PATCH.c                     .bss                         pad=16
+.bss         recon/syslib/psx/libcard/END.c                       .bss                         pad=16
+.bss         recon/syslib/psx/libapi/CHCLRPAD.c                   .bss                         pad=16
+.bss         recon/syslib/psx/libapi/PATCH.c                      .bss                         pad=16
+
+[front]
+front.rdata  recon/game/common/minfront.cpp                       .rodata
+front.rdata  recon/game/psx/fe3dmenu.cpp                          .rodata
+front.rdata  recon/frontend/common/feapp.cpp                      .rodata
+front.rdata  recon/frontend/common/feaudio.cpp                    .rodata
+front.rdata  recon/frontend/common/fecars.cpp                     .rodata
+front.rdata  recon/frontend/common/fedialog.cpp                   .rodata
+front.rdata  recon/frontend/common/femenuextended.cpp             .rodata
+front.rdata  recon/frontend/common/femenuoptions.cpp              .rodata
+front.rdata  recon/frontend/common/fetextrender.cpp               .rodata
+front.rdata  recon/frontend/common/fetracks.cpp                   .rodata
+front.rdata  recon/frontend/common/fecheats.cpp                   .rodata
+front.rdata  recon/frontend/common/fecntl.cpp                     .rodata
+front.rdata  recon/frontend/common/femenu.cpp                     .rodata
+front.rdata  recon/frontend/common/fescreen.cpp                   .rodata
+front.rdata  recon/frontend/common/fetools.cpp                    .rodata
+front.rdata  recon/frontend/common/front.cpp                      .rodata
+front.rdata  recon/frontend/common/femenudefs.cpp                 .rodata
+front.rdata  recon/frontend/common/fetourn.cpp                    .rodata
+front.rdata  recon/frontend/common/femission.cpp                  .rodata
+front.rdata  recon/frontend/common/fememcard.cpp                  .rodata
+front.rdata  recon/frontend/common/fecredits.cpp                  .rodata
+front.rdata  recon/frontend/common/screenmain.cpp                 .rodata
+front.rdata  recon/frontend/common/screenpinkslips.cpp            .rodata
+front.rdata  recon/frontend/common/screenpost.cpp                 .rodata
+front.rdata  recon/frontend/common/screencarselect.cpp            .rodata
+front.rdata  recon/frontend/common/screentournselect.cpp          .rodata
+front.rdata  recon/frontend/common/screentrophyroom.cpp           .rodata
+front.rdata  recon/frontend/common/screentrophyinfo.cpp           .rodata
+front.rdata  recon/frontend/common/screentracks.cpp               .rodata
+front.rdata  recon/frontend/common/screentrackinfo.cpp            .rodata
+front.rdata  recon/frontend/common/screentrackrecords.cpp         .rodata
+front.rdata  recon/frontend/common/screencontroller.cpp           .rodata
+front.rdata  recon/frontend/common/screendisplay.cpp              .rodata
+front.rdata  recon/frontend/common/screenaudio.cpp                .rodata
+front.rdata  recon/frontend/common/screenmemcard.cpp              .rodata
+front.rdata  recon/frontend/common/screencongrats.cpp             .rodata
+front.rdata  recon/frontend/common/statchk.cpp                    .rodata
+front.rdata  recon/frontend/common/stattool.cpp                   .rodata
+front.rdata  recon/frontend/common/screenusername.cpp             .rodata
+front.rdata  recon/frontend/psx/drawshp.cpp                       .rodata
+front.rdata  recon/frontend/psx/movie.cpp                         .rodata
+front.rdata  recon/frontend/psx/mmeffect.cpp                      .rodata
+front.rdata  recon/frontend/psx/psxfront.cpp                      .rodata
+front.rdata  recon/frontend/psx/fetexture.cpp                     .rodata
+front.rdata  recon/frontend/psx/memcard.c                         .rodata
+front.rdata  recon/frontend/psx/mdec.cpp                          .rodata
+front.rdata  recon/frontend/psx/video.cpp                         .rodata
+front.text   recon/game/common/minfront.cpp                       .text
+front.text   recon/game/psx/fe3dmenu.cpp                          .text
+front.text   recon/frontend/common/feapp.cpp                      .text
+front.text   recon/frontend/common/feaudio.cpp                    .text
+front.text   recon/frontend/common/fecars.cpp                     .text
+front.text   recon/frontend/common/fedialog.cpp                   .text
+front.text   recon/frontend/common/femenuextended.cpp             .text
+front.text   recon/frontend/common/femenuoptions.cpp              .text
+front.text   recon/frontend/common/fetextrender.cpp               .text
+front.text   recon/frontend/common/fetracks.cpp                   .text
+front.text   recon/frontend/common/fetv.cpp                       .text
+front.text   recon/frontend/common/fecheats.cpp                   .text
+front.text   recon/frontend/common/feinput.cpp                    .text
+front.text   recon/frontend/common/femenu.cpp                     .text
+front.text   recon/frontend/common/fescreen.cpp                   .text
+front.text   recon/frontend/common/fetools.cpp                    .text
+front.text   recon/frontend/common/front.cpp                      .text
+front.text   recon/frontend/common/femenudefs.cpp                 .text
+front.text   recon/frontend/common/fetourn.cpp                    .text
+front.text   recon/frontend/common/femission.cpp                  .text
+front.text   recon/frontend/common/fememcard.cpp                  .text
+front.text   recon/frontend/common/fecredits.cpp                  .text
+front.text   recon/frontend/common/fevideowall.cpp                .text
+front.text   recon/frontend/common/screenmain.cpp                 .text
+front.text   recon/frontend/common/screenpinkslips.cpp            .text
+front.text   recon/frontend/common/screenpost.cpp                 .text
+front.text   recon/frontend/common/screencarselect.cpp            .text
+front.text   recon/frontend/common/screentournselect.cpp          .text
+front.text   recon/frontend/common/screentrophyroom.cpp           .text
+front.text   recon/frontend/common/screentrophyinfo.cpp           .text
+front.text   recon/frontend/common/screentracks.cpp               .text
+front.text   recon/frontend/common/screentrackinfo.cpp            .text
+front.text   recon/frontend/common/screentrackrecords.cpp         .text
+front.text   recon/frontend/common/screencontroller.cpp           .text
+front.text   recon/frontend/common/screendisplay.cpp              .text
+front.text   recon/frontend/common/screenaudio.cpp                .text
+front.text   recon/frontend/common/screenmemcard.cpp              .text
+front.text   recon/frontend/common/screencongrats.cpp             .text
+front.text   recon/frontend/common/statchk.cpp                    .text
+front.text   recon/frontend/common/stattool.cpp                   .text
+front.text   recon/frontend/common/screenusername.cpp             .text
+front.text   recon/frontend/common/fefades.cpp                    .text
+front.text   recon/frontend/common/felines.cpp                    .text
+front.text   recon/frontend/psx/drawshp.cpp                       .text
+front.text   recon/frontend/psx/movie.cpp                         .text
+front.text   recon/frontend/psx/mmeffect.cpp                      .text
+front.text   recon/frontend/psx/psxfront.cpp                      .text
+front.text   recon/frontend/psx/fetexture.cpp                     .text
+front.text   recon/frontend/psx/memcard.c                         .text
+front.text   recon/frontend/psx/mdec.cpp                          .text
+front.text   recon/frontend/psx/video.cpp                         .text
+front.data   recon/game/psx/fe3dmenu.cpp                          .data
+front.data   recon/frontend/common/feapp.cpp                      .data
+front.data   recon/frontend/common/feaudio.cpp                    .data
+front.data   recon/frontend/common/fecars.cpp                     .data
+front.data   recon/frontend/common/femenuoptions.cpp              .data
+front.data   recon/frontend/common/fetextrender.cpp               .data
+front.data   recon/frontend/common/fetracks.cpp                   .data
+front.data   recon/frontend/common/fecheats.cpp                   .data
+front.data   recon/frontend/common/fecolor.cpp                    .data
+front.data   recon/frontend/common/feinput.cpp                    .data
+front.data   recon/frontend/common/femenu.cpp                     .data
+front.data   recon/frontend/common/fescreen.cpp                   .data
+front.data   recon/frontend/common/fetools.cpp                    .data
+front.data   recon/frontend/common/front.cpp                      .data
+front.data   recon/frontend/common/femenudefs.cpp                 .data
+front.data   recon/frontend/common/fetourn.cpp                    .data
+front.data   recon/frontend/common/fememcard.cpp                  .data
+front.data   recon/frontend/common/fecredits.cpp                  .data
+front.data   recon/frontend/common/screenmain.cpp                 .data
+front.data   recon/frontend/common/screenpinkslips.cpp            .data
+front.data   recon/frontend/common/screenpost.cpp                 .data
+front.data   recon/frontend/common/screencarselect.cpp            .data
+front.data   recon/frontend/common/screentournselect.cpp          .data
+front.data   recon/frontend/common/screentrophyroom.cpp           .data
+front.data   recon/frontend/common/screentrophyinfo.cpp           .data
+front.data   recon/frontend/common/screentracks.cpp               .data
+front.data   recon/frontend/common/screentrackinfo.cpp            .data
+front.data   recon/frontend/common/screentrackrecords.cpp         .data
+front.data   recon/frontend/common/screencontroller.cpp           .data
+front.data   recon/frontend/common/screendisplay.cpp              .data
+front.data   recon/frontend/common/screenaudio.cpp                .data
+front.data   recon/frontend/common/screenmemcard.cpp              .data
+front.data   recon/frontend/common/screencongrats.cpp             .data
+front.data   recon/frontend/common/statchk.cpp                    .data
+front.data   recon/frontend/common/stattool.cpp                   .data
+front.data   recon/frontend/common/screenusername.cpp             .data
+front.data   recon/frontend/psx/drawshp.cpp                       .data
+front.data   recon/frontend/psx/movie.cpp                         .data
+front.data   recon/frontend/psx/psxfront.cpp                      .data
+front.data   recon/frontend/psx/memcard.c                         .data
+front.data   recon/frontend/psx/mdec.cpp                          .data
+front.bss    recon/frontend/common/fedialog.cpp                   .bss
+front.bss    recon/frontend/common/femenuextended.cpp             .bss
+front.bss    recon/frontend/common/feinput.cpp                    .bss
+front.bss    recon/frontend/common/fememcard.cpp                  .bss
+front.bss    recon/frontend/common/screenmain.cpp                 .bss
+front.bss    recon/frontend/common/screenpinkslips.cpp            .bss
+front.bss    recon/frontend/common/screencarselect.cpp            .bss
+front.bss    recon/frontend/common/screentournselect.cpp          .bss
+front.bss    recon/frontend/common/screentracks.cpp               .bss
+front.bss    recon/frontend/common/screentrackinfo.cpp            .bss
+front.bss    recon/frontend/psx/movie.cpp                         .bss
+front.bss    recon/frontend/psx/memcard.c                         .bss

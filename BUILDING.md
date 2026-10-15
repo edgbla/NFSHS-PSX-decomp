@@ -3,7 +3,16 @@
 How to go from this repository's source to the two executable files on the *Need for Speed: High Stakes* (PSX) disc,
 and how to check that they are byte-identical to retail.
 
-State on 2026-09-20: both files build **byte-identical to the retail disc** through Route A below.
+State on 2026-10-13: both files build **byte-identical to the retail disc** through Route A below -- a **natural link**:
+the objects follow each other in link order and every address falls out of that order and the object sizes; no object is
+placed at an address of its own, no symbol is given a retail address, no retail byte is copied in.
+
+On Linux, Route A also runs natively (no Wine, no SN binaries) with FSF stand-in compilers: see
+[BUILDING_LINUX.md](BUILDING_LINUX.md) (in Russian).
+
+The former Routes B, C and D (SN's PSYLINK / SLINK / CPE2X under an MS-DOS player, and the `recon/mod` relink on top of
+Route C) have been removed together with `tools/psyq_pipe/` and `tools/msdos-player/`; what Route C established about the
+original link is summarised in [How the natural link reproduces retail](#how-the-natural-link-reproduces-retail).
 
 | File | Size | sha1 (first 12) |
 |---|---|---|
@@ -41,24 +50,56 @@ Nothing copyrighted is in the repository. You supply:
 
 | What | Where it goes | Notes |
 |---|---|---|
-| The merged target | `rom/nfs4-f.exe` | sha1 `b48ea3452e64…`. Needed by every comparison, not by the build itself. |
-| The retail link map | `rom/NFS4.MAP` | From the disc. The linker-script generator reads symbol addresses from it. |
-| The retail symbol file | `rom/NFS4.SYM` | From the disc, 7,881,225 bytes. Only the comparison tools and Route B need it; `tools/retail_sym.py` dumps it to `build/sym/nfs4-f-v3.txt` with the vendored `tools/dumpsym/dumpsym.exe` on first use. |
+| The merged target | `rom/nfs4-f.exe` | sha1 `b48ea3452e64…`. Optional: only byte comparisons read it; the build and the sha1 check of the two disc files do not. |
+| The retail link map | `rom/NFS4.MAP` | From the disc. Optional: analysis tools (`gen_symbols.py`, `fn_sizes.py` …) read it; the build does not. |
+| The retail symbol file | `rom/NFS4.SYM` | From the disc, 7,881,225 bytes. Only the comparison tools need it; `tools/retail_sym.py` dumps it to `build/sym/nfs4-f-v3.txt` with the vendored `tools/dumpsym/dumpsym.exe` on first use. |
 | PsyQ 4.3 compilers | `C:/Temp/psq43/COMPILER/CC1PSX.EXE`, `CC1PLPSX.EXE` | The real SN compilers (GNU C 2.8.0). Override with `NFS4_CC1`, `NFS4_CC1PL`. |
 | PsyQ 4.0 `CC1PSX` | next to `CC1PSX.EXE` as `CC1PSX272.EXE` | gcc 2.7.2 lane used by some Sony library files. Without it those files fall back with a warning. |
 | PsyQ 4.4 `CC1PLPSX` | next to `CC1PSX.EXE` as `CC1PLPSX44.EXE` | One per-function splice (`Night_CreateNightTableElement`). |
-| PsyQ 4.3 libraries, extracted | `C:/Temp/nfs4-clean/psyq43/extracted/` | Made once from the SDK's `PSX/LIB` folder with `python tools/psyq_extract.py [LIBDIR [OUTDIR]]`: every library member as an `.obj`, every function as a `.bin`, plus `INDEX.tsv`. `tools/gen_ld.py` runs `tools/link_stripped_check.py`, which compares the link-stripped functions with these blobs. |
+| PsyQ 4.3 libraries, extracted | `C:/Temp/nfs4-clean/psyq43/extracted/` | Made once from the SDK's `PSX/LIB` folder with `python tools/psyq_extract.py [LIBDIR [OUTDIR]]`: every library member as an `.obj`, every function as a `.bin`, plus `INDEX.tsv`. `tools/link_stripped_check.py` compares the link-stripped functions with these blobs. Not needed by the build. |
 | MIPS binutils 2.43 | `C:/Tools/mips-ps1/mips/bin/` | `mipsel-none-elf-{cpp,as,ld,objcopy,objdump,nm}`. Override with `NFS4_MIPS_BIN`. |
 | Python 3.12+ | | Standard library only for the build tools. |
+| Ninja 1.10+ | on `PATH` | Optional but recommended: incremental, parallel builds (`python configure.py && ninja`). Without it the sequential scripts below do the same job. |
 
 `maspsx` (the ASPSX 2.77 stand-in that lets GNU `as` assemble the compiler output) is vendored in `tools/maspsx/`.
 The exact toolchain zip layout CI expects is described at the top of `.github/workflows/report.yml`.
 
-The source the build compiles is `recon/` (the reconstructed C and C++), plus the residual data pieces in `asm/data/`
-and the PS-X EXE header `asm/header.s`. `src/` and `asm/nonmatchings/` belong to the older split lane and are not part
-of this build.
+The source the build compiles is `recon/` (the reconstructed C and C++) plus the PS-X EXE header `asm/header.s`.
+`src/` and `asm/nonmatchings/` are the splat split (per-function matching with objdiff, `fn_sizes.py`); they are not
+linked.
 
-## Route A — the byte-identical build
+## Route A — the byte-identical build (natural link)
+
+### With Ninja (incremental)
+
+```bash
+python configure.py      # once: writes build.ninja (it regenerates itself afterwards)
+ninja                    # compile + natural link + NFS4.EXE / FRONT.BIN
+```
+
+`configure.py` turns the build plan of `tools/build.py` into `build.ninja`: per translation unit one preprocessor edge
+(`<obj>.i`, header dependencies from `cpp -MD`) and one compile edge (`<obj>.o` + `<obj>.s`, run by `tools/tu_step.py`:
+the TU's cc1 / cc1plus with all its flags, the `.s` passes and splices of `build.py`, maspsx + GNU `as`; `.include`d
+assembly is tracked through a depfile). Every per-file parameter -- compiler lane, `PER_TU_FLAGS`, cc1 version -- is
+written into that TU's command line, so editing one TU's entry rebuilds just that TU (TUs with per-function splice
+tables carry a hash of their table entries for the same reason). Then the link: `gen_natural_ld.py` (restat: an
+unchanged script does not relink), GNU `ld`, `elf_to_exe.py --split`. The objects are byte-identical to those of the
+sequential build. From scratch on 2 cores the default target takes about 22 s; after editing one file, under a second.
+
+| Target | What |
+|---|---|
+| `ninja` = `ninja disc` | the objects that are linked (`recon/` + `asm/header.s`), the link, `NFS4.EXE` + `FRONT.BIN` |
+| `ninja link` / `ninja objects` | stop after `build/full_link/full.elf` / after the linked objects |
+| `ninja split` | also `src/*.c` (the splat split; not linked) |
+| `ninja expected` | `expected/**.o`, the objdiff targets as CI builds them (no `-DSKIP_ASM`) |
+| `ninja all` | `disc` + `split` |
+| `ninja sizes` | section sizes of the linked ELF next to retail (`full_link.py --report`) |
+
+`ninja -t commands build/recon/game/common/ai.cpp.o` prints the exact commands of one object; `ninja -t cleandead`
+deletes outputs of removed sources; `python configure.py --strict-link` makes sections missing from `link_order.txt` a
+link error. Not tracked per TU is `build.py`'s compile *logic* (`run_s` / `run_o` code): after changing it, run
+`ninja -t clean && ninja`. `NFS4_*` environment variables are read when `build.ninja` is written -- re-run
+`configure.py` after changing them.
 
 ### One command
 
@@ -66,10 +107,12 @@ of this build.
 python tools/build_iso.py --no-iso
 ```
 
-This compiles everything (strict: any failing file aborts), runs the production link, and cuts the two files into
-`build/full_link/disc/`. Use `--skip-compile` to reuse the objects already in `build/`.
+With `ninja` on `PATH` this runs `ninja disc` (writing `build.ninja` first if needed). Otherwise -- or with
+`--no-ninja`, `--tolerant`, `--skip-compile`, `--skip-link` -- it runs the three scripts below: compile everything
+(strict: any failing file aborts), the production link, and the cut into `build/full_link/disc/`. `--skip-compile`
+reuses the objects already in `build/`.
 
-### Step by step
+### Step by step (the sequential scripts)
 
 **1. Compile** every translation unit to an ELF object in `build/recon/…`:
 
@@ -86,73 +129,115 @@ python tools/build.py --skip-asm --only game/common/stats,frontend/psx/psxfront
 
 Set `NFS4_STRICT=1` to make a single failure abort; by default the build keeps going and lists failures at the end.
 
-**2. Regenerate the linker script** — only when you added or removed a file, or changed where data lives:
-
-```bash
-python tools/gen_ld.py --link
-```
-
-`linkers/nfs4_recon.ld` is generated and committed; do not edit it by hand. It places every object's sections at their
-retail addresses. Inputs you may need to touch when data moves between files:
-`linkers/nfs4_recon.data_extra.json`, `nfs4_recon.bss_extra.json`, `nfs4_recon.rodata_extra.json`, the
-`*.ldfrag` files, and `linkers/link_stripped.json` (functions retail's link removed as unreferenced).
-`--link` also links a measurement ELF to `build/gen_ld/recon_multdef-ok.elf` and writes
-`build/gen_ld/genld_report.txt`; check that it says `DROPPED (interleaved) : 0`.
-
-**3. Production link** and whole-image compare:
+**2. Link:**
 
 ```bash
 python tools/full_link.py
 ```
 
-Links the 749 recon-lane objects with `linkers/nfs4_recon.ld` into `build/full_link/full.elf` and compares the load
-image with `rom/nfs4-f.exe`. Expected last lines: `covered words 309036  identical 309036  (100.000%)  diff words 0`.
+`tools/gen_natural_ld.py` turns the committed link order `linkers/link_order.txt` into
+`build/full_link/nfs4_natural.ld` (generated on every link from the objects actually built; not committed), then GNU ld
+links `asm/header.s` and every recon object into `build/full_link/full.elf` (+ `full.map`). The link is strict:
+unresolved symbols, duplicate definitions and orphan sections are errors. It prints the section sizes next to retail's:
 
-**4. Cut the two disc files:**
+```
+[map] .rdata        0x80010000  0x04797C  0x04797C  +0
+[map] .text         0x8005797C  0x0B5358  0x0B5358  +0
+...
+[map] front.bss     0x80052B38  0x001A10  0x001A10  +0
+[sym] __SN_ENTRY_POINT=0x800E402C  __exe_t_size=0x0012E000  ...  _front_objend=0x80054548  _gp=0x8013C54C
+```
+
+**3. Cut the two disc files:**
 
 ```bash
 python tools/elf_to_exe.py --split
 ```
 
-Writes `build/full_link/nfs4.exe` (the merged image) and `build/full_link/disc/NFS4.EXE` + `FRONT.BIN`, and compares
-all three with retail:
+Writes `build/full_link/nfs4.exe` (the merged image) and `build/full_link/disc/NFS4.EXE` + `FRONT.BIN`, prints their
+sha1 against the retail disc and, when `rom/nfs4-f.exe` is present, byte-compares (`--no-compare` skips that):
 
 ```
-[split] …\disc\NFS4.EXE   1239040 bytes  sha1 c5c60d450bac == retail disc
-[split] …\disc\FRONT.BIN   279880 bytes  sha1 d6c5b5d16e55 == retail disc
+[split] …/disc/NFS4.EXE   1239040 bytes  sha1 c5c60d450bac == retail disc
+[split] …/disc/FRONT.BIN   279880 bytes  sha1 d6c5b5d16e55 == retail disc
 [cmp] MATCH (byte-identical)
 ```
 
 `elf_to_exe.py` does not use `objcopy -O binary`: the header sits at load address 0 and the code at `0x8001xxxx`, so a
-flat binary would span 2 GB. It takes the 0x800-byte header from the ELF's own `.header` section (assembled from
-`asm/header.s`) and copies every loadable section to its address; where sections overlap, the later one wins — which is
-how the overlay ends up over `bigBuf`, exactly as in the retail EXE. It also warns if a `.text` section has grown past
-its slot (an edit that costs an instruction silently loses its tail to the next object otherwise).
+flat binary would span 2 GB. It takes the 0x800-byte header from the ELF's own `.header` section (`asm/header.s`, whose
+pc0 / t_addr / t_size are linker symbols) and copies every loadable section to its address -- the main sections first,
+then the overlay's, which land in `bigBuf`, as in `rom/nfs4-f.exe`. `FRONT.BIN` is cut at the linker symbols
+`_front_obj` .. `_front_objend`.
 
-It can also cut any other ELF, for example the measurement link:
+### The link order: `linkers/link_order.txt`
 
-```bash
-python tools/elf_to_exe.py build/gen_ld/recon_multdef-ok.elf build/full_link/nfs4.exe --split
+One line per input section, grouped by output section, in link order:
+
 ```
+[main]
+.rdata       recon/frontend/psx/bigbuf.c        .rodata
+.rdata       recon/frontend/psx/address.c       .rodata
+...
+.text        recon/syslib/psx/libgpu/FONT.c     .text      pad=16
+.text        recon/syslib/psx/libpress/VLC.c    .text      align=16 pad=16
+...
+[front]
+front.rdata  recon/game/common/minfront.cpp     .rodata
+...
+```
+
+`[main]` is `NFS4.EXE`: the text group `.rdata .text .data .sdata` from `0x80010000` (the PS-X EXE load address) and the
+bss group `.sbss .bss` behind it, then the `last` group (`.last`, endcode.cpp's `endofcode`). `[front]` is `FRONT.BIN`:
+`front.rdata front.text front.data front.bss` linked over `bigBuf` at `0x80010000`. A section starts right behind the
+previous one -- on 4 bytes in `[main]`, on 8 in `[front]` -- and each output section ends on that boundary. Attributes
+describe the original objects, never an address:
+
+| attribute | meaning | where |
+|---|---|---|
+| `pad=16` | the section's size is rounded up to 16 bytes from its own start | 218 sections of 158 Sony library members (PsyQ's assembler padded every section) |
+| `align=N` | the section starts on an N-byte boundary | `VLC.obj` `.text` (16), newton.cpp's `static coorddef dummy` (8) |
+| `tail=N` | N zero bytes follow the section | `PADENTRY.obj` `.text` (8) |
+
+Input sections ending in `.strip` (functions retail's `/strip` link removed, `LINK_STRIPPED`) or `_legacy` are discarded.
+The linker defines the symbols the game uses: `_gp` (= start of `.sdata`), `_bss_obj` / `__last_org` (the range the
+startup code clears; the heap starts behind it), `_front_obj` / `_front_objend` (the overlay, read by `address.c`), and
+`__exe_t_addr` / `__exe_t_size` for the header. The only numbers in the generated script are the load address
+`0x80010000` and the 2048-byte rounding of `t_size`.
+
+**Adding a file**: build it, then add its sections to `link_order.txt` where the object belongs in link order. Until you
+do, `full_link.py` appends them to the end of the matching output section and warns (`--strict` makes that an error).
+Editing a source needs nothing: if a function grows, everything behind it moves and every reference follows.
+
+### How the natural link reproduces retail
+
+The retail files were linked by SN's SLINK (`/strip`) from EA's link script: game objects in the script's order, the
+EA and Sony library members in the order the linker pulled them in, the overlay objects renamed to `front.*` with every
+chunk aligned to 8 (`section.8 front.*`). `link_order.txt` is that order (it was read off the retail layout once and is
+now just the order -- adding or growing an object moves everything behind it). Route C (removed) had proved the model with
+the original tools; reproducing it with GNU ld needed only facts about the original objects, now in the sources:
+
+- three Sony assembler modules start their `.text` with the 8-byte library stamp (`Ps…`): `libc/A63.c`, `libapi/C114.c`,
+  `libgte/MSC00.c` (like the `.data` stamps of `FERR`, `PADMAIN`, `SYS`, `LIBMCRD`);
+- `2mbyte.c` owns the 4-byte `.sbss` word where the startup code parks `$ra` (`_ra_save`, formerly `D_8013DE5C`), and
+  writes the KSEG0 constant as `%hi(0x80000004)` instead of an address symbol;
+- the four certificate asm files (`asm/cert/`) reference their own object's data by name -- `mc`, `_mc_present`,
+  `_mc_save_cb`, `$LC0`/`$LC5` (LIBMCRD), `_cd_idx`/`_dpcr`/`_dicr` (stcdint), `Font+0x24` (FONT) -- instead of
+  `D_<retail address>`, exactly like the section-relative relocations of the original objects.
 
 ### Checks to run after a change
 
-```bash
-python tools/honest_measure.py
-```
+- `python tools/elf_to_exe.py --split` -- the sha1 lines say whether both files are still identical to the disc.
+- `python tools/linux/fn_sizes.py --all` -- per-function code size against retail (`3522 functions compared, 0 differ`).
+- A size change no longer breaks the link: it moves what follows. The `[map]` table of `full_link.py` shows which output
+  section changed size.
 
-Prints the honest match (`299710/299710 = 100.000% (0 diff words)` today) plus two guards: `OVERLAP AUDIT` (a
-reconstructed byte hidden behind an overlapping retail blob) and `FOREIGN LABELS` (a reconstructed object covering a
-retail label it does not define, or data with no retail address). All three must be clean.
+Pitfall (sequential scripts only): `full_link.py` links whatever objects are in `build/`. After reverting a source file,
+rebuild it before linking. Ninja tracks this itself.
 
-```bash
-python tools/relink.py --lane recon
-```
-
-The standing link gate: real duplicate definitions and hidden phantoms must be 0 (`GATE: GREEN`).
-
-Pitfall: both links use whatever objects are in `build/`. After reverting a source file, rebuild it before linking, or a
-stale object shows up as diff words.
+The former address-pinned placement (`tools/gen_ld.py` → `linkers/nfs4_recon.ld` with its PROVIDE / `*_extra.json` /
+`*.ldfrag` inputs, the splat link `linkers/nfs4.ld` + `asm/data/`, and the tools measured on them: `relink.py`,
+`honest_measure.py`, `probe_link.py`, …) has been removed. A splat re-run of `configs/nfs4.yaml` writes `asm/data/` and
+the `linkers/nfs4*.ld` / `undefined_*_auto.txt` files again; they are git-ignored and nothing reads them.
 
 ### A bootable disc image
 
@@ -172,267 +257,16 @@ python tools/build_iso.py
 The retail `NFS4.EXE` / `FRONT.BIN` are saved once to `build/cd/orig/`; `--restore` puts them back. The script reads the
 finished image back and confirms both files are really on it. `--name` changes the disc folder / XML base name.
 
-## Route B — the original SN tools (PSYLINK + CPE2X)
-
-This route uses the retail assembler and linker themselves. It produces both files natively, but it is **not
-byte-identical yet**; it exists to measure layout and to compare our `.SYM` with retail's.
-
-Extra prerequisites: `C:/Temp/psq43/PSSN/ASPSX.EXE` (2.77) and `PSYLINK.EXE` (2.73), Sony's `CPE2X.EXE`
-(`C:/Temp/psq43/PSX/BIN/`, a 16-bit DOS program — it runs under the vendored `tools/msdos-player/msdos.exe`), and the
-retail `rom/NFS4.SYM` (its dump gives the link order; `tools/dumpsym/` and `tools/retail_sym.py` handle it).
-
-```bash
-python tools/build.py --skip-asm
-```
-
-```bash
-python tools/gen_ld.py --link
-```
-
-```bash
-python tools/psyq_pipe/psylink_lane.py
-```
-
-```bash
-python tools/psyq_pipe/psylink_disc.py
-```
-
-- `psylink_lane.py` takes the compiler output (`build/**/*.s`), assembles every file with ASPSX 2.77, and links with
-  PSYLINK in the **retail link order** (the order of the FILE records in `NFS4.SYM`), writing
-  `build/psyq/nfs4.{cpe,sym,map}`. Today: 518 of 518 files assemble, 0 link errors, no drift point inside any section.
-- `psylink_disc.py` adds two lines to that link script and relinks:
-
-  ```
-          regs    pc=__SN_ENTRY_POINT
-  front   group   over(text),file("front.bin")
-  ```
-
-  `file()` makes PSYLINK write the overlay group to its own raw file and leave it out of the CPE; `CPE2X /CA` then turns
-  the CPE into `NFS4.EXE`. Output: `build/psyq/disc/NFS4.EXE` and `FRONT.BIN`.
-
-Where it stands: `NFS4.EXE` has the retail size and an identical header except the entry point (`0x800E3E1C` against
-`0x800E402C`); the `bigBuf` hole is all zeros like retail; `FRONT.BIN` is 0x98 bytes short.
-
-### Why Route B is not byte-identical
-
-The SN linker lays every section out object by object in link order and cannot pin an object to an address, so any byte
-an object gains or loses shifts everything after it. `python tools/psyq_pipe/layout_delta.py` shows where that happens,
-using every retail label (libraries included) and the honest link map. Section sizes, ours against retail (2026-09-21):
-`.rdata` -532, `.text` +432, `.data` -48, `.sdata` -28, `.sbss` +64, `.bss` -156, `front.rdata` -128, `front.text` 0,
-`front.data` 0, `front.bss` -24. The game code itself has **no** size difference: `front.text` is exact and the game part
-of `.text` has no change point. The differences are:
-
-1. **Sony's library code is not ASPSX 2.77 output (about +810 bytes of `.text`).** EA linked Sony's prebuilt `LIB*.LIB`
-   members; Route B recompiles our reconstructions of them and assembles them with ASPSX 2.77. Those objects were built
-   by Sony with gcc 2.7.2 and an assembler that fills branch delay slots by reordering; ASPSX 2.77 never reorders and
-   pads each unfilled slot with a `nop`. Route A reproduces them with GNU `as` in reorder mode (the `cc1_272` lane in
-   `tools/build.py`); real ASPSX 2.77 cannot. Typical: +16..+24 per function in libmcrd, +72 in `StCdInterrupt`, +44 in
-   libgpu `SYS` and libetc `INTR`.
-   Swapping the assembler version does not help: `python tools/psyq_pipe/aspsx_ladder.py` assembles the same gcc 2.7.2
-   output with every real ASPSX on this machine, and 2.34, 2.56, 2.77 and 2.79 all produce the **same** code, larger than
-   the retail-identical GNU-assembled object by the same amount (libetc `INTR` +44, libcd `C_011` +72, libgpu `SYS` +56,
-   libpad `PADMAIN` +48, libcd `BIOS` +156, `LIBMCRD` +164 bytes). ASPSX has no reorder mode at all; Sony did not build
-   these objects with it. The compiler side is already gcc 2.7.2 (PsyQ 4.0 `CC1PSX`) per file in both routes.
-2. **Sony's objects round every section up to 16 bytes (about -380 bytes of `.text`, more in `.data` / `.bss`).** In the
-   SDK objects every section size is a multiple of 16 (`SPRINTF.obj` `.text` 0x890, ours 0x888; `FONT.obj` `.bss`
-   0x4410, ours 0x4404), so retail has 8 or 12 pad bytes after each small library function (`SetPolyF4`, `SetFogNear`,
-   `__gtdf2` ...). Our objects do not carry that padding. `tools/psyq_pipe/obj_align.py` prints it per object.
-3. **Read-only data no source owns yet (-532 in `.rdata`, -128 in `front.rdata`).** The residual blob pieces: literal
-   strings and pads between objects' read-only data, including the unreferenced `"SimpleMem"` tag at the head of 55
-   objects. Route A fills them with retail bytes; Route B has nothing to put there.
-4. **Small-data ordering (`.sbss` +64, `.bss` -156).** The linker allocates uninitialised globals per symbol; several
-   EA library files (`primate`, `locatbig`, `unbtree` / `stream`) come out in a different order, some variables land in
-   `.sbss` where retail has them in `.bss`, and Sony's `.bss` sections carry the same 16-byte rounding as above.
-5. **Dead stripping.** Retail's link removed unreferenced functions; stock PSYLINK 2.73 / 2.74 does not. The lane models
-   it by not assembling the functions tagged `LINK_STRIPPED`. Linking Sony's own library members instead of our
-   reconstructions would solve points 1 and 2 at once but bring the unstripped functions back, so an exact Route B needs
-   the linker EA actually used. That linker is now identified (SN's SLINK) and tested: see Route C.
-
-The modules that still have no source file (`sdasync`, `unitvect`, `textsubs`, `hypot3d`, `hypot`) are **not** a cause:
-all their functions were stripped, so they add no text.
-
-A lane bug was found and fixed by this analysis on 2026-09-21: a directive with a trailing comment
-(`.text # maspsx-keep`, used by the certificate blocks) was not recognised after a `LINK_STRIPPED` function, which
-dropped libgpu `FntFlush` (796 bytes) from the native link.
-
-The original retail `NFS4.CPE` confirms this is how EA built it: one register record `pc = 0x800E402C`, a first load
-chunk of exactly 282,000 bytes at `0x80010000` (`bigbuf.obj`), and no overlay bytes in the CPE at all.
-
-A full-debug variant of this lane (compiler `-g`, ASPSX `-g`) emits a complete `.SYM` from our source for comparison
-with retail's; see `sym-match.md`.
-
-## Route C — the way the original was linked (SLINK + Sony's prebuilt libraries)
-
-**Byte-identical since 2026-09-22.** This route builds both disc files with the ORIGINAL tools -- cc1 / cc1plus, ASPSX 2.77,
-SN's slink with `/strip`, Sony's prebuilt libraries, Sony's CPE2X -- and they come out identical to retail:
-`NFS4.EXE` sha1 `c5c60d450bac`, `FRONT.BIN` sha1 `d6c5b5d16e55`. No reconstructed Sony code is linked, nothing is pinned
-to an address, no retail bytes are copied in; the layout falls out of the link order, the library pull order and the
-linker's own allocation.
-
-```bash
-NFS4_LANE_OFFICIAL=1 NFS4_LANE_OUT=build/psyq_off python tools/psyq_pipe/psylink_lane.py --assemble --link
-```
-
-```bash
-python tools/psyq_pipe/slink_lane.py
-```
-
-```bash
-python tools/psyq_pipe/slink_disc.py
-```
-
-What is still borrowed from retail knowledge: the link order of the game objects (the SYM's FILE records -- the original
-makefile listed them in that order).  The slink script carries NO `equ` data label any more: the 23 invented `D_xxxxxxxx`
-labels it used to need were never unowned data -- each was an address INSIDE a named object (SYM), and the sources now
-name that object (`Paths_Paths[n]`, `gPauseMenuRect.y`, `simGlobal.gameTicks`, `frontEnd.carListType`,
-`&bigBuf[282000 - 0x80]`, `CopCarTypeLights[carType - 22]`, ...).  Four of them had been codegen levers (retail reaches the
-member with its own `lui` where cse would share a base register); the honest forms that reproduce retail there:
-a pointer-taking inline whose argument is a constant `&array[K]` (hud `Hud_ShapeWidth`, overlays `Hud_StatsCarFlags`), and
-in track `TexturesLoadInitial` the dead counted loop the SYM's two zero-length nested blocks record -- its head label
-still stands when cse runs, and cse never scans across a label.
-
-Two facts measured on the way, both against the real tools: ASPSX 2.77 never makes a reference to an `.extern` symbol
-gp-relative, whatever `-G` says (only small data DEFINED in the file is) -- retail agrees, only render.obj reaches its
-own `Draw_gPlayer1View` through `$gp`; and at cc1plus `-G8` an extern of <= 8 bytes keeps `SYMBOL_REF_FLAG`, so each
-struct member is an independent `lhu $r,sym+N` macro, while at `-G0` every member goes through one shared base.
-
-What the original build was (each point is measured, 2026-09-21):
-
-- **Compile**: `ccpsx -O2 -g` per file = cc1 / cc1plus + ASPSX, as in Route B.
-- **Linker: SN's SLINK, not PSYLINK.** The retail `NFS4.MAP` is in slink's map format (no `Program entry point` line,
-  one space between address and name; PSYLINK writes both differently). SLINK is "the new SN linker" of 1998/99; SN
-  shipped Beta 3.0 (1999-01-05, six weeks before the retail link of 1999-02-22) on the PsyQ 4.4 CD as
-  `pssn/Slink/slink3b.zip`, manual included. It needs `.ctors` / `.dtors` sections in the script, which is where the
-  `__ctors_*`, `__dtors_*` and `_front_ctors_*` symbols in the retail MAP come from.
-- **`/strip`** = "strip dead code based on static coverage": slink removes every function nothing reaches from the entry
-  point, libraries included (EA did not pass `/nostriplib`). This is the dead stripping Routes A and B model by hand with
-  `LINK_STRIPPED`. Sony's startup object has to be protected, exactly as the slink manual says (`-nostrip stup1`);
-  without it slink removes `stup1`, `main` and half the game.
-- **Sony's libraries prebuilt**: `inclib` of the PsyQ **4.3** `LIB*.LIB` files plus `2MBYTE.OBJ` — except **`LIBCD.LIB`,
-  which is the PsyQ 4.4 one** (retail `CdRead` is 39 words longer than 4.3's; with the 4.4 libcd every Sony function
-  matches, with all-4.4 or all-4.5 libraries 43 / 50 functions differ).
-- **None of our reconstructed Sony code (`recon/syslib`) is linked.** The lane drops all 174 of those objects and
-  asserts that none is left; every Sony function in the output comes from Sony's own `LIB` files. Of the 38 address
-  equates the PSYLINK lane needs, only 24 remain (game data labels no source owns yet); the other 14 were holes inside
-  Sony's data, which Sony's libraries now define themselves.
-- **EA's own libraries** (`eacpsxz`, `sndpsxz`, `spchpsxz`) were `.lib` files too, pulled on demand. The lane packs ours
-  with SN's librarian (`PSYLIB2 /a`) under the retail member names.
-- **The overlay objects are prefixed by the linker, not by the assembler**: `include x.obj,front` in the script. slink then
-  renames their sections to `front.*` and puts their uninitialised globals into `front.bss` with its own layout (exact that
-  way; a hand-made layout was 24 bytes short). The retail MAP's section symbols give EA's whole section list, which the
-  lane's script mirrors: `.rdata .text .data .sdata .ctors .dtors textpsx.text textpsx.rdata textpsx.data textpsx.sdata`
-  in `text`, `.sbss .bss` in `bss`, a `last` group with `.last` (its `__last_obj` is the start of free memory), and
-  `front.rdata front.text front.data front.sdata front.sbss front.bss front.ctors front.dtors` in `front`.
-- **The front-end overlay sections are declared with 8-byte alignment** (`section.8 front.text,front` ...): slink then
-  aligns every object's chunk to 8, which is the 4-byte pad after every front-end object that no assembler produced.
-
-```bash
-NFS4_LANE_OFFICIAL=1 NFS4_LANE_OUT=build/psyq_off python tools/psyq_pipe/psylink_lane.py --assemble --link
-```
-
-```bash
-python tools/psyq_pipe/slink_lane.py
-```
-
-The first command assembles the objects as the original build had them: functions tagged `LINK_STRIPPED` are **kept**
-(the linker has to remove them, not us) and no retail-derived pads are added. The second builds the three EA libraries,
-writes `build/psyq_off/off.lnk`, runs slink and reports. Result:
-
-| section | ours | retail | |
-|---|---|---|---|
-| `.text` | 0xB5358 | 0xB5358 | **exact** |
-| `front.text` | 0x3E970 | 0x3E970 | **exact** |
-| `.rdata` | 0x4797C | 0x4797C | **exact** |
-| `front.rdata` | 0x28F0 | 0x28F0 | **exact** |
-| `.data` | 0x2F878 | 0x2F878 | **exact** |
-| `front.data` | 0x18D8 | 0x18D8 | **exact** |
-| `.sbss` | 0x164 | 0x164 | **exact** |
-| `.sdata` | 0x1830 | 0x1830 | **exact** |
-| `.bss` | 0xAC24 | 0xAC24 | **exact** |
-| `front.bss` | 0x1A10 | 0x1A10 | **exact** |
-
-(2026-09-21, after the data-ownership pass. Before it: `.rdata` -468, `front.rdata` -128, `.data` -84, `.sdata` -44,
-`.sbss` +28, `.bss` -36. With `.rdata` exact, `.text` starts at the retail address and 2,183 of the 3,167 functions are
-byte-identical outright; after the pull-order work 2,848 are, and the main image behind the overlay differs from retail in
-947 bytes of 956,468 (`FRONT.BIN`: 29 of 279,880) -- addresses of `.bss` variables, which is still 4 bytes too big.)
-
-What the pass found -- every item was something Route A's address-pinned placement had been hiding:
-
-- The unreferenced 12-byte `"SimpleMem"` literal opens the read-only data of **118** retail objects. Which ones is a fact
-  the retail SYM records: it keeps each object's block of type definitions, and an object has the tag exactly when that
-  block contains the track / Group header family (`Trk_NewSimQuad`) or the `SimpleMem` class -- 35 overlay + 83 main
-  objects, 1:1 with the 35 + 83 tags in link order (`sym_saw_type.py`, `sym_tag_header.py`, `simplemem_bysym.py`).
-- Wrong storage class: `identitymatrix` and `coef` (matrix.c) were `const` but live in retail `.data`; seven EA library
-  globals (`tickset`, `tickval`, `joy_inited`, `g_currentthread`, `systemtasklock`, `lastsystemtasktick`, `gFileOpSeq`)
-  live in retail `.sdata`, i.e. were written `= 0` -- ours were tentative definitions whose `.sbss` the linker fragments
-  steered into the `.sdata` range.
-- Tables one entry short, the last entry supplied by filler bytes: `coef[10]`, `asintbl[513]`, `fatantbl[258]`.
-- Unreferenced literals with an owner by link order: `"install.psx"` (paths.obj), `"%c"` (textcrnt.obj).
-- Phantom literals our sources claimed but retail has once: `"%s%s.viv"` (Feaudio.obj's, not fecars'), `"unpacked"`
-  (FETexture.obj's, not PSXFront's) -- identical bytes had overlapped in Route A.
-- Lane: only `.text.strip` functions are kept for slink to remove (`.rodata.strip` / `.bss.strip` are data retail never
-  had); `.comm` / `.lcomm` go to ASPSX and the linker untouched.
-
-- The last bytes (`slink_addrdrift.py`: every address the two images reference differently, as a drift map):
-  `static coorddef dummy;` in newton.cpp is a local COMMON, which ASPSX 2.77 aligns to 8 (the GNU lane pins it in a named
-  section; the lane turns those three carriers back into `.lcomm`); the file manager `gFileDevice` is 40 bytes, not 48
-  (libgpu's data starts right behind it -- an invented 8-byte tail); EA's library objects keep their uninitialised
-  variables in DECLARATION order, globals and statics interleaved, 8-byte objects on an 8-byte boundary (they were built
-  with another assembler generation -- ASPSX 2.77 + slink would allocate them as COMMONs in symbol-hash order); and
-  retail's `LIBCD.LIB` is the PATCHED one Sony shipped in `psx/lib/patches` next to PsyQ 4.4: same code as 4.4's, and its
-  data carries retail's library stamp `50 73 04 26 f4 2d 43 10`.
-
-Reports: `slink_datadiff.py` (section contents aligned against retail, addresses masked), `slink_labels.py LO HI`,
-`ro_view.py LO HI`, `unowned_data.py`.
-
-- `/strip` removed 82 functions (7,944 bytes; without `/strip` `.text` is exactly that much too big). 76 are on our
-  hand-made list `linkers/link_stripped.json`; the other 6 (`StopCallback`, `RestartCallback`, `GetIntrMask`,
-  `CdReadBreak`, `CdReadCallback`, `CdReadMode`) are absent from the retail MAP as well — retail removed them too, we
-  never listed them because our reconstruction never contained them. Nothing retail keeps is removed.
-- `python tools/psyq_pipe/slink_bytes.py off`: 3,167 functions compared, all identical to retail apart from the
-  addresses they contain (4 are reported only because a neighbouring library member sits elsewhere).
-- `python tools/psyq_pipe/slink_order.py off`: slink pulls the library members **on demand in retail's order** -- all 460
-  objects with code are in the same relative order, including the way Sony's and EA's members interleave.
-  How the order comes about (`slink_pullsim.py` models it, `slink_pullsolve.py` searches it): slink pulls BEFORE it strips;
-  unresolved names are served in the order they are met -- objects in script order, inside an object ASPSX's reference-record
-  order, which is its symbol-HASH order (names in one hash chain come out in first-use order); a pulled member's own
-  references join the end of the queue. That makes the retail order evidence about the objects themselves:
-  - a member retail has EARLIER than we do was asked for by a function the final link later removed. Five such references
-    are in the sources as `LINK_STRIPPED` stubs (name and body not retained): audiomus -> `iSNDstreamcreate`,
-    mathnfs -> `fixedatan`, quatern -> `intsin`, font -> `puti`, async -> `addexit`;
-  - a member pair in the "wrong" order means a function filed under the wrong member: `initmemadr` is meminit.obj's (not
-    inittmr's), the mutex pool is threads.obj's (not callback's), `iSNDcalcvol`..`iSNDstartvoice` open slib.obj (not
-    spatkey's), `iSNDplatformfxmasterlevel` closes sdfx.obj (not sfxlevel's); and MathNfs.obj asks for `fixedinverse`, the
-    other exported name of `rinverse`;
-  - the members the final link left no code of are in the link as well, and the pull order gives their dependency chain:
-    sbremove -> sdasync -> sdmemman, sdma; matrix -> unitvect -> hypot3d -> hypot; window -> pageflip -> vsync;
-    textfor -> textsubs; meminit -> libc `C52.obj` (`free`). `iSNDplatformfree` turned out to be sdasync.obj's one surviving
-    function (it had been filed under sdata.obj, which is data only). The new members and the asker stubs are
-    `LINK_STRIPPED`; their function names and bodies are inferred and say so -- the reference chain is the evidence.
-  Result: all 337 library members enter the link, in retail's order; 460 of 460 objects with code are in retail's order and
-  the `.text` function order is identical to the retail MAP.
-- `python tools/psyq_pipe/slink_delta.py off`: where a section's layout drifts, step by step with the owning object.
-
-That was the state of the pass on 2026-09-21; the three items it left -- the library member pull order, the modules
-without a source, and the uninitialised-data layout of the overlay objects -- were closed the next day (the pull-order
-model, the all-stripped members and the COMMON alignment rules above), and Route C has been byte-identical since.  Every
-item of the Route B list is gone: nothing reconstructed stands in for a Sony member, no object is pinned, no retail byte
-is copied in, and the link script carries no `equ` data label.  `python tools/psyq_pipe/slink_census.py` shows who
-supplies each section's bytes -- our objects, the Sony members, and slink's alignment padding sum to the retail lengths.
-
-Not vendored (SN's / Sony's copyright): `slink.exe` (the lane unpacks it from `C:/Temp/psq44/pssn/Slink/slink3b.zip`),
-`PSYLIB2.EXE`, and the SDK libraries.
-
 ## Where things end up
 
 | Path | What |
 |---|---|
+| `build.ninja`, `build.ninja.d` | generated by `configure.py` (not committed); `build/.ninja_log`, `build/.ninja_deps` are Ninja's state |
 | `build/recon/**/*.o` | compiled objects (`.i`, `.s` next to them) |
-| `build/asm/**` | assembled header and residual data pieces |
-| `linkers/nfs4_recon.ld` | generated placement script (committed) |
-| `build/gen_ld/recon_multdef-ok.elf`, `.map` | measurement link used by `honest_measure.py` and the guards |
-| `build/full_link/full.elf` | production link |
+| `build/asm/header.s.o` | assembled PS-X EXE header |
+| `linkers/link_order.txt` | the link order (committed) |
+| `build/full_link/nfs4_natural.ld` | linker script generated from it on every link |
+| `build/full_link/full.elf`, `full.map` | production link |
 | `build/full_link/nfs4.exe` | merged image, equals `rom/nfs4-f.exe` |
 | `build/full_link/disc/NFS4.EXE`, `FRONT.BIN` | **the two disc files** |
 | `build/cd/<name>.bin`, `.cue` | rebuilt disc image |
-| `build/psyq/`, `build/psyq/disc/` | Route B outputs |

@@ -6,12 +6,14 @@ Pipeline (matches the original PsyQ 4.3 toolchain byte-for-byte):
     src/*.c  --cpp-->  *.i  --CC1PSX(gcc2.8.0)-->  *.s
              --maspsx(aspsx 2.77)--> GNU as --> ELF .o
     asm/*.s  --GNU as--> ELF .o
-    all .o   --GNU ld (linkers/nfs4.ld)--> nfs4.elf
-             --objcopy--> nfs4.exe  (flat PS-EXE; compared to rom/nfs4-f.exe)
+
+This script only produces objects.  The link is tools/full_link.py (natural link in
+linkers/link_order.txt order), the PS-X EXE / disc files come from tools/elf_to_exe.py.
 
 Usage:
-    python tools/build.py            # full build + verify against original
-    python tools/build.py --skip-asm # SKIP_ASM=1 (objdiff/decomp.me-style)
+    python tools/build.py            # every TU; not-yet-decompiled functions via INCLUDE_ASM
+    python tools/build.py --skip-asm # SKIP_ASM=1 (objdiff/decomp.me-style; what full_link.py links)
+    python tools/build.py --no-link  # accepted for compatibility (there is no link step any more)
     python tools/build.py clean
 
     # partial build (no asm/ step, no link, fails loud):
@@ -30,6 +32,8 @@ from pathlib import Path
 import os
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain as tc   # host-dependent defaults (Windows dev box / native Linux)
 
 
 def _env(name, default):
@@ -38,12 +42,11 @@ def _env(name, default):
 
 # Tool locations — overridable via env so CI (or another machine) can point at
 # its own copies; defaults are this dev box.
-MIPS = _env("NFS4_MIPS_BIN", r"C:/Tools/mips-ps1/mips/bin")
-CC1 = _env("NFS4_CC1", r"C:/Temp/psq43/COMPILER/CC1PSX.EXE")
-CPP = _env("NFS4_CPP", MIPS / "mipsel-none-elf-cpp.exe")
-AS = _env("NFS4_AS", MIPS / "mipsel-none-elf-as.exe")
-LD = _env("NFS4_LD", MIPS / "mipsel-none-elf-ld.exe")
-OBJCOPY = _env("NFS4_OBJCOPY", MIPS / "mipsel-none-elf-objcopy.exe")
+CC1 = _env("NFS4_CC1", tc.DEFAULT_CC1)
+CPP = _env("NFS4_CPP", tc.mips_cpp())
+AS = _env("NFS4_AS", tc.mips("as"))
+LD = _env("NFS4_LD", tc.mips("ld"))
+OBJCOPY = _env("NFS4_OBJCOPY", tc.mips("objcopy"))
 # maspsx is VENDORED in-repo (tools/maspsx, MIT) -- the exact patched assembler
 # stack the gate + CI use (li.d reg LUT + generalized .section parsing). Default
 # to the tracked copy so a bare `build.py` (e.g. from update_match_progress.py)
@@ -59,12 +62,12 @@ def _resolve_maspsx():
 
 
 MASPSX = _resolve_maspsx()
-CC1PL = _env("NFS4_CC1PL", r"C:/Temp/psq43/COMPILER/CC1PLPSX.EXE")
+CC1PL = _env("NFS4_CC1PL", tc.DEFAULT_CC1PL)
 # 04M (2026-08-04): PsyQ 4.0's CC1PSX = GNU C 2.7.2.SN32.3.7 -- the compiler
 # Sony's PsyQ-4.3-era LIBRARY objects were actually built with (proven byte-
 # level on libmath _err_math; triple-confirmed by sotn/sozud/psyz which all
 # build Sony libs with gcc 2.6/2.7.2 at -G0).  Selected per-TU via the
-# "cc1_272" PER_TU_FLAGS key; see _compile_c_272 for the lane.
+# "cc1_272" PER_TU_FLAGS key; see _plan_c_272 for the lane.
 # Resolution order (first that EXISTS wins):
 #   1. env NFS4_CC1_272
 #   2. CC1PSX272.EXE next to the resolved CC1 (so CI needs only one extra
@@ -77,7 +80,7 @@ def _resolve_cc1_272():
     if os.environ.get("NFS4_CC1_272"):
         cands.append(Path(os.environ["NFS4_CC1_272"]))
     cands.append(Path(CC1).parent / "CC1PSX272.EXE")
-    cands.append(Path(r"C:/Temp/nfs3-clean/psyq400/COMPILER/CC1PSX.EXE"))
+    cands.append(Path(tc.DEFAULT_CC1_272))
     for c in cands:
         if c.is_file():
             return c
@@ -90,13 +93,13 @@ _warned_272 = False
 # W52: the FULL gcc ladder (fork C:/Temp/windows-gcc-psx; rungs 2.6.0, 2.6.3,
 # 2.7.2-970404, 2.7.2, 2.8.0, 2.8.1, 2.91.66, 2.95.2) as a generic lane.
 # PER_TU key `cc1_alt: "<ver>"` routes the TU through the SAME recipe as
-# _compile_c_272 (macro-emitting cc1 + direct GNU as reorder mode, no maspsx)
+# _plan_c_272 (macro-emitting cc1 + direct GNU as reorder mode, no maspsx)
 # but with the named rung's cc1.exe.  Env NFS4_FORCE_CC1_ALT=<ver> overrides
 # the lane for EVERY C TU compiled in the process -- PROBE-ONLY (single-TU
 # verify_asm A/B runs); NEVER set it for a tree build.  Probe winners get
 # wired as PER_TU `cc1_alt` entries by the orchestrator.  The sibling probe
 # NFS4_FORCE_CC1_VER=<ver> swaps only cc1 and retains the normal maspsx route.
-GCC_LADDER = Path(_env("NFS4_GCC_LADDER", r"C:/Temp/windows-gcc-psx"))
+GCC_LADDER = Path(_env("NFS4_GCC_LADDER", tc.DEFAULT_GCC_LADDER))
 
 
 # Special compiler identities: the FntFlush-only gcc 2.8.1 build with reload_cse
@@ -113,7 +116,7 @@ CC1_SPECIAL_RUNGS = {
     # certificate on FONT.c's own lane.  The hash pins above are kept as the
     # historical record of the binary the certificate was derived with.
     "2.8.1-sn": [
-        Path(_env("NFS4_CC1_281_SN", r"C:/Temp/psq44/pssn/bin/CC1PSX.EXE")),
+        Path(_env("NFS4_CC1_281_SN", tc.DEFAULT_CC1_281_SN)),
         Path(r"C:/Temp/psq45/BIN/CC1PSX.EXE"),
     ],
 }
@@ -133,6 +136,8 @@ def _pe_semantic_sha256(candidate: Path) -> str:
 
 
 def _cc1_alt_hash_ok(ver: str, candidate: Path) -> bool:
+    if tc.is_native_substitute(candidate):
+        return True      # native Linux FSF stand-in: no SN binary hash to pin
     if ver == "2.8.1-sn":
         return hashlib.sha256(candidate.read_bytes()).hexdigest() == CC1_281_SN_SHA256
     if ver != "2.8.1-norcse":
@@ -149,8 +154,13 @@ def _resolve_cc1_alt(ver: str):
     # Resolution order: env/dev-box ladder, then the CI toolchain zip's
     # toolchain/gcc-ladder/ tree beside psyq/ (same pattern as CC1PSX272.EXE).
     for base in (GCC_LADDER, Path(CC1).parent.parent / "gcc-ladder"):
-        c = base / f"gcc-{ver}-psx" / "cc1.exe"
+        c = base / f"gcc-{ver}-psx" / f"cc1{tc.EXE}"
         if c.is_file() and _cc1_alt_hash_ok(ver, c):
+            return c
+    if not tc.IS_WINDOWS:
+        # native Linux tree: old-gcc names some rungs differently (970404 = gcc-2.7.2-cdk)
+        c = tc.linux_rung_cc1(ver)
+        if c.is_file():
             return c
     return None
 
@@ -170,14 +180,12 @@ def _warn_alt_fallback(rel, ver, fallback):
 PY = sys.executable
 RECON = ROOT / "recon"   # vendored reconstruction modules (C++), self-contained types
 # Side trees under recon/ that are NOT part of the main reconstruction (the mod lane builds them on its own route;
-# their TUs redefine main symbols) and per-tree test harnesses.  The main build, gen_ld and the SYM lane skip them.
+# their TUs redefine main symbols) and per-tree test harnesses.  The main build (full_link.py) and the SYM lane skip them.
 RECON_SIDE_TREES = {"mod", "game-mod", "syslib-mod"}
 def is_main_recon(p):
     parts = p.relative_to(RECON).parts
     return parts[0] not in RECON_SIDE_TREES and "tests" not in parts[:-1]
 
-TARGET = ROOT / "rom" / "nfs4-f.exe"
-LDSCRIPT = ROOT / "linkers" / "nfs4.ld"
 BUILD = ROOT / "build"
 OUT = BUILD  # object output root; overridden by --out
 
@@ -218,7 +226,7 @@ JTBL_AT_FUSION = os.environ.get("NFS4_JTBL_AT_FUSION") == "1"
 #                           2.7.2.SN32) + DIRECT GNU as in reorder mode (no
 #                           maspsx) -- the proven toolchain of Sony's library
 #                           objects.  g_value defaults to "0" in this lane.
-#                           See _compile_c_272.
+#                           See _plan_c_272.
 #   "aspsx_277"          -> inside the cc1_272 lane, assemble the compiler's
 #                           raw output with ASPSX 2.77 semantics (via maspsx)
 #                           instead of GNU as reorder mode.  This is an
@@ -433,7 +441,7 @@ PER_TU_FLAGS = {
     "recon/syslib/psx/libc/MEMMOVE.c":      {"cc1_alt": "2.7.2-970404"},
     # w59-a13 (orchestrator-wired, COUPLED with the BSEARCH.c body landed in the same
     # commit): 26 -> 4 @48/48.  Source alone regresses the 2.8 lane to 40; wiring
-    # alone gives 24.  (_compile_c_272 supports no_schedule_insns since w51.)
+    # alone gives 24.  (_plan_c_272 supports no_schedule_insns since w51.)
     "recon/syslib/psx/libc/BSEARCH.c":      {"cc1_272": True, "no_schedule_insns": True},
     # 2026-08-04G -G8 PROBE QUEUE (w47-a7 census S7, 20 objects gated inline):
     # these 7 TUs meet the a8 wiring bar -- net diff improvement + ZERO PASS
@@ -1192,7 +1200,7 @@ _SPLICE_COUNTER = [0]
 
 
 # w53-a6 P2: per-FUNCTION flag splice for the 272/alt recipe (the mechanism
-# _apply_fn_splice provides for the maspsx lane, which _compile_c_272 never
+# _apply_fn_splice provides for the maspsx lane, which _plan_c_272 never
 # calls).  {rel: {extra_cc1_flag: {fns}}}.  Splice runs BEFORE the alt28
 # unfill (the spliced region still carries the 2.8 j-$31 block).
 # W73 (orchestrator, user-ordered vendor-provenance experiment): PER-FN RAW-4.0
@@ -1216,12 +1224,11 @@ _SPLICE_COUNTER = [0]
 # .exists()) and decomp.dev showed firstfile at 93.88% / _padInitDirSeq's TU
 # drifting instead of their sealed PASSes.
 def _resolve_cc1_psyq40() -> Path:
-    for c in (Path(_env("NFS4_CC1_PSYQ40",
-                        r"C:/Temp/nfs3-clean/psyq400/COMPILER/CC1PSX.EXE")),
+    for c in (Path(_env("NFS4_CC1_PSYQ40", tc.DEFAULT_CC1_272)),
               Path(CC1).parent / "CC1PSX272.EXE"):
         if c.is_file():
             return c
-    return Path(r"C:/Temp/nfs3-clean/psyq400/COMPILER/CC1PSX.EXE")
+    return Path(tc.DEFAULT_CC1_272)
 CC1_PSYQ40 = _resolve_cc1_psyq40()
 PER_FN_RAW40_SPLICE = {
     "recon/syslib/psx/libpad/PADSEQD.c": {"_padInitDirSeq"},
@@ -1529,8 +1536,7 @@ CC1PLUS_RUNGS = {
     # the default-lane residual, not the source's truth.  Retail PsyQ 4.4
     # CC1PLPSX.EXE sha256:
     # 70319c94de27924f5720af361afd2aa7e6de051a7718e0c1a7f07b57fa92109c
-    "2.8.1-sn": [Path(_env("NFS4_CC1PL_281",
-                           r"C:/Temp/psq44/pssn/bin/CC1PLPSX.EXE")),
+    "2.8.1-sn": [Path(_env("NFS4_CC1PL_281", tc.DEFAULT_CC1PL_281_SN)),
                  Path(r"C:/Temp/psq45/BIN/CC1PLPSX.EXE"),
                  Path(CC1).parent / "CC1PLPSX44.EXE"],
 }
@@ -1665,7 +1671,7 @@ def _apply_cc1_ver_splice(rel_posix: str, s_file: Path, i_file: Path,
         if ver == "2.8.1-norcse":
             run_env = os.environ.copy()
             run_env["GCC_NO_RELOAD_CSE"] = "1"
-            run_env["TMPDIR"] = run_env["TEMP"] = run_env["TMP"] = r"C:\Temp"
+            run_env["TMPDIR"] = run_env["TEMP"] = run_env["TMP"] = tc.default_tmp()
             # Exact proven vendor-style invocation.  -g1 crashes before this
             # compiler writes FntFlush; -mgas is part of the object identity.
             alt_flags = ["-quiet", "-O2", "-G4", "-mgas",
@@ -1728,7 +1734,7 @@ def _apply_cc1_ver_splice(rel_posix: str, s_file: Path, i_file: Path,
 
 ASPSX_VERSION = "2.77"
 G_VALUE = "4"               # original built with -G4
-AS_ARCH = ["-EL", "-march=r3000", "-mtune=r3000"]
+AS_ARCH = ["-EL", "-march=r3000", "-mtune=r3000"] + tc.AS_EXTRA
 CC1_FLAGS = ["-quiet", "-O2", f"-G{G_VALUE}", "-g1", "-mgpOPT", "-fgnu-linker"]
 CPP_FLAGS = ["-nostdinc", "-undef", "-D__GNUC__=2", "-D__OPTIMIZE__",
              "-Dmips", "-D__mips__", "-D__psx__", "-DPSX",
@@ -1743,8 +1749,35 @@ def run(cmd, **kw):
 _MOVE_RE = re.compile(r"^(\tmove\t)(\$[a-z0-9]+),(\$[a-z0-9]+)[ \t]*$", re.M)
 
 
-def _compile_c_272(rel: Path, tu_flags: dict, i_file: Path, s_file: Path,
-                   obj: Path, cc1_path: Path = None) -> Path:
+# ----------------------------------------------------------------------------------------------------------------------
+# One translation unit = a PLAN plus three steps.
+#
+#   plan_c / plan_cpp   resolve everything the TU needs -- lane, compiler binary, per-TU flags, the exact cpp / cc1 /
+#                       maspsx-or-as command lines -- without running anything;
+#   run_cpp             source  -> .i   (the plan's cpp command)
+#   run_s               .i      -> .s   (cc1 / cc1plus, then the lane's text passes and per-function splices)
+#   run_o / run_raw40   .s      -> .o   (maspsx + GNU as, or GNU as alone; then fix_symsizes)
+#
+# compile_c / compile_cpp (this script, objdiff, verify_asm, ...) run the steps in one process.  configure.py writes the
+# same plans into build.ninja, one Ninja edge per step (tools/tu_step.py calls run_s / run_o), so both builds execute
+# the same code with the same command lines.
+#
+# Plan keys: kind ("c" | "cpp"), lane ("c" = 2.8 maspsx lane, "c272" = 04M 2.7.2/ladder lane, "cpp"), rel (POSIX path
+# relative to ROOT), src / obj / i / s (absolute Paths), cpp / cc1 / asm (argv lists), asm_stdin (the asm command reads
+# the .s text on stdin: maspsx), native (cc1 is an FSF stand-in -> native post-processing), ver_splice (apply the
+# PER_FN_CC1_VER_SPLICE table), raw40 (None, or the W73 raw-4.0 splice recipe that replaces the asm step).
+# ----------------------------------------------------------------------------------------------------------------------
+
+def _plan_base(kind: str, src: Path, out) -> dict:
+    out = OUT if out is None else Path(out)
+    rel = src.relative_to(ROOT)
+    obj = out / (str(rel) + ".o")
+    return dict(kind=kind, rel=rel.as_posix(), src=src, obj=obj,
+                i=obj.with_suffix(".i"), s=obj.with_suffix(".s"),
+                native=False, ver_splice=True, asm_stdin=False, raw40=None)
+
+
+def _plan_c_272(plan: dict, tu_flags: dict, cc1_path: Path = None) -> dict:
     """The 04M gcc-2.7.2 lane for Sony library TUs: PsyQ 4.0's CC1PSX +
     DIRECT GNU as in its default reorder mode (no maspsx).
 
@@ -1759,7 +1792,8 @@ def _compile_c_272(rel: Path, tu_flags: dict, i_file: Path, s_file: Path,
     headers and assemble verbatim either way.
 
     The one spelling fix: modern gas expands `move` to `or`; 2.7.2-era
-    toolchains (and retail) used `addu` -- rewritten textually before as.
+    toolchains (and retail) used `addu` -- rewritten textually before as
+    (run_s, lane "c272").
     """
     tu_g_value = str(tu_flags.get("g_value", "0"))
     cc1_flags = ["-quiet", "-O2", f"-G{tu_g_value}", "-mgas"]
@@ -1796,16 +1830,8 @@ def _compile_c_272(rel: Path, tu_flags: dict, i_file: Path, s_file: Path,
                 or ("2.7.2" if cc1_path is None else ""))
     cc1_flags = _cc1_flags_for_rung(str(lane_ver), cc1_flags)
     cc1 = cc1_path if cc1_path is not None else CC1_272
-    r = run([cc1, *cc1_flags, i_file, "-o", s_file])
-    if r.returncode:
-        sys.exit(f"[cc1-272/alt {cc1}] {rel}\n{r.stdout}{r.stderr}")
-    txt = s_file.read_text(errors="replace")
-    txt = _MOVE_RE.sub(lambda m: "\taddu\t%s,%s,$0" % (m.group(2), m.group(3)), txt)
-    txt = _apply_cc1_ver_splice_272(rel.as_posix(), txt, i_file, cc1_flags,
-                                    s_file)
-    txt = _apply_flag_splice_272(rel.as_posix(), txt, i_file, cc1, cc1_flags,
-                                 s_file)
-    s_file.write_text(txt)
+    obj, s_file = plan["obj"], plan["s"]
+    plan.update(lane="c272", cc1=[cc1, *cc1_flags, plan["i"], "-o", s_file])
     if tu_flags.get("aspsx_277"):
         # W81-root: READ/WRITE are source- and cc1-exact on the 2.7.2 lane,
         # but GNU as moves the stack restore into jr's delay slot.  Real
@@ -1813,39 +1839,28 @@ def _compile_c_272(rel: Path, tu_flags: dict, i_file: Path, s_file: Path,
         # retail 192-byte bodies (only unresolved JAL relocation bytes differ
         # before link).  maspsx 2.77 reproduces those real-ASPSX bytes while
         # still producing the ELF object consumed by this build.
-        maspsx_cmd = [PY, MASPSX, f"--aspsx-version={ASPSX_VERSION}",
-                      "--expand-div", "--run-assembler",
-                      f"--gnu-as-path={AS}", *AS_ARCH, f"-G{tu_g_value}",
-                      "-I", ROOT / "include", "-I", ROOT, "-o", obj]
-        r = subprocess.run([str(c) for c in maspsx_cmd], input=txt,
-                           capture_output=True, text=True, cwd=ROOT)
-        if r.returncode or not obj.exists():
-            sys.exit(f"[maspsx/as-272] {rel}\n{r.stdout}{r.stderr}")
+        plan["asm"] = [PY, MASPSX, f"--aspsx-version={ASPSX_VERSION}",
+                       "--expand-div", "--run-assembler",
+                       f"--gnu-as-path={AS}", *AS_ARCH, f"-G{tu_g_value}",
+                       "-I", ROOT / "include", "-I", ROOT, "-o", obj]
+        plan["asm_stdin"] = True
     else:
-        r = run([AS, *AS_ARCH, f"-G{tu_g_value}", "-I", ROOT / "include",
-                 "-I", ROOT, "-o", obj, s_file])
-        if r.returncode or not obj.exists():
-            sys.exit(f"[as-272] {rel}\n{r.stdout}{r.stderr}")
-    import fix_symsizes; fix_symsizes.fix(str(obj))
-    return obj
+        plan["asm"] = [AS, *AS_ARCH, f"-G{tu_g_value}", "-I", ROOT / "include",
+                       "-I", ROOT, "-o", obj, s_file]
+    return plan
 
 
-def compile_c(src: Path, skip_asm: bool) -> Path:
-    """cpp -> cc1 -> maspsx -> as => build/src/<rel>.c.o"""
+def plan_c(src: Path, skip_asm: bool, out=None) -> dict:
+    """Plan of a C TU (src/**.c, recon/**.c): cpp -> cc1 -> maspsx -> as => <out>/<rel>.c.o"""
+    plan = _plan_base("c", src, out)
     rel = src.relative_to(ROOT)
     tu_flags = per_tu_flags(src)
-    obj = OUT / (str(rel) + ".o")
-    obj.parent.mkdir(parents=True, exist_ok=True)
-    i_file = obj.with_suffix(".i")
-    s_file = obj.with_suffix(".s")
+    obj, i_file, s_file = plan["obj"], plan["i"], plan["s"]
 
     cpp = [CPP, *CPP_FLAGS]
     if skip_asm:
         cpp.append("-DSKIP_ASM")
-    cpp += [src, "-o", i_file]
-    r = run(cpp)
-    if r.returncode:
-        sys.exit(f"[cpp] {rel}\n{r.stderr}")
+    plan["cpp"] = cpp + [src, "-o", i_file]
 
     # W52 ladder lane: env force (probe-only) wins over everything, then the
     # per-TU cc1_alt wiring.  Both reuse the 272 recipe with a swapped cc1.
@@ -1855,8 +1870,7 @@ def compile_c(src: Path, skip_asm: bool) -> Path:
     if alt_ver:
         cc1_alt = _resolve_cc1_alt(str(alt_ver))
         if cc1_alt is not None:
-            return _compile_c_272(rel, tu_flags, i_file, s_file, obj,
-                                  cc1_path=cc1_alt)
+            return _plan_c_272(plan, tu_flags, cc1_path=cc1_alt)
         if os.environ.get("NFS4_FORCE_CC1_ALT"):
             # probe use: fail loud -- a silent fallback would fake the A/B
             sys.exit(f"[cc1-alt] {rel}: ladder rung {alt_ver!r} not found "
@@ -1866,12 +1880,12 @@ def compile_c(src: Path, skip_asm: bool) -> Path:
         # "2.7.2" rung, approximate otherwise); else the normal 2.8 lane below.
         if CC1_272 is not None:
             _warn_alt_fallback(rel, str(alt_ver), "the cc1_272 lane")
-            return _compile_c_272(rel, tu_flags, i_file, s_file, obj)
+            return _plan_c_272(plan, tu_flags)
         _warn_alt_fallback(rel, str(alt_ver), "the default 2.8 pipeline")
 
     if tu_flags.get("cc1_272") and not forced_normal_ver:
         if CC1_272 is not None:
-            return _compile_c_272(rel, tu_flags, i_file, s_file, obj)
+            return _plan_c_272(plan, tu_flags)
         global _warned_272
         if not _warned_272:
             _warned_272 = True
@@ -1922,13 +1936,9 @@ def compile_c(src: Path, skip_asm: bool) -> Path:
             cc1_bin = CC1
         else:
             cc1_flags = _cc1_flags_for_rung(str(cc1_ver), cc1_flags)
-    r = run([cc1_bin, *cc1_flags, i_file, "-o", s_file])
-    if r.returncode:
-        sys.exit(f"[cc1] {rel}\n{r.stdout}{r.stderr}")
-
-    if not forced_normal_ver:
-        _apply_cc1_ver_splice(rel.as_posix(), s_file, i_file, cc1_flags)
-    _apply_fn_splice(rel.as_posix(), s_file, i_file, cc1_bin, cc1_flags)
+    plan.update(lane="c", cc1=[cc1_bin, *cc1_flags, i_file, "-o", s_file],
+                native=tc.is_native_substitute(cc1_bin),
+                ver_splice=not forced_normal_ver)
 
     raw40 = PER_FN_RAW40_SPLICE.get(rel.as_posix())
     if raw40 and CC1_PSYQ40.exists():
@@ -1943,114 +1953,57 @@ def compile_c(src: Path, skip_asm: bool) -> Path:
             cap_cmd.append("--jtbl-at-fusion")
         if tu_flags.get("nop_before_label"):
             cap_cmd.append("--nop-before-label")
-        r = subprocess.run([str(c) for c in cap_cmd],
-                           input=s_file.read_text(), capture_output=True,
-                           text=True, cwd=ROOT)
-        if r.returncode:
-            sys.exit(f"[maspsx-capture] {rel}\n{r.stderr}")
-        post = r.stdout
         alt_s = obj.with_suffix(".raw40.s")
-        # the 1996-era cc1 builds its scratch path from TMPDIR and writes
-        # cta<pid> files there; a POSIX-style or empty TMPDIR makes it try
-        # "\/cta..." at the drive root (the stray cta* litter class).
-        _env40 = dict(os.environ)
-        _tmp40 = os.environ.get("TEMP") or r"C:\Temp"
-        _env40.update(TMPDIR=_tmp40, TMP=_tmp40, TEMP=_tmp40)
+        merged = obj.with_suffix(".raw40merged.s")
         # W74-A15: drop -g1 for the alt compile -- the 1996 cc1 answers it
         # with COFF debug GNU as rejects (.def/.val/.scl/.type/.endef, .loc,
         # LM<n>: labels; the LM labels also split the .ent region). Debug-only,
         # codegen-identical (PADSEQD was immune only because its fn carried
         # no params/labels).
-        _flags40 = [str(f) for f in cc1_flags if str(f) != "-g1"]
-        r2 = subprocess.run([str(CC1_PSYQ40), *_flags40,
-                             str(i_file), "-o", str(alt_s)],
-                            capture_output=True, text=True, env=_env40)
-        if r2.returncode:
-            sys.exit(f"[cc1-psyq40] {rel}\n{r2.stdout}{r2.stderr}")
-        alt_text = alt_s.read_text(errors="replace")
-        for name in sorted(raw40):
-            fr = _extract_fn_region(alt_text, name)
-            # maspsx's --print-output strips the leading tab from .ent/.end;
-            # extract the post-maspsx region with a whitespace-tolerant pair.
-            pm = re.search(r"^[ \t]*\.ent[ \t]+%s\b[^\n]*\n" % re.escape(name),
-                           post, re.M)
-            if not pm:
-                sys.exit(f"[raw40] post-maspsx .ent {name} not found in {rel}")
-            pm2 = re.search(r"^[ \t]*\.end[ \t]+%s[ \t]*$" % re.escape(name),
-                            post[pm.end():], re.M)
-            pend = pm.end() + (pm2.end() if pm2 else 0)
-            tr = post[pm.start():pend]
-            _SPLICE_COUNTER[0] += 1
-            fr = _uniquify_local_labels(fr, f"raw40{_SPLICE_COUNTER[0]}")
-            # W75-A19: the spliced region goes STRAIGHT to GNU as -- it never
-            # passes through maspsx (whose expand_move rewrites `move`) nor
-            # through the 272 lane's own move fix above.  Modern gas spells
-            # the `move` PSEUDO as `or rD,rS,$0` (0x25) while retail and every
-            # maspsx-lane object carry `addu` (0x21), so every `move` in a
-            # spliced region assembled to the WRONG WORD.  The gate cannot see
-            # it (verify_asm normalizes `move` <-> `addu rD,rS,zero`, and
-            # objdump prints the `or` form as `move` too) but objdiff compares
-            # BYTES: firstfile read 94.17% on the board while gating PASS
-            # 103/103, on 10 such words.  Semantics identical, encoding wrong.
-            # (This is catalog 04M's named "pipeline needs a move->addu pass"
-            # gap; the 272 lane already does it, compile_c's raw40 branch did
-            # not.)
-            fr = _MOVE_RE.sub(
-                lambda m: "\taddu\t%s,%s,$0" % (m.group(2), m.group(3)), fr)
-            post = post.replace(tr, fr, 1)
-        merged = obj.with_suffix(".raw40merged.s")
-        merged.write_text(post)
+        flags40 = [str(f) for f in cc1_flags if str(f) != "-g1"]
         # maspsx --run-assembler force-feeds GNU as -G0 (its default; the
         # --dont-force-G0 flag exists to disable) -- mirror that here, else
         # the spliced sw macros go gp-relative and diverge.
-        r3 = run([AS, *AS_ARCH, "-G0", "-I", ROOT / "include",
-                  "-I", ROOT, "-o", obj, merged])
-        if r3.returncode or not obj.exists():
-            sys.exit(f"[as-raw40] {rel}\n{r3.stdout}{r3.stderr}")
-    else:
-        # maspsx reads cc1 .s on stdin; remaining args pass through to GNU as.
-        maspsx_cmd = [PY, MASPSX, f"--aspsx-version={ASPSX_VERSION}", "--expand-div",
-                      "--run-assembler", f"--gnu-as-path={AS}",
-                      *AS_ARCH, f"-G{tu_g_value}", "-I", ROOT / "include",
-                      "-I", ROOT, "-o", obj]
-        if JTBL_AT_FUSION or tu_flags.get("jtbl_at_fusion"):
-            maspsx_cmd.append("--jtbl-at-fusion")
-        if tu_flags.get("nop_before_label"):
-            maspsx_cmd.append("--nop-before-label")
-        if tu_flags.get("preserve_small_common_binding"):
-            maspsx_cmd.append("--preserve-small-common-binding")
-        r = subprocess.run([str(c) for c in maspsx_cmd],
-                           input=s_file.read_text(), capture_output=True, text=True,
-                           cwd=ROOT)
-        if r.returncode or not obj.exists():
-            sys.exit(f"[maspsx/as] {rel}\n{r.stdout}{r.stderr}")
-    # hand-asm blocks lack .size/.type => objdiff sees 0-length fns (0% on
-    # decomp.dev despite PASS). Symtab-metadata-only, code bytes untouched.
-    import fix_symsizes; fix_symsizes.fix(str(obj))
-    return obj
+        plan["raw40"] = dict(
+            names=sorted(raw40), cap=cap_cmd, alt_s=alt_s, merged=merged,
+            cc1=[CC1_PSYQ40, *flags40, i_file, "-o", alt_s],
+            asm=[AS, *AS_ARCH, "-G0", "-I", ROOT / "include", "-I", ROOT, "-o", obj, merged])
+        plan["asm"] = None
+        return plan
+
+    # maspsx reads cc1 .s on stdin; remaining args pass through to GNU as.
+    maspsx_cmd = [PY, MASPSX, f"--aspsx-version={ASPSX_VERSION}", "--expand-div",
+                  "--run-assembler", f"--gnu-as-path={AS}",
+                  *AS_ARCH, f"-G{tu_g_value}", "-I", ROOT / "include",
+                  "-I", ROOT, "-o", obj]
+    if JTBL_AT_FUSION or tu_flags.get("jtbl_at_fusion"):
+        maspsx_cmd.append("--jtbl-at-fusion")
+    if tu_flags.get("nop_before_label"):
+        maspsx_cmd.append("--nop-before-label")
+    if tu_flags.get("preserve_small_common_binding"):
+        maspsx_cmd.append("--preserve-small-common-binding")
+    plan.update(asm=maspsx_cmd, asm_stdin=True)
+    return plan
 
 
-def compile_cpp(src: Path) -> Path:
-    """Vendored reconstruction C++ TU -> ELF via CC1PLPSX. No -D__GNUC__ so
+def plan_cpp(src: Path, out=None) -> dict:
+    """Plan of a vendored reconstruction C++ TU -> ELF via CC1PLPSX. No -D__GNUC__ so
     nfs4_types.h uses its self-contained (PsyQ-free) type defs."""
-    rel = src.relative_to(ROOT)
+    plan = _plan_base("cpp", src, out)
     tu_flags = per_tu_flags(src)
     cc1pl = cpp_compiler(src)
     tu_g_value = str(tu_flags.get("g_value", G_VALUE))
-    obj = OUT / (str(rel) + ".o")
-    obj.parent.mkdir(parents=True, exist_ok=True)
-    i_file = obj.with_suffix(".i")
-    s_file = obj.with_suffix(".s")
+    obj, i_file, s_file = plan["obj"], plan["i"], plan["s"]
     # Preprocess in C mode (-x c) so the cpp driver uses cc1, not cc1plus
     # (the slim CI toolchain ships cc1 only). -D__cplusplus keeps the C++
     # branches of nfs4_types.h (e.g. no `bool` typedef) — verified byte-identical
     # to true cc1plus preprocessing. CC1PLPSX still compiles the result as C++.
-    r = run([CPP, "-x", "c", "-D__cplusplus=1", "-nostdinc", "-undef",
-             "-Dmips", "-D__mips__", "-D__psx__",
-             f"-I{RECON}", src, "-o", i_file])
-    if r.returncode:
-        sys.exit(f"[cpp++] {rel}\n{r.stderr}")
+    plan["cpp"] = [CPP, "-x", "c", "-D__cplusplus=1", "-nostdinc", "-undef",
+                   "-Dmips", "-D__mips__", "-D__psx__",
+                   f"-I{RECON}", src, "-o", i_file]
     cc1pl_flags = ["-quiet", "-O2", f"-G{tu_g_value}"]
+    if tc.is_native_substitute(cc1pl):
+        cc1pl_flags += tc.NATIVE_CC1PLUS_FLAGS
     if tu_flags.get("no_delayed_branch"):
         cc1pl_flags.append("-fno-delayed-branch")
     if tu_flags.get("no_thread_jumps"):
@@ -2071,19 +2024,13 @@ def compile_cpp(src: Path) -> Path:
         cc1pl_flags.append("-fno-builtin")
     # FEVIRT-NII-LANE (A/B 2026-09-20): hypothesis = the whole FRONT END was built with -fno-implement-inlines.
     _fe_lane_nii = src.as_posix().find("/recon/frontend/") >= 0 and not tu_flags.get("implement_inlines")
-    if tu_flags.get("no_implement_inlines") or (_fe_lane_nii and __import__("os").environ.get("NFS4_FE_NII") == "1"):
+    if tu_flags.get("no_implement_inlines") or (_fe_lane_nii and os.environ.get("NFS4_FE_NII") == "1"):
         # class (b) 2026-09-17 A/B option, NOT retail: it also suppresses the vtable-needed
         # inline virtual dtor copies (~AIHigh_BTC_HumanPerp, ~AIState_Idle/~Normal) that
         # retail objects DO carry (build/psyq/probe/aistate_nii.s, aihigh_nii.s).  Retail's
         # "no copy of inline non-virtual members in the key-function TU" comes from the
         # SOURCE instead: non-member inline helpers / definitions not visible to that TU.
         cc1pl_flags.append("-fno-implement-inlines")
-    r = run([cc1pl, *cc1pl_flags, i_file, "-o", s_file])
-    if r.returncode:
-        sys.exit(f"[cc1pl] {rel}\n{r.stdout}{r.stderr}")
-
-    _apply_cc1plus_ver_splice(rel.as_posix(), s_file, i_file, cc1pl_flags)
-    _apply_fn_splice(rel.as_posix(), s_file, i_file, cc1pl, cc1pl_flags)
 
     maspsx_cmd = [PY, MASPSX, f"--aspsx-version={ASPSX_VERSION}", "--expand-div",
                   "--run-assembler", f"--gnu-as-path={AS}",
@@ -2098,17 +2045,202 @@ def compile_cpp(src: Path) -> Path:
     # aligns every local common to min(16, next pow2 >= size) -- retail collide/camera/screenmain spacing.
     if not tu_flags.get("no_aspsx_lcomm_align"):
         maspsx_cmd.append("--aspsx-lcomm-align")
-    # cfront dtor mangling: our CC1PL emits `_._<class>` (NO_DOLLAR_IN_LABEL -> '.'),
-    # but EA's toolchain used the '.'->'_' convention (NO_DOT_IN_LABEL) => `___<class>`.
-    # `_._` only ever appears as the dtor prefix, so this rename is surgical.
-    s_text = s_file.read_text().replace("_._", "___")
-    r = subprocess.run([str(c) for c in maspsx_cmd],
-                       input=s_text, capture_output=True, text=True,
-                       cwd=ROOT)
+    plan.update(lane="cpp", cc1=[cc1pl, *cc1pl_flags, i_file, "-o", s_file],
+                native=tc.is_native_substitute(cc1pl), asm=maspsx_cmd, asm_stdin=True)
+    return plan
+
+
+def plan_tu(src: Path, skip_asm: bool = False, out=None) -> dict:
+    return plan_cpp(src, out) if src.suffix == ".cpp" else plan_c(src, skip_asm, out)
+
+
+def run_cpp(plan: dict, extra=()) -> None:
+    """source -> .i  (`extra`: e.g. Ninja's -MD -MF depfile options)"""
+    Path(plan["i"]).parent.mkdir(parents=True, exist_ok=True)
+    r = run([*plan["cpp"], *extra])
+    if r.returncode:
+        sys.exit(f"[{'cpp++' if plan['kind'] == 'cpp' else 'cpp'}] {plan['rel']}\n{r.stderr}")
+
+
+def run_s(lane: str, rel: str, cc1_cmd, native: bool = False, ver_splice: bool = True) -> None:
+    """.i -> .s: run `cc1_cmd` ([cc1, *flags, i_file, "-o", s_file]), then the lane's passes on the .s:
+         c     native jtbl post-processing (FSF stand-in only), PER_FN_CC1_VER_SPLICE, the per-function flag splices
+         c272  move -> addu, PER_FN_CC1_VER_SPLICE_272, PER_FN_FLAG_SPLICE_272
+         cpp   PER_FN_CC1PLUS_VER_SPLICE, the per-function flag splices"""
+    cmd = [str(c) for c in cc1_cmd]
+    cc1_bin, cc1_flags = Path(cmd[0]), cmd[1:-3]
+    i_file, s_file = Path(cmd[-3]), Path(cmd[-1])
+    s_file.parent.mkdir(parents=True, exist_ok=True)
+    r = run(cmd)
+    if r.returncode:
+        label = {"c": "cc1", "c272": f"cc1-272/alt {cc1_bin}", "cpp": "cc1pl"}[lane]
+        sys.exit(f"[{label}] {rel}\n{r.stdout}{r.stderr}")
+    if lane == "c":
+        if native:
+            _s = s_file.read_text()
+            _p = tc.native_cc1_postprocess(_s, ROOT / rel)
+            if _p != _s:
+                s_file.write_text(_p)
+        if ver_splice:
+            _apply_cc1_ver_splice(rel, s_file, i_file, cc1_flags)
+        _apply_fn_splice(rel, s_file, i_file, cc1_bin, cc1_flags)
+    elif lane == "c272":
+        txt = s_file.read_text(errors="replace")
+        txt = _MOVE_RE.sub(lambda m: "\taddu\t%s,%s,$0" % (m.group(2), m.group(3)), txt)
+        txt = _apply_cc1_ver_splice_272(rel, txt, i_file, cc1_flags, s_file)
+        txt = _apply_flag_splice_272(rel, txt, i_file, cc1_bin, cc1_flags, s_file)
+        s_file.write_text(txt)
+    elif lane == "cpp":
+        _apply_cc1plus_ver_splice(rel, s_file, i_file, cc1_flags)
+        _apply_fn_splice(rel, s_file, i_file, cc1_bin, cc1_flags)
+    else:
+        sys.exit(f"[run_s] unknown lane {lane!r}")
+
+
+def _fix_symsizes(obj) -> None:
+    # hand-asm blocks lack .size/.type => objdiff sees 0-length fns (0% on
+    # decomp.dev despite PASS). Symtab-metadata-only, code bytes untouched.
+    import fix_symsizes; fix_symsizes.fix(str(obj))
+
+
+def _maspsx_inproc(cmd, text):
+    """Run `[python, .../maspsx.py, args...]` inside this process (same code as the subprocess; saves an interpreter
+    start per TU).  Only for one-TU-per-process callers (tools/tu_step.py under Ninja): maspsx keeps no state between
+    calls, but nothing here is meant to be reused across TUs.  Returns (returncode, stdout, stderr)."""
+    import contextlib
+    import io
+    import runpy
+    script = cmd[1]
+    saved = sys.argv, sys.stdin, list(sys.path)
+    out, err = io.StringIO(), io.StringIO()
+    rc = 0
+    try:
+        sys.argv = [script, *cmd[2:]]
+        sys.stdin = io.StringIO(text)
+        sys.path.insert(0, str(Path(script).parent))
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            runpy.run_path(script, run_name="__main__")
+    except SystemExit as e:
+        rc = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+    finally:
+        sys.argv, sys.stdin, sys.path[:] = saved[0], saved[1], saved[2]
+    return subprocess.CompletedProcess(cmd, rc, out.getvalue(), err.getvalue())
+
+
+def run_o(lane: str, rel: str, asm_cmd, stdin=None, native: bool = False, inproc: bool = False) -> None:
+    """.s -> .o: run `asm_cmd` (maspsx --run-assembler ... -o obj, or GNU as ... -o obj s_file).
+    `stdin`: the .s whose text is fed to maspsx; for C++ it first gets the cfront dtor rename and the native jtbl
+    post-processing.  `inproc`: run maspsx inside this process (see _maspsx_inproc)."""
+    cmd = [str(c) for c in asm_cmd]
+    obj = Path(cmd[cmd.index("-o") + 1])
+    obj.parent.mkdir(parents=True, exist_ok=True)
+    # maspsx does not pass GNU as's exit status on, so success is "the object exists": drop the previous build's
+    # object first, or a failed assembly would leave a stale object that looks fresh (incremental builds).
+    if obj.exists():
+        obj.unlink()
+    if stdin is not None:
+        text = Path(stdin).read_text()
+        if lane == "cpp":
+            # cfront dtor mangling: our CC1PL emits `_._<class>` (NO_DOLLAR_IN_LABEL -> '.'),
+            # but EA's toolchain used the '.'->'_' convention (NO_DOT_IN_LABEL) => `___<class>`.
+            # `_._` only ever appears as the dtor prefix, so this rename is surgical.
+            text = text.replace("_._", "___")
+            if native:
+                text = tc.native_cc1plus_postprocess(text, ROOT / rel)
+        if inproc and len(cmd) > 1 and Path(cmd[1]).name == "maspsx.py":
+            r = _maspsx_inproc(cmd, text)
+        else:
+            r = subprocess.run(cmd, input=text, capture_output=True, text=True, cwd=ROOT)
+    else:
+        r = run(cmd)
     if r.returncode or not obj.exists():
-        sys.exit(f"[maspsx/as++] {rel}\n{r.stdout}{r.stderr}")
-    import fix_symsizes; fix_symsizes.fix(str(obj))  # see compile_c note
-    return obj
+        label = {"c": "maspsx/as", "c272": "maspsx/as-272" if stdin is not None else "as-272",
+                 "cpp": "maspsx/as++"}[lane]
+        sys.exit(f"[{label}] {rel}\n{r.stdout}{r.stderr}")
+    _fix_symsizes(obj)
+
+
+def run_raw40(plan: dict) -> None:
+    """.s -> .o for a PER_FN_RAW40_SPLICE TU (see plan_c): maspsx text capture, the PsyQ 4.0 cc1's raw regions
+    spliced in, GNU as."""
+    rel, obj, s_file, rw = plan["rel"], plan["obj"], plan["s"], plan["raw40"]
+    r = subprocess.run([str(c) for c in rw["cap"]],
+                       input=Path(s_file).read_text(), capture_output=True,
+                       text=True, cwd=ROOT)
+    if r.returncode:
+        sys.exit(f"[maspsx-capture] {rel}\n{r.stderr}")
+    post = r.stdout
+    # the 1996-era cc1 builds its scratch path from TMPDIR and writes
+    # cta<pid> files there; a POSIX-style or empty TMPDIR makes it try
+    # "\/cta..." at the drive root (the stray cta* litter class).
+    _env40 = dict(os.environ)
+    _tmp40 = tc.default_tmp()
+    _env40.update(TMPDIR=_tmp40, TMP=_tmp40, TEMP=_tmp40)
+    r2 = subprocess.run([str(c) for c in rw["cc1"]],
+                        capture_output=True, text=True, env=_env40)
+    if r2.returncode:
+        sys.exit(f"[cc1-psyq40] {rel}\n{r2.stdout}{r2.stderr}")
+    alt_text = Path(rw["alt_s"]).read_text(errors="replace")
+    for name in rw["names"]:
+        fr = _extract_fn_region(alt_text, name)
+        # maspsx's --print-output strips the leading tab from .ent/.end;
+        # extract the post-maspsx region with a whitespace-tolerant pair.
+        pm = re.search(r"^[ \t]*\.ent[ \t]+%s\b[^\n]*\n" % re.escape(name),
+                       post, re.M)
+        if not pm:
+            sys.exit(f"[raw40] post-maspsx .ent {name} not found in {rel}")
+        pm2 = re.search(r"^[ \t]*\.end[ \t]+%s[ \t]*$" % re.escape(name),
+                        post[pm.end():], re.M)
+        pend = pm.end() + (pm2.end() if pm2 else 0)
+        tr = post[pm.start():pend]
+        _SPLICE_COUNTER[0] += 1
+        fr = _uniquify_local_labels(fr, f"raw40{_SPLICE_COUNTER[0]}")
+        # W75-A19: the spliced region goes STRAIGHT to GNU as -- it never
+        # passes through maspsx (whose expand_move rewrites `move`) nor
+        # through the 272 lane's own move fix above.  Modern gas spells
+        # the `move` PSEUDO as `or rD,rS,$0` (0x25) while retail and every
+        # maspsx-lane object carry `addu` (0x21), so every `move` in a
+        # spliced region assembled to the WRONG WORD.  The gate cannot see
+        # it (verify_asm normalizes `move` <-> `addu rD,rS,zero`, and
+        # objdump prints the `or` form as `move` too) but objdiff compares
+        # BYTES: firstfile read 94.17% on the board while gating PASS
+        # 103/103, on 10 such words.  Semantics identical, encoding wrong.
+        # (This is catalog 04M's named "pipeline needs a move->addu pass"
+        # gap; the 272 lane already does it, compile_c's raw40 branch did
+        # not.)
+        fr = _MOVE_RE.sub(
+            lambda m: "\taddu\t%s,%s,$0" % (m.group(2), m.group(3)), fr)
+        post = post.replace(tr, fr, 1)
+    Path(rw["merged"]).write_text(post)
+    if Path(obj).exists():
+        Path(obj).unlink()
+    r3 = run(rw["asm"])
+    if r3.returncode or not Path(obj).exists():
+        sys.exit(f"[as-raw40] {rel}\n{r3.stdout}{r3.stderr}")
+    _fix_symsizes(obj)
+
+
+def compile_tu(src: Path, skip_asm: bool = False, out=None) -> Path:
+    """Plan + all steps of one TU in this process => <out>/<rel>.o"""
+    plan = plan_tu(src, skip_asm, out)
+    run_cpp(plan)
+    run_s(plan["lane"], plan["rel"], plan["cc1"], plan["native"], plan["ver_splice"])
+    if plan["raw40"]:
+        run_raw40(plan)
+    else:
+        run_o(plan["lane"], plan["rel"], plan["asm"],
+              plan["s"] if plan["asm_stdin"] else None, plan["native"])
+    return plan["obj"]
+
+
+def compile_c(src: Path, skip_asm: bool) -> Path:
+    """cpp -> cc1 -> maspsx -> as => build/src/<rel>.c.o"""
+    return compile_tu(src, skip_asm)
+
+
+def compile_cpp(src: Path) -> Path:
+    """Vendored reconstruction C++ TU -> ELF via CC1PLPSX (see plan_cpp)."""
+    return compile_tu(src)
 
 
 def assemble_s(src: Path) -> Path:
@@ -2121,59 +2253,6 @@ def assemble_s(src: Path) -> Path:
     if r.returncode:
         sys.exit(f"[as] {rel}\n{r.stderr}")
     return obj
-
-
-def link_and_verify():
-    elf = BUILD / "nfs4.elf"
-    out_exe = BUILD / "nfs4.exe"
-    # The linker script's `*/src/...` selectors place input sections, but GNU
-    # ld does not use wildcard selectors to discover files.  Pass the current
-    # source-lane objects explicitly through a response file; otherwise only
-    # the exactly named raw data objects are loaded and every code reference
-    # (vtable slots, jump-table .L labels, calls) is reported as undefined.
-    # Derive this list from live source paths rather than build/**/*.o so stale
-    # probe/renamed objects can never leak into the retail link.
-    src_objects = []
-    for src in sorted((ROOT / "src").rglob("*.c")):
-        obj = OUT / (str(src.relative_to(ROOT)) + ".o")
-        if obj.exists():
-            src_objects.append(obj)
-    rsp = BUILD / "link_src_objects.rsp"
-    rsp.write_text("\n".join(f'"{obj.relative_to(ROOT).as_posix()}"'
-                              for obj in src_objects) + "\n")
-    cmd = [LD, f"@{rsp.relative_to(ROOT).as_posix()}"]
-    # splat's undefined_{syms,funcs}_auto.txt are `name = 0xADDR;` assignments
-    # (valid ld script) for refs to addresses outside our segments (HW regs,
-    # BIOS, overlay). Feed them so absolute relocations resolve.
-    for auto in ("undefined_syms_auto.txt", "undefined_funcs_auto.txt",
-                 "retail_data_symbols.ld"):
-        p = ROOT / "linkers" / auto
-        if p.exists():
-            cmd += ["-T", p]
-    cmd += ["-T", LDSCRIPT, "-Map", BUILD / "nfs4.map",
-            "--no-check-sections", "-o", elf]
-    r = run(cmd, cwd=ROOT)
-    if r.returncode:
-        sys.exit(f"[ld]\n{r.stderr}")
-    # flatten loadable image to a raw PS-EXE body for comparison
-    r = run([OBJCOPY, "-O", "binary", elf, out_exe])
-    if r.returncode:
-        sys.exit(f"[objcopy]\n{r.stderr}")
-
-    built = out_exe.read_bytes()
-    target = TARGET.read_bytes()
-    got = hashlib.sha1(built).hexdigest()
-    want = hashlib.sha1(target).hexdigest()
-    print(f"\nbuilt : {out_exe.name}  {len(built)} bytes  sha1={got}")
-    print(f"target: {TARGET.name}  {len(target)} bytes  sha1={want}")
-    if got == want:
-        print("MATCH (byte-identical)")
-        return
-    n = min(len(built), len(target))
-    diffs = sum(1 for i in range(n) if built[i] != target[i])
-    first = next((i for i in range(n) if built[i] != target[i]), -1)
-    print(f"MISMATCH: {diffs}/{n} bytes differ ({100*(n-diffs)/n:.2f}% match); "
-          f"first diff at 0x{first:X}; size delta {len(built)-len(target)}")
 
 
 def clean():
@@ -2318,9 +2397,8 @@ def main():
     if "clean" in args:
         clean(); return
     skip_asm = "--skip-asm" in args
-    # objdiff base build can't link (all asm fns absent); also used to build
-    # the `expected/` target objects (no link needed for objdiff either).
-    no_link = "--no-link" in args or skip_asm
+    # `--no-link` is still accepted (objdiff `expected/` builds pass it); the
+    # link itself is tools/full_link.py.
     if "--out" in args:
         OUT = ROOT / args[args.index("--out") + 1]
     OUT.mkdir(parents=True, exist_ok=True)
@@ -2345,10 +2423,8 @@ def main():
 
     print(f"== output -> {OUT.relative_to(ROOT)}  (skip_asm={skip_asm}) ==")
 
-    print("== assembling data/header ==")
+    print("== assembling header ==")
     for s in sorted((ROOT / "asm").glob("*.s")):
-        assemble_s(s)
-    for s in sorted((ROOT / "asm" / "data").glob("*.s")):
         assemble_s(s)
 
     # Tolerant build: a WIP decomp has hundreds of in-progress TUs; a single
@@ -2390,11 +2466,7 @@ def main():
         for rel, why in failures:
             print(f"   SKIP {rel}: {why}")
 
-    if no_link:
-        print("== objects only (no link) ==")
-        return
-    print("== linking ==")
-    link_and_verify()
+    print("== objects only (link: tools/full_link.py) ==")
 
 
 if __name__ == "__main__":

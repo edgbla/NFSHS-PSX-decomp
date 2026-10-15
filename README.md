@@ -72,14 +72,16 @@ include/macro.inc           glabel/jlabel/dlabel/alabel/endlabel (jlabel is glob
 include/common.h            master include for every src/*.c
 src/main.c                  the main .text TU (C stubs + INCLUDE_ASM per fn)
 asm/nonmatchings/main/*.s    per-function disassembly
-asm/data/*.s, asm/header.s   data sections + PS-EXE header
-linkers/nfs4.ld             splat-generated linker script
+asm/header.s                PS-EXE header (entry point / sizes from linker symbols)
+recon/                      the reconstructed C/C++ that the build compiles
+linkers/link_order.txt      link order of the natural link (tools/full_link.py)
 rom/nfs4-f.exe              the target (NOT committed — sha1 b48ea3452e64...)
 rom/NFS4.MAP                retail link map from the disc (NOT committed — md5
                             12326ebd37ed...)
 rom/NFS4.SYM                retail symbol file from the disc (NOT committed); tools/retail_sym.py
                             dumps it with tools/dumpsym/ into build/sym/ on first use
-tools/build.py              cpp->cc1->maspsx->as->ld->objcopy + byte-diff report
+configure.py                writes build.ninja (incremental Ninja build of everything below)
+tools/build.py              cpp->cc1->maspsx->as (objects; the link is tools/full_link.py)
 tools/gen_symbols.py        NFS4.MAP -> symbol_addrs.txt (sanitizes . and case clashes)
 tools/fix_gte.py            rewrite GTE compute ops (rtps/mvmva/...) to .word
 tools/audit_vtable_indexing.py  reject _vf indexing that scales by a whole vtable row
@@ -96,8 +98,12 @@ py -3.12 C:/Temp/splat-main/split.py configs/nfs4.yaml
 py -3.12 tools/fix_gte.py            # GTE compute ops GNU as can't assemble
 py -3.12 tools/audit_vtable_indexing.py  # static vtable OOB regression audit
 
-# 2. build + verify against rom/nfs4-f.exe
-py -3.12 tools/build.py              # full asm build + link + diff report
+# 2. build -- with Ninja (incremental, parallel; see BUILDING.md)
+python configure.py && ninja         # objects + natural link + NFS4.EXE / FRONT.BIN
+ninja all expected                   # + src/ objects + expected/ (the objdiff base and target)
+
+#    or with the sequential scripts (link + disc files: see BUILDING.md)
+py -3.12 tools/build.py              # every TU, missing functions via INCLUDE_ASM (objects only)
 py -3.12 tools/build.py --skip-asm   # C-only (objdiff / decomp.me style)
 py -3.12 tools/build.py clean
 ```
@@ -122,6 +128,7 @@ bytes) against the **base** (`build/` = `--skip-asm`, only decompiled C). Genera
 the report locally:
 
 ```sh
+ninja all expected                                  # base + target objects (or the two lines below)
 py -3.12 tools/build.py --out expected --no-link   # target objects (once)
 py -3.12 tools/build.py --skip-asm                  # base objects
 tools/objdiff/objdiff-cli.exe report generate -p . -o build/report.binpb -f proto
