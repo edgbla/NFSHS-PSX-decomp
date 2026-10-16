@@ -318,6 +318,12 @@ JTBL_AT_FUSION = os.environ.get("NFS4_JTBL_AT_FUSION") == "1"
 #   "no_thread_jumps"     -> disable jump threading for a whole C++ TU.
 #                           This is an input option, not a branch rewrite;
 #                           require full-TU instruction/branch/byte receipts.
+#   "debug_g"             -> pass -g to cc1plus (full COFF debug, as the SYM
+#                           shows for the TU: locals + blocks).  NOT debug-only
+#                           in gcc 2.8: cse_basic_block flushes its table every
+#                           1001 chain objects and counts NOTEs too, so -g's line
+#                           notes move the flush points.  maspsx already drops
+#                           the .def/.begin/.bend records GNU as rejects.
 #
 # The 7 TUs below own the retail binary's 7 ASPSX-$at-macro jtbl sites
 # (w23-a11 investigation plus later per-site corrections); the other 26 jtbl TUs are deliberately absent
@@ -325,7 +331,7 @@ JTBL_AT_FUSION = os.environ.get("NFS4_JTBL_AT_FUSION") == "1"
 PER_TU_FLAGS = {
     "recon/frontend/common/screentracks.cpp": {"no_implement_inlines": True},   # FEVIRT-NII-PROBE
     "recon/frontend/common/fedialog.cpp": {"no_implement_inlines": True},   # FEVIRT-NII-PROBE
-    "recon/frontend/common/femenudefs.cpp": {"no_implement_inlines": True},   # FEVIRT-NII-PROBE
+    "recon/frontend/common/femenudefs.cpp": {"no_implement_inlines": True, "debug_g": True},   # FEVIRT-NII-PROBE; -g: retail SYM has full debug for this TU
     "recon/frontend/common/femenuoptions.cpp": {"no_implement_inlines": True},   # FEVIRT-NII-PROBE
     # P905: ordinary primate COMMON globals must remain public when lowered
     # into their native .sbss run. This preserves compiler-declared binding,
@@ -2022,6 +2028,8 @@ def plan_cpp(src: Path, out=None) -> dict:
         cc1pl_flags.append("-fno-strength-reduce")
     if tu_flags.get("no_builtin"):
         cc1pl_flags.append("-fno-builtin")
+    if tu_flags.get("debug_g"):
+        cc1pl_flags.append("-g")
     # FEVIRT-NII-LANE (A/B 2026-09-20): hypothesis = the whole FRONT END was built with -fno-implement-inlines.
     _fe_lane_nii = src.as_posix().find("/recon/frontend/") >= 0 and not tu_flags.get("implement_inlines")
     if tu_flags.get("no_implement_inlines") or (_fe_lane_nii and os.environ.get("NFS4_FE_NII") == "1"):
@@ -2091,6 +2099,12 @@ def run_s(lane: str, rel: str, cc1_cmd, native: bool = False, ver_splice: bool =
         txt = _apply_flag_splice_272(rel, txt, i_file, cc1_bin, cc1_flags, s_file)
         s_file.write_text(txt)
     elif lane == "cpp":
+        if "-g" in cc1_flags:
+            # PER_TU_FLAGS "debug_g": maspsx drops the COFF .def/.begin/.bend records, but GNU as
+            # would turn the `.loc` line records into DWARF .debug_* sections that the natural
+            # link rejects as orphans.  Line records only -- the code is already final here.
+            _s = s_file.read_text()
+            s_file.write_text(re.sub(r"^\t\.loc\t[^\n]*\n", "", _s, flags=re.M))
         _apply_cc1plus_ver_splice(rel, s_file, i_file, cc1_flags)
         _apply_fn_splice(rel, s_file, i_file, cc1_bin, cc1_flags)
     else:
