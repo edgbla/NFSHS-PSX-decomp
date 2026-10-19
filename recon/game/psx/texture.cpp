@@ -391,7 +391,7 @@ void Texture_Vramf(shapetbl *shp,int x,int y,int clutx,int cluty)
           *(u_char *)shp = *(u_char *)shp | 8;
           r.x = (short)x;
           r.y = (short)y;
-          rowpix = shp->width * shapedepth(shp);
+          rowpix = shp->width * shapedepth((unsigned char *)shp);
           rowround = rowpix + 0xf;
           if (rowround < 0) {
             rowround = rowpix + 0x1e;
@@ -438,7 +438,7 @@ void Texture_Vramcf(shapetbl *shp,int x,int y,int clutx,int cluty)
 
   /* MATCH: mask INTO rowall (ONE statement) -- the oracle parks the MASKED value
    * in the callee-saved reg and derives BOTH rowbytes and r.w from it. */
-  rowall = (shp->width * shapedepth(shp) + 0xf) & 0xfffffff0;
+  rowall = (shp->width * shapedepth((unsigned char *)shp) + 0xf) & 0xfffffff0;
   rowbytes = (int)rowall >> 3;
   /* MATCH: the odd/simple case is the BRANCH TARGET (beqz/bnez skip forward) and
    * the two-blit path is the FALL-THROUGH, with a SECOND textual Vramf call laid

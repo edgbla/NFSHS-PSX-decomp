@@ -391,8 +391,8 @@ int AudioEng_StartUp(int player,char *carname)
         int i;
 
         for (i = 0; i < bigcount(header); i++) {
-          long size;
-          long offset;
+          unsigned int size;
+          int offset;
           char *name;
 
           name = (char *)locatebigentry(header,(char *)0x0,i,&offset,&size);

@@ -12,8 +12,11 @@ extern int             TrackSpec_gMaxSpec;       /* 0x8013db98 */
 extern char           *Paths_Paths[50];          /* 0x80116468 */
 
 extern "C" int sprintf(...);
-extern "C" void *loadfileadr(...);
-extern "C" int purgememadr(...);
+/* eaclib (EACPSXZ.LIB) -- the library's own headers for the members this TU uses. */
+extern "C" {
+#include "eaclib/psx/eacpsxz/memstd.h"
+#include "eaclib/psx/eacpsxz/nsync.h"
+}
 
 /* track-spec selection table (weather*2+night -> spec index) @0x80056AD4: MATERIALIZED as the
  * local `int spec[4] = {0,1,2,3}` in TrackSpec_Load (rodata->stack aggregate copy; image-verified).

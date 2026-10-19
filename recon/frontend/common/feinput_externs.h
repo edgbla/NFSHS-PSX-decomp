@@ -16,7 +16,10 @@ struct FEInput_PadCodegenView {
 };
 extern FEInput_PadCodegenView gPadinfo;
 extern tfrontEnd        frontEnd;
-extern int              ticks;                         /* @0x8013dcac; scalar owned by vars.c */
+/* eaclib (EACPSXZ.LIB) -- the library's own headers for the members this TU uses. */
+extern "C" {
+#include "eaclib/psx/eacpsxz/vars.h"
+}
 extern int              FeTools_gScrollTicksOut;        /* @0x800517d0; SYM INT */
 extern tPSXToFEMapping  getKeyMappings[];               /* @0x8005173c */
 

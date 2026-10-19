@@ -4,23 +4,22 @@
 #include "front_types.h"
 
 extern "C" int sprintf(char *, const char *, ...);
+/* eaclib (EACPSXZ.LIB) -- the library's own headers for the members this TU uses. */
+extern "C" {
+#include "eaclib/psx/eacpsxz/eac_mem.h"
+#include "eaclib/psx/eacpsxz/primate.h"
+#include "eaclib/psx/eacpsxz/random.h"
+#include "eaclib/psx/eacpsxz/syncfile.h"
+#include "eaclib/psx/eacpsxz/timer.h"
+#include "eaclib/psx/eacpsxz/vars.h"
+}
 extern "C" {
 int PadGetState(int);
 int PadInfoMode(int, int, int);
 int PadSetMainMode(int, int, int);
-int FILE_addbigsync(...);
-void FILE_delbigsync(...);
 void PAD_update(...);
-void blockmove(...);
-void initlinkmode(...);
-int largestunused(...);
-int purgememadr(...);
 int rand(...);
-void resizememadr(...);
-void seedrandom(int);
-void timedwait(...);
 }
-extern int          ticks;
 extern tfrontEnd    frontEnd;
 extern tFEApplication *FEApp;   /* P885: native SYM4b4f01 is one PTR STRUCT. */
 extern tGlobalMenuDefs *menuDefs;

@@ -164,8 +164,10 @@ void  Init_Memcard(bool, bool);
  void  SetLicensePlate(void);
 extern "C" CARDINFO_def *MCRD_getcard(int);
 void *Draw_GetDRAWENV(int, int);
-extern "C" int fixedmult(int, int);
-extern "C" int fixeddiv(int, int);
+/* eaclib (EACPSXZ.LIB) -- the library's own headers for the members this TU uses. */
+extern "C" {
+#include "eaclib/psx/eacpsxz/eac_math.h"
+}
 extern "C" int gettick(void);
 extern "C" int sprintf(char *, const char *, ...);
 extern "C" void SetDrawArea(DR_AREA *, RECT *);

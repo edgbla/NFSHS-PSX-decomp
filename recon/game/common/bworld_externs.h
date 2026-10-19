@@ -72,10 +72,12 @@ extern void TrsProj_TransPtN16(RelCoord16 *s,coorddef *d,int n);
 int Anim_InitSystem(char *trackName);
 void Anim_Restart(void);
 void AudList_LoadAudioFile(int AudioFileIndex);
+/* eaclib (EACPSXZ.LIB) -- the library's own headers for the members this TU uses. */
+extern "C" {
+#include "eaclib/psx/eacpsxz/eac_matrix.h"
+}
 extern "C" {
 void *SetSp(...);
-void transpose(...);
-int xformy(...);
 int rand(...);
 }
 

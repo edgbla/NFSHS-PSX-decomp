@@ -6,6 +6,14 @@
 
 /* Narrow eaclib/libc boundary used by this owner. Keeping the original C
  * linkage and return types avoids importing libfns.h's whole-game type graph. */
+/* eaclib (EACPSXZ.LIB) -- the library's own headers for the members this TU uses. */
+extern "C" {
+#include "eaclib/psx/eacpsxz/eac_math.h"
+#include "eaclib/psx/eacpsxz/memstd.h"
+#include "eaclib/psx/eacpsxz/random.h"
+#include "eaclib/psx/eacpsxz/systask.h"
+#include "eaclib/psx/eacpsxz/timer.h"
+}
 extern "C" {
 int SND3dpos(...);
 void SNDSTRM_setpriority(...);
@@ -26,17 +34,10 @@ int SNDplay(...);
 void SNDplaysetdef(...);
 int SNDstop(...);
 void SNDvol(...);
-int fixeddiv(...);
-int fixedmult(...);
-int gettick(...);
 void *memcpy(...);
-int purgememadr(...);
 int puts(...);
-int random(...);
-void *reservememadr(...);
 char *strcat(...);
 char *strcpy(...);
-int systemtask(...);
 }
 
 extern "C" CARDINFO_def *MCRD_getcard(int);
