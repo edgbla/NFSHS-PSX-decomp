@@ -43,14 +43,15 @@ static SYSTEM_TASK_SUB systemtasksubs[16];
  *   Slot pick: an exact fn match always wins its slot; otherwise the first free slot — but when called
  *   re-entrantly (count>0 at entry) the first `count` free slots are skipped (count is decremented per
  *   skipped free slot, a plain register copy — only the +1/-1 bracket touches the global). */
-void addsystemtask(int taskFn, int period, int delay)
+void addsystemtask(unsigned int (*task)(int, int), int period, int delay)
 {
-    int  fn;
+    int  taskFn;
+    unsigned int (*fn)(int, int);
     int  found;
     int  count;
     int *slot;
 
-    fn = taskFn;                               /* MATCH: param saved into fn (`addu t1,a0,zero`) -- the
+    fn = task;                                  /* MATCH: param saved into fn (`addu t1,a0,zero`) -- the
                                                 * INDEX-FORM loop below is what keeps this copy alive
                                                 * (a pointer-walk loop lets fn stay in $a0, no copy) */
     found = -1;
@@ -59,7 +60,7 @@ void addsystemtask(int taskFn, int period, int delay)
     systemtasklock = count + 1;                /* re-entrancy bracket: ++ at entry, -- at exit */
     slot  = (int *)systemtasksubs;
     for (; taskFn < 0x10; taskFn++) {
-        if (slot[taskFn * 4] == fn) {          /* MATCH: index form (strength-reduces to the oracle's
+        if (slot[taskFn * 4] == (int)fn) {          /* MATCH: index form (strength-reduces to the oracle's
                                                 * t0 walker) -- do NOT rewrite as *slot/slot+=4 */
             found = taskFn;                    /* exact match -> (re)use this slot */
         } else if (slot[taskFn * 4] == 0 && found == -1) {
@@ -94,7 +95,7 @@ void addsystemtask(int taskFn, int period, int delay)
         int *base = (int *)systemtasksubs;
         found  = (int)((found * 4) + base);    /* slot pointer, in found's own register */
         taskFn = libticks + delay;             /* MATCH: libticks read AT its use inside the if */
-        ((int *)found)[0] = fn;
+        ((int *)found)[0] = (int)fn;
         ((int *)found)[1] = period;
         ((int *)found)[3] = 0;
         ((int *)found)[2] = taskFn;
@@ -114,18 +115,19 @@ void addsystemtask(int taskFn, int period, int delay)
  *   (2) the array-to-`int *` base conversion is kept explicit.  It gives the
  *       oracle's separate-temp address materialization (`lui v0; addiu a2,v0`)
  *       while preserving the recovered `SYSTEM_TASK_SUB[16]` definition. */
-void delsystemtask(int fn)
+void delsystemtask(unsigned int (*task)(int, int))
 {
+    unsigned int (*fn)(int, int) = task;
     int  i    = 0;
-    int *base = systemtasksubs;
+    int *base = (int *)systemtasksubs;
     int *slot = base;
     for (; i < 0x10; i++) {
-        if (*slot == fn)
+        if (*slot == (int)fn)
             break;
         slot = slot + 4;
     }
     if (i < 0x10) {
-        if (base[i * 4] == fn)
+        if (base[i * 4] == (int)fn)
             base[i * 4] = 0;
     }
 }
