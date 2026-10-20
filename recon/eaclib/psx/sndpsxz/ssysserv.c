@@ -5,18 +5,14 @@
  *
  *   Client list lives at sndgs[0x19..] (int fn-ptrs); the count is sndgs[0x10]._1_1_ = ((char*)sndgs)[0x41].
  */
-
-extern int sndgs[];
-
-extern short *iSNDserveraddclient(int cb);       /* @0x8010479C */
-extern void   iSNDserverremoveclient(int cb);    /* @0x801047CC */
-extern void   SNDSYS_service(void);              /* @0x80104878 */
+#include "sdata.h"
+#include "ssysserv.h"
 
 #define NCLIENT (((char *)sndgs)[0x41])   /* sndgs[0x10]._1_1_ : service-client count */
 
 /* iSNDserveraddclient @0x8010479C : append callback `cb` to the service-client list; returns sndgs.
  *   The count is read SIGNED (lb) for the array index but UNSIGNED (lbu) for the increment-store. */
-extern short *iSNDserveraddclient(int cb)
+short *iSNDserveraddclient(int cb)
 {
     /* MATCH: index sndgs by the raw client count ONLY (base = sndgs + count*4) and fold the 0x19-slot
      * (0x64-byte) client-array offset into the store DISPLACEMENT via a single explicit char* base --
@@ -32,7 +28,7 @@ extern short *iSNDserveraddclient(int cb)
 
 /* iSNDserverremoveclient @0x801047CC : unregister `cb`, compacting the list.  void -- $v0 at every
  *   exit is incidental (numclients / slt scratch / i<<2). */
-extern void iSNDserverremoveclient(int cb)
+void iSNDserverremoveclient(int cb)
 {
     int i;
     int j;
@@ -106,7 +102,7 @@ shiftloop:                                                    /* compact the tai
 /* MATCH: a separate `guard` pointer fixes that lazy promotion.  Initializing `i` before the
  * signed-count test puts `i = 0` in the oracle's `blez` delay slot; repeating the initialization
  * when entering the loop preserves the expected loop setup and is harmless. */
-extern void SNDSYS_service(void)
+void SNDSYS_service(void)
 {
     char *base;
     char *guard;

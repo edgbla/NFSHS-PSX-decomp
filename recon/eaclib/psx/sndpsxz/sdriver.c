@@ -16,6 +16,8 @@
  *     b    +0x24/+0x25 (DAT_80147a14/15) L/R out  b  +0x27 (DAT_80147a17) voice-done flag (bit7)
  *     b    +0x28 (DAT_80147a18) pitch-dirty flag
  */
+#include "salloc.h"
+#include "sdriver.h"
 
 /* --- packet-voice table fields (0x2c stride) --- */
 extern int           DAT_801479f8;     /* +0x08 hw pitch/rate (int view: [chan*0xb]) */
@@ -38,7 +40,6 @@ extern unsigned char sndpd[];          /* driver-state base; voice table starts 
 /* "voice has finished" notifier installed by the host (@0x8014803C) */
 
 /* dependencies in sibling objs */
-extern void         iSNDfreechan(int chan);                       /* salloc  */
 extern int          iSNDpsxkeyoff(int mask);                      /* spatkey */
 extern unsigned int iSNDpsxeffecton(int mask);                    /* spatkey */
 extern unsigned int iSNDpsxeffectoff(int mask);                   /* spatkey */
@@ -46,13 +47,11 @@ extern void iSNDsetvol(int chan, int left, int right);    /* spatkey */
 extern void iSNDatolrv(unsigned int pan, int level, int *outL, int *outR);                 /* saetolrv */
 extern void iSNDatodlrv(unsigned int pan, int level, int *outL, int *outR, int pL, int pR);/* saetodv  */
 
-extern int iSNDstop(unsigned int chan);                           /* @0x800FFE90 */
-extern int iSNDvol(int chan, int level);                          /* @0x801000F8 */
 
 /* iSNDstop @0x800FFE90 : silence a hardware voice (and its linked partner).  Fires the voice-done hook
  *   unless already flagged, releases the channel(s) back to the pool, marks them idle and strobes the SPU
  *   key-off for the combined voice mask. */
-extern int iSNDstop(unsigned int chan)
+int iSNDstop(unsigned int chan)
 {
     int vt = (int)chan * 0x2c;
     volatile unsigned char *base = sndpd + 0xd8;
@@ -80,7 +79,7 @@ extern int iSNDstop(unsigned int chan)
 /* iSNDplatformpitch @0x800FFF94 : program a voice's hardware pitch from its base pitch * `pitch` multiplier
  *   (12.12), scaled by 0x1b9, mirrored to the linked partner. MATCH (49/49): the voice table is
  *   sndpd+0xd8; spelling the 0x2c stride as 0xb then <<2 preserves the oracle's scheduling. */
-extern int iSNDplatformpitch(int chan, int pitch)
+int iSNDplatformpitch(int chan, int pitch)
 {
     int vt = chan * 0xb;
     unsigned char *slot;
@@ -107,7 +106,7 @@ extern int iSNDplatformpitch(int chan, int pitch)
  *   overwrites $a1 with the playstate), `fxon` is $a2 -- matches SNDfxlevel's iSNDplatformfxlevel(voice,bus,fxArg).
  *   MATCH: the slot is async/volatile signed-byte storage; casting playstate to unsigned char produces the
  *   oracle's lbu+nop+andi sequence, and `if (fxon)` preserves its effect-on/effect-off block order. */
-extern int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
+int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
 {
     int          vt = (int)chan * 0x2c;
     volatile signed char *slot = (volatile signed char *)&DAT_801479f0 + vt;
@@ -132,7 +131,7 @@ extern int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
  *   routing mode (absolute iSNDatolrv, or delta-from-cache iSNDatodlrv), cache the L/R, and push to the SPU
  *   voice regs via iSNDsetvol.  When not playing, just caches the level.  (Ghidra mis-named arg2 "chan" and
  *   dropped the inner-call args -- all restored from disasm-v3.) */
-extern int iSNDvol(int chan, int level)
+int iSNDvol(int chan, int level)
 {
     int vt = chan * 0x2c;
     volatile unsigned char *slot = sndpd + 0xd8 + vt;

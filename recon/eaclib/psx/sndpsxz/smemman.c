@@ -32,18 +32,6 @@
 
 /* {block,size} free-list entry -- 2-byte alignment is LOAD-BEARING (struct assignment on an
  * align-2 4-byte struct = the oracle's lwl/lwr+swl/swr unaligned word copy). */
-typedef struct SndMemEnt {
-    unsigned short blk, sz;
-} SndMemEnt;
-
-typedef struct SNDMemState {
-    int            base;                /* +0x00 pool byte address */
-    unsigned short count;               /* +0x04 live allocation count */
-    unsigned short poolWords;           /* +0x06 pool size in words */
-    int            highWater;           /* +0x08 high-water mark */
-    SndMemEnt      entries[128];         /* +0x0c sorted allocation table */
-} SNDMemState;
-extern SNDMemState sndmm;
 /* W65-A6 DATA-MAT: `sndmm` was extern-only tree-wide (13 reloc-referenced undefined sites).
  * Retail: .bss @0x80148780 (VA > t_addr+t_size 0x8013E000 => no file bytes, pure zero-init).
  * smemman.obj owns it (sole referencer besides its own asm-label alias `sndmm_b`).
@@ -54,6 +42,8 @@ extern SNDMemState sndmm;
  * identical to the existing extern declaration, so nothing about address materialization can
  * move, and 524 > the TU's -G4 so maspsx routes it to `.section .bss` + `.globl` (a `.comm`
  * of size <= -G would land in `.sbss` as a LOCAL symbol and fix nothing).  4/4 PASS unchanged. */
+#include "smemman.h"
+
 SNDMemState sndmm;                  /* @0x80148780 [BSS] definition */
 /* UNSIZED-ARRAY VIEW of the same storage (asm-label alias): an unsized `unsigned char[]`
  * makes gcc materialize each `sndmm_b + K` as the FUSED high(sym+K)/lo_sum pair, so the two
@@ -67,14 +57,10 @@ extern unsigned char sndmm_b[] __asm__("sndmm");
 #define DAT_8014878c (sndmm.entries[0].blk)
 extern void           trap(unsigned int code);
 
-extern void iSNDmemconstrain(int *block, int *size);   /* @0x801061A8 */
-extern int *iSNDmeminit(int membase, int memsize);     /* @0x801061D4 */
-extern unsigned int iSNDmemrestore(void);              /* @0x801061F4 */
-extern int  iSNDmalloc(int size);                      /* @0x80106238 */
 
 /* iSNDmemconstrain @0x801061A8 : clamp a candidate [block, size] so block+size stays within the pool top.
  *   Its true contract is void; the subtraction left in v0 on the clamp path is incidental. */
-extern void iSNDmemconstrain(int *block, int *size)
+void iSNDmemconstrain(int *block, int *size)
 {
     unsigned int top = (unsigned short)DAT_80148786;
     int start = *block;
@@ -83,7 +69,7 @@ extern void iSNDmemconstrain(int *block, int *size)
 }
 
 /* iSNDmeminit @0x801061D4 : (re)initialise the pool over `memsize` bytes at `membase`. */
-extern int *iSNDmeminit(int membase, int memsize)
+int *iSNDmeminit(int membase, int memsize)
 {
     char *mm;
     sndmm.base = membase;
@@ -97,7 +83,7 @@ extern int *iSNDmeminit(int membase, int memsize)
 /* iSNDmemrestore @0x801061F4 : return pool utilisation percent = high_water*100/poolsize.
  *   The unsigned divide auto-emits the BREAK 0x1c00 div-by-zero guard (oracle 0x80106228),
  *   so the trap only fires when the pool was never initialised (poolsize==0). */
-extern unsigned int iSNDmemrestore(void)
+unsigned int iSNDmemrestore(void)
 {
     /* high-water (+8) and poolsize (+6) are fields of the sndmm struct @0x80148780; read both off the
      * single `&sndmm` base (lui;addiu materialized once, CSE'd) to match the oracle's `lw 8(a0)/lhu 6(a0)`
@@ -285,7 +271,7 @@ extern unsigned int iSNDmemrestore(void)
  *   temps that cse folded, so they never crossed it).
  *   Next angle: a zero-insn dial that lowers whatever pseudo currently occupies $v0 in that block
  *   rather than lengthening `j` (i.e. reach the fresh dest without paying for j's live range). */
-extern int iSNDmalloc(int size)
+int iSNDmalloc(int size)
 {
     /* MATCH (w31-a2, from the raw oracle -- same shape family as iSNDpsxmalloc but with THREE
      * separate iSNDmemconstrain call sites (gcc merges none of them: the empty arm and the

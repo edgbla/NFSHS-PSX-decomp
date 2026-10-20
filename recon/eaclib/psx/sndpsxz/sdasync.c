@@ -8,15 +8,16 @@
  *   iSNDpsxfree it asked for a DMA-queue name of sdma.obj -- the asynchronous SPU transfer its name promises.
  *   Function names and bodies are NOT retained anywhere; the names below are the natural ones for the member and are
  *   INFERRED.  What is evidence is the reference chain -- it is what puts the members in the retail order. */
+#include "sdasync.h"
+
 #include "../../../link_stripped.h"
 
 /* ---- the surviving function (moved verbatim from sdata.c) ---- */
 extern void iSNDpsxfree(int ptr);   /* sdmemman */
 
-extern void iSNDplatformfree(int ptr);   /* @0x800FE594 */
 
 /* iSNDplatformfree @0x800FE594 : free the SPU block at `ptr`. */
-extern void iSNDplatformfree(int ptr)
+void iSNDplatformfree(int ptr)
 {
     iSNDpsxfree(ptr);
 }

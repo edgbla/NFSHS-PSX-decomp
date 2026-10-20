@@ -2,15 +2,13 @@
  *   Source obj : nfs4\eaclib\psx\sstopall.obj ; archive C:\nfs4\EACLIB\PSX\SNDPSXZ.LIB (xlsx col11)
  *   1 fn @0x800E81A8.  SNDstopall -- stop every voice in the channel pool.  Ghidra nfs4-f.exe.c (sstopall).
  */
-
-extern int sndgs[];
-extern int SNDstop(unsigned int tag);   /* sstop */
-
-extern void SNDstopall(void);           /* @0x800E81A8 */
+#include "sdata.h"
+#include "sstop.h"
+#include "sstopall.h"
 
 /* SNDstopall @0x800E81A8 : walk the channel pool (sndgs[0x25], count sndgs[4]._1_1_) and SNDstop each
  *   channel by its owning tag. */
-extern void SNDstopall(void)
+void SNDstopall(void)
 {
     int i, off;
     int *base = sndgs;

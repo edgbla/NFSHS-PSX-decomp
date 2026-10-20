@@ -9,8 +9,9 @@
  *     +0x07/09    s8  pan = 0x40 (centre)     +0x0B s8 = 0
  *     +0x0C/0E   s16 pitch = 0x1000 (== 1.0)  +0x10/12 s16 = 0
  */
+#include "splysdef.h"
 
-extern int SNDplaysetdef(void *def)   /* @0x800E6834 : §3.2 non-void — the oracle reserves $v0 for
+int SNDplaysetdef(void *def)   /* @0x800E6834 : §3.2 non-void — the oracle reserves $v0 for
                                              a return of 0 (addu v0,zero,zero), which pushes the 0x40
                                              constant to $v1; declared void drops both. extern so the
                                              return-type change is unmangled / caller-safe. */

@@ -99,7 +99,7 @@ extern int  SNDSYS_restore(void);          /* @0x800F204C */
  *   taken), threaded through a local exactly like the §3.2 Ghidra void-return-bug class; the header's
  *   `void` prototype is the same incidental-vs-real-return question, resolved here from the oracle
  *   (`addu a1,zero,zero` init -> `addu a1,v0,zero` on the call path -> `addu v0,a1,zero` at exit). */
-extern int SNDSYS_getopts(SNDSYSOPTS *opts)
+int SNDSYS_getopts(SNDSYSOPTS *opts)
 {
     int r = 0;
     SNDSYSOPTS *base;
@@ -124,7 +124,7 @@ extern int D_80147898[];   /* linker alias for sndgs + 0x38 (SNDSYSOPTS::vec) */
  *   array-shaped D_80147898 alias lets the callback store fill outputset's jal
  *   delay slot; spelling that store as a direct typed vec assignment regresses
  *   this function while preserving behavior. */
-extern int SNDSYS_setopts(SNDSYSOPTS *opts)
+int SNDSYS_setopts(SNDSYSOPTS *opts)
 {
     char *base = (char *)sndgs;
     ((SNDSYSOPTS *)base)->set = opts->set;
@@ -137,7 +137,7 @@ extern int SNDSYS_setopts(SNDSYSOPTS *opts)
  *   allocator, default the options, allocate the channel + bank tables, install the 100 Hz server, and
  *   start the SPU (iSNDinit). MATCH (79/79): returns the platform status on failure after cleanup,
  *   otherwise zero; no-op with zero when already up. */
-extern int SNDSYS_init(int membase, int memsize)
+int SNDSYS_init(int membase, int memsize)
 {
     unsigned int nchan;
     int          rv;
@@ -177,7 +177,7 @@ extern int SNDSYS_init(int membase, int memsize)
 
 /* SNDSYS_restore @0x800F204C : shut the sound system down -- fire the registered teardown hooks, stop all
  *   voices, restore the SPU, free the mutex + memory.  No-op if not up. */
-extern int SNDSYS_restore(void)
+int SNDSYS_restore(void)
 {
     if ((signed char)sndgs[0xf] == 0)                             /* audio not up */
         return -10;

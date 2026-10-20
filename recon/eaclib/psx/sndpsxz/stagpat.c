@@ -12,50 +12,34 @@
  *     +0x64 envelope ptr (&snddefaultenvelope), +0x90 patch flag, +0x94 timbre-active.
  *   BANK header: +0x03 flags (bit1 = 8-byte header, bit0 = resolved), +0x04/+0x08 tag stream start.
  */
+#include "salloc.h"
+#include "sclcptch.h"
+#include "sdata.h"
+#include "sdplapat.h"
+#include "sdresolv.h"
+#include "sgettag.h"
+#include "slib.h"
+#include "snd_state.h"
+#include "srandom.h"
+#include "srrange.h"
+#include "sserver.h"
+#include "sstop.h"
+#include "stagpat.h"
 
-extern int          sndgs[];
 /* stagpat.obj .data 0x801371C4..0x801371D0 (link-order slot sclcptch [378] .. CTYPE0 [389]; stagpat [379] is the only
  * user of both cells): the default envelope, then the rolling key-group counter. */
 signed char snddefaultenvelope[8] = { -1, -1, -1, 0x7f, 0x7f, 0, 0, 0 };   /* @0x801371C4 */
 unsigned char DAT_801371cc = 0;   /* @0x801371CC : rolling key-group counter (the library is built -G0: plain .data) */
 
-extern int  iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr);  /* sgettag (4-arg) */
-extern int  iSNDplatformresolve(int resolv, int patch_idx, int scratch);  /* sdresolv */
-extern int  iSNDplatformremove(int resolv, int *patch_idx);               /* sdresolv */
-extern int  randrange(int range);                                         /* srrange  */
-extern int  iSNDrandom(void);                                             /* srandom  */
-extern int  iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *out); /* salloc */
-extern void iSNDfreechan(int chan);                                       /* salloc   */
-extern int  iSNDcalcpitch(int note);                                      /* sclcptch */
-extern void iSNDcalcvol(int chan);                                /* spatkey  */
-extern int  iSNDplatformrate[];                                           /* spktplay/data */
-extern int  iSNDplatformplay(int chan, int voice, int level, int pitch, int a5,
-                             int fx, int volAngle, int pitchOffset);       /* sdplapat */
-extern void trap(unsigned int code);                                      /* compiler div-by-zero break */
-
-extern void iSNDresetpatch(int patch);                          /* @0x80101ABC */
-extern unsigned char *iSNDresettimbre(int *t, int buf);         /* @0x80101AC4 */
-extern void iSNDresolveheader(int *hdr, int *out);              /* @0x80101B7C */
-extern int  iSNDfindfreekey(void);                              /* @0x80101BFC */
-extern int  iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch);  /* @0x801024EC */
-extern int  iSNDremovetaggedpatch(int bank, int *patch_idx);    /* @0x801025C0 */
-extern int  iSNDplaytaggedtimbre(int timbre, int tag, int vol, int header,
-                                     int baseNote, int velScale, int pitchOff);  /* @0x80101C8C */
-extern int  iSNDplaytaggedpatch(int patch, int tag);            /* @0x8010218C */
-extern int  SNDstop(unsigned int tag);                          /* sstop  */
-extern int  iSNDgetchan(unsigned int tag);                      /* salloc */
-extern void iSNDenteraudio(void);                               /* sserver */
-extern void iSNDleaveaudio(void);
-
 /* iSNDresetpatch @0x80101ABC : clear a patch-play state's flag word (+0x90). */
-extern void iSNDresetpatch(int patch)
+void iSNDresetpatch(int patch)
 {
     *(int *)(patch + 0x90) = 0;
 }
 
 /* iSNDresettimbre @0x80101AC4 : zero the 0x98-byte timbre `buf` then load the default timbre into `t`
  *   (note range 0..0x3c, full velocity, default envelope). */
-extern unsigned char *iSNDresettimbre(int *t, int buf)
+unsigned char *iSNDresettimbre(int *t, int buf)
 {
     int i = 0x25;
     int *p = (int *)(buf + 0x94);
@@ -100,7 +84,7 @@ extern unsigned char *iSNDresettimbre(int *t, int buf)
 
 /* iSNDresolveheader @0x80101B7C : fold an override header `out` into the running timbre header `hdr`
  *   (sum the envelope / volume / pitch fields). */
-extern void iSNDresolveheader(int *hdr, int *out)
+void iSNDresolveheader(int *hdr, int *out)
 {
     *(int *)((int)hdr + 0x48) = *(int *)((int)out + 0x48) + *(int *)((int)hdr + 0x48);
     *(int *)((int)hdr + 0x54) = *(int *)((int)out + 0x54) + *(int *)((int)hdr + 0x54);
@@ -114,7 +98,7 @@ extern void iSNDresolveheader(int *hdr, int *out)
 /* iSNDfindfreekey @0x80101BFC : advance the rolling key-group counter (DAT_801371cc) to a value not
  *   currently owned by any held channel; RETURNS the chosen key (oracle: `lbu v0,key; jr ra` --
  *   iSNDplaytaggedpatch captures it in $fp and stamps it into every started voice's +0x37). */
-extern int iSNDfindfreekey(void)
+int iSNDfindfreekey(void)
 {
     int   i, count, probe;
     unsigned char key;
@@ -160,7 +144,7 @@ done:
  *   restores the detune table/scaling path, both PRNG return uses, all four stack arguments, and the
  *   success/failure return contract. MATCH (320/320): modeling the one-word platform-rate storage as
  *   an array element makes gcc split its address materialization around the independent byte load. */
-extern int iSNDplaytaggedtimbre(int timbre, int tag, int vol, int header,
+int iSNDplaytaggedtimbre(int timbre, int tag, int vol, int header,
                                     int baseNote, int velScale, int pitchOff)
 {
     int b7  = *(signed char *)(tag + 7);
@@ -311,7 +295,7 @@ pan_low:
  *     7-arg call: (timbreData, tag, &builtTimbre, &header, note, vel, pitchOff). pitchOff ($s6) is the
  *     CAPTURED randrange() result of the last 0x24 field tag (0 until one is seen); the group key ($fp)
  *     is the CAPTURED iSNDfindfreekey() return.  BYTE-MATCHES the oracle (verify_asm PASS, 216 insns). */
-extern int iSNDplaytaggedpatch(int bank, int tag)
+int iSNDplaytaggedpatch(int bank, int tag)
 {
     int           bt[0x26];                /* built timbre    @sp+0x20  */
     int           hdr[0x26];               /* override header @sp+0xB8  */
@@ -412,7 +396,7 @@ fail:
 
 /* iSNDresolvetaggedpatch @0x801024EC : walk a bank's tag stream and resolve its SPU sample data (tag 0xfd
  *   = platform resolve), marking the bank resolved (+3 |= 1).  Returns -1 / resolve result. */
-extern int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
+int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
 {
     unsigned int state[4];
     int r = -1;
@@ -432,7 +416,7 @@ extern int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
 
 /* iSNDremovetaggedpatch @0x801025C0 : walk a bank's tag stream and release its resolved SPU data (tag 0xfd
  *   = platform remove), clearing the resolved flag (+3 &= ~1). */
-extern int iSNDremovetaggedpatch(int bank, int *patch_idx)
+int iSNDremovetaggedpatch(int bank, int *patch_idx)
 {
     unsigned int state[4];
     state[0] = (unsigned int)bank;

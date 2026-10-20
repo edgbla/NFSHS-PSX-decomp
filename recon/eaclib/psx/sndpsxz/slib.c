@@ -38,7 +38,7 @@
  *   are latched into DAT_80147e14..2c (the DMA + SPU register pointers the rest of the sound code uses).
  */
 
-extern int            sndgs[];
+
 /* W65-A6 DATA-MAT: `sndpd` was extern-only tree-wide -- 113 reloc-referenced undefined sites
  * across 20 TUs.  Retail: .bss @0x80147918, size 1836 (= gPreLoadTicks @0x80148044 - 0x80147918);
  * VA > t_addr+t_size (0x8013E000) => no file bytes, pure zero-init BSS.  slib.obj owns it
@@ -55,6 +55,15 @@ extern int            sndgs[];
  * Emitted as extra LABELS (not `sym = sndpd+N`): ASPSX 2.77 has no symbol-assignment form
  * (catalog 15E), a second label is the only dual-legal spelling.  Retires 2 more `DAT_`
  * seal-criterion #3 violations.  Receipts: scratchpad/w65a6/RECEIPTS.md */
+#include "salloc.h"
+#include "sdata.h"
+#include "sdfx.h"
+#include "sdma.h"
+#include "slib.h"
+#include "slib_state.h"
+#include "sserver.h"
+#include "ssysserv.h"
+
 __asm__("\t.globl\tsndpd\n\t.globl\tD_801479F0\n\t.globl\tDAT_801479f0\n\t.globl\tD_80147A0C\n"
         "\t.globl\tDAT_80147e28\n\t.globl\tD_80147E34\n"
         "\t.section\t.bss\n\t.align\t2\n"
@@ -66,15 +75,15 @@ __asm__("\t.globl\tsndpd\n\t.globl\tD_801479F0\n\t.globl\tDAT_801479f0\n\t.globl
         "D_80147E34:\n\t.space\t0x210\n\t.text");
 /* ==== moved here from spatkey.c 2026-09-21: the SPU key / voice / volume layer opens this object (see the note in spatkey.c).
  *      It stands BEFORE this file's own sndpd-relative macros, so its declarations keep the spelling they were matched with. ==== */
-extern int sndgs[];
-extern unsigned char sndpd[];   /* EA sound-driver state base @0x80147918 (unsized array: forces
+
+   /* EA sound-driver state base @0x80147918 (unsized array: forces
                                      * the oracle's `lui;addiu &sndpd; lw r,0x514(base)` base+offset shape
                                      * instead of folding &sndpd+const into one absolute %lo load) */
 /* SPU register-base pointers live as fields inside the sndpd state block:
  *   DAT_80147e28 (voice regs)   = *(int*)(sndpd + 0x510)
  *   DAT_80147e2c (control regs) = *(int*)(sndpd + 0x514) */
 #define SNDPD_VOICEREG   (((int *)sndpd)[0x510/4])
-extern int DAT_80147e28[];      /* one-word SPU voice register base storage */
+      /* one-word SPU voice register base storage */
 extern int DAT_801479f0;        /* packet-voice table base; entry +0x00 = SPU start addr, +0x04 idx src, +0x08 sample-rate src */
 /* packet-voice table fields (0x2c stride, indexed [chan*0x2c]) */
 extern unsigned char DAT_80147a0c;   /* +0x1c playstate */
@@ -91,7 +100,6 @@ extern unsigned char DAT_80147a17;   /* +0x27 partner-addr mode (bit7) / table i
 extern void iSNDvol(int chan, int level);            /* sdriver */
 extern int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon);
 
-extern int iSNDsetslot(int chan, int addr, int pitch);   /* @0x800FF394 */
 
 #define SB(base,idx) ((&(base))[idx])              /* (&DAT)[idx] -- byte at base+idx */
 
@@ -99,7 +107,7 @@ extern int iSNDsetslot(int chan, int addr, int pitch);   /* @0x800FF394 */
 /* iSNDcalcvol @0x800FF050 : compute a channel's effective 0..0x7F volume from its patch volume (+0x2C),
  *   note velocity (+0x1E), expression (+0x26) and the master volume, then apply the optional velocity
  *   (+0x50) and final (+0x44) volume curves.  Caches the result at +0x2D and returns it. */
-extern void iSNDcalcvol(int chan)
+void iSNDcalcvol(int chan)
 {
     int          v = sndgs[0x25] + chan * 100;
     int          n = (int)*(signed char *)(v + 0x2c) * (int)*(short *)(v + 0x1e) *
@@ -121,7 +129,7 @@ extern void iSNDcalcvol(int chan)
 }
 
 /* iSNDpsxkeyon @0x800FF140 : strobe the SPU key-on register for `mask` (24 voices). */
-extern int iSNDpsxkeyon(int mask)
+int iSNDpsxkeyon(int mask)
 {
     int *base = (int *)sndpd;
     int r;
@@ -132,7 +140,7 @@ extern int iSNDpsxkeyon(int mask)
 }
 
 /* iSNDpsxkeyoff @0x800FF168 : strobe the SPU key-off register for `mask`. */
-extern int iSNDpsxkeyoff(int mask)
+int iSNDpsxkeyoff(int mask)
 {
     int *base = (int *)sndpd;
     int r;
@@ -143,7 +151,7 @@ extern int iSNDpsxkeyoff(int mask)
 }
 
 /* iSNDpsxeffecton @0x800FF190 : enable reverb on the `mask` voices (OR into the SPU echo-on register). */
-extern unsigned int iSNDpsxeffecton(int mask)
+unsigned int iSNDpsxeffecton(int mask)
 {
     int *base = (int *)sndpd;
     unsigned int r;
@@ -158,7 +166,7 @@ extern unsigned int iSNDpsxeffecton(int mask)
 }
 
 /* iSNDpsxeffectoff @0x800FF1D0 : disable reverb on the `mask` voices. */
-extern unsigned int iSNDpsxeffectoff(int mask)
+unsigned int iSNDpsxeffectoff(int mask)
 {
     int *base = (int *)sndpd;
     unsigned int r;
@@ -173,7 +181,7 @@ extern unsigned int iSNDpsxeffectoff(int mask)
 }
 
 /* iSNDpsxeffectvol @0x800FF210 : set the SPU reverb (echo) L/R output volume. */
-extern int iSNDpsxeffectvol(int left, int right)
+int iSNDpsxeffectvol(int left, int right)
 {
     int *base = (int *)sndpd;
     int r;
@@ -189,7 +197,7 @@ extern int iSNDpsxeffectvol(int left, int right)
  *   `(sum*0x81)>>1` scratch on the mono paths (no C `return` could produce that) -- the declared
  *   return value was the 4 extra insns (`addu v0,x,zero` funnels).  One `vol` + one reused `vreg`
  *   carry the a0/a3 webs through the shared tail. */
-extern void iSNDsetvol(int chan, int left, int right)
+void iSNDsetvol(int chan, int left, int right)
 {
     int            vt = chan * 0x2c;
     volatile unsigned char *voiceBase = sndpd + 0xd8;
@@ -244,7 +252,7 @@ extern void iSNDsetvol(int chan, int left, int right)
  * materialization.  Listing the two variable stores before the constant ADSR stores gives gcc the
  * oracle's early `sra`/base-load schedule; it still emits the hardware writes in oracle order
  * (attack, sustain, pitch, address, level). */
-extern int iSNDsetslot(int chan, int addr, int pitch)
+int iSNDsetslot(int chan, int addr, int pitch)
 {
     int r = DAT_80147e28[0] + chan * 0x10;
     *(short *)(r + 4)  = (short)pitch;               /* sample rate / pitch */
@@ -257,7 +265,7 @@ extern int iSNDsetslot(int chan, int addr, int pitch)
 
 /* iSNDstartvoice @0x800FF3CC : key a channel's voice (and its linked partner) -- reset pan caches, arm the
  *   ADSR slot, set the initial volume + fx level, and return the SPU key-on mask. */
-extern unsigned int iSNDstartvoice(unsigned int chan)
+unsigned int iSNDstartvoice(unsigned int chan)
 {
     int          vt  = chan * 0x2c;
     volatile unsigned char *vte = sndpd + 0xd8 + vt; /* &voicetable[chan] */
@@ -308,17 +316,17 @@ extern unsigned int iSNDstartvoice(unsigned int chan)
 
 /* ==== end of the block moved from spatkey.c ==== */
 
-extern unsigned char  sndpd[];              /* voice/queue state base @0x80147918 (unsized array: forces
+              /* voice/queue state base @0x80147918 (unsized array: forces
                                               * base+offset addressing instead of folding &sndpd+const into
                                               * one absolute %lo load -- see sdpacket.c/spatkey.c precedent) */
-extern unsigned char  D_801479F0[];         /* exact voice-table-base linker symbol; iSNDserve's
+         /* exact voice-table-base linker symbol; iSNDserve's
                                               * retail relocations name this object directly */
-extern unsigned char  D_80147A0C[];         /* same table's +0x1c state field; exact-VA alias is in
+         /* same table's +0x1c state field; exact-VA alias is in
                                               * linkers/undefined_syms_auto.txt */
 #define DAT_80147919 (sndpd[1])              /* pre-load guard == sndpd+1 */
 #define snd_old_chan_mode (sndpd[2])         /* last applied channel-mode byte */
 #define DAT_8014791c (*(int *)(sndpd + 4))   /* current fx mode == sndpd+4 */
-extern unsigned char  sndpdsafeloop[16];    /* DMA scratch RAM @0x80136DF0, per configs/symbol_addrs.txt
+    /* DMA scratch RAM @0x80136DF0, per configs/symbol_addrs.txt
                                               * (oracle references this real symbol name directly, not a bare VA) */
 /* w64-a18 E5 fix: retail = a 16-byte INITIALISED .data object (word 0 =
  * 0x00000700, rest zero) -- was a 1-byte .sbss tentative def (W62-A19 3.2's
@@ -398,30 +406,30 @@ unsigned char sndpdsafeloop[16] = {0x00, 0x07, 0x00, 0x00}; /* @0x80136DF0 */
 #define EXT_VOL_R_F                (*(volatile unsigned short *)(DAT_80147e2c + 0x1b6))
 
 /* dependencies */
-extern int          iSNDpsxkeyoff(int mask);                  /* spatkey */
-extern void iSNDsetvol(int chan, int left, int right);/* spatkey */
-extern unsigned int iSNDstartvoice(unsigned int chan);       /* spatkey */
-extern void         iSNDfreechan(int chan);                  /* salloc  */
-extern unsigned int iSNDpsxfxinit(int mode);                 /* sdfx    */
-extern void         iSNDserver(void);                        /* sserver */
-extern void         iSNDleaveaudio(void);                    /* sserver */
-extern int          iSNDdmqueue(int ram, unsigned int spu, int len, int prio, int flag); /* sdma */
+                  /* spatkey */
+/* spatkey */
+       /* spatkey */
+                  /* salloc  */
+                 /* sdfx    */
+                        /* sserver */
+                    /* sserver */
+ /* sdma */
 extern int          DMACallback(int ch, int func);            /* libetc INTR.obj @0x800F28AC -- Ghidra/our
                                                                 * previous decl dropped BOTH real args (channel,
                                                                 * new-callback-fn); see cdcont.cpp/SYS.cpp for
                                                                 * the true signature used tree-wide */
-extern void         iSNDdmcallback(void);                    /* sdma -- installed as the DMA4 callback */
+                    /* sdma -- installed as the DMA4 callback */
 extern int          addtimer(int callback);                  /* addtimer */
 extern int          deltimer(int callback);                  /* addtimer */
 extern int          addexit(int handler);                    /* exit     */
-extern void         SNDSYS_service(void);                    /* ssysserv */
+                    /* ssysserv */
 extern void         SNDSYS_restore(void);                    /* ssysinit (exit handler) */
 
-extern int  iSNDplatformoutputcaps(void);   /* @0x800FF5A8 -- oracle explicitly zeroes $v0 before return */
-extern int  iSNDplatformoutputset(void);    /* @0x800FF600 */
-extern int  iSNDinit(void);                 /* @0x800FF700 */
-extern int  iSNDrestore(void);              /* @0x800FF9A0 */
-extern void iSNDserve(void);                /* @0x800FFAF4 */
+   /* @0x800FF5A8 -- oracle explicitly zeroes $v0 before return */
+    /* @0x800FF600 */
+                 /* @0x800FF700 */
+              /* @0x800FF9A0 */
+                /* @0x800FFAF4 */
 
 #define SCB(i) (((char *)sndgs)[i])
 #define SUB(i) (((unsigned char *)sndgs)[i])
@@ -489,7 +497,7 @@ static inline void wr_sr(unsigned int s) { g_sr = s; }
 
 /* iSNDplatformoutputcaps @0x800FF5A8 : publish this platform's output capabilities into sndgs (44.1 kHz,
  *   24 SPU voices, stereo). */
-extern int iSNDplatformoutputcaps(void)
+int iSNDplatformoutputcaps(void)
 {
     unsigned char *base = (unsigned char *)sndgs;   /* materialize bare &sndgs first (oracle: no offset folded into %lo) */
     base[7] = 0;  base[8] = 0;  base[9] = 0;  base[6] = 0x18;
@@ -501,7 +509,7 @@ extern int iSNDplatformoutputcaps(void)
 
 /* iSNDplatformoutputset @0x800FF600 : apply the requested output channel count (clamped to caps), and if the
  *   mode changed while audio is up, re-push every playing voice's L/R volume. */
-extern int iSNDplatformoutputset(void)
+int iSNDplatformoutputset(void)
 {
     unsigned char *base;    /* &sndgs, CALLER-saved live range (pre-loop field checks only) --
                               * matches iSNDplatformoutputcaps' PASSing lever; SCB(0x11)=0x18 as
@@ -560,7 +568,7 @@ extern int iSNDplatformoutputset(void)
 /* iSNDinit @0x800FF700 : bring up the SPU -- enable DMA4, zero the SPU voice/main/CD/ext volumes, latch the
  *   DMA + SPU register addresses, key-off all voices, set master volume, apply the fx preset, and install
  *   the audio timer + exit handler. */
-extern int iSNDinit(void)
+int iSNDinit(void)
 {
     unsigned int sr;
     DECLARE_DMA_CHANNEL(ch);      /* DMACallback channel arg (4), materialized early like the oracle */
@@ -675,7 +683,7 @@ extern int iSNDinit(void)
 
 /* iSNDrestore @0x800FF9A0 : tear the SPU back down -- unwind the audio lock, let all voices fade past their
  *   release, drop the audio timer, clear the fx, and re-arm the DMA callback. */
-extern int iSNDrestore(void)
+int iSNDrestore(void)
 {
     unsigned char *guard;
     unsigned char *gpraw;
@@ -749,7 +757,7 @@ extern int iSNDrestore(void)
 /* iSNDserve @0x800FFAF4 : the per-frame SPU voice driver -- run the user serve hook, advance every voice's
  *   play position, retire finished/stopping voices (free their channels, key them off), and key-on any
  *   newly-armed voices.  Batches the SPU key-on/key-off masks for a single hardware poke. */
-extern void iSNDserve(void)
+void iSNDserve(void)
 {
     unsigned int koff;         /* local_30 : key-off mask deferred until DMA settles */
     unsigned int kon;          /* mask     : key-on mask */

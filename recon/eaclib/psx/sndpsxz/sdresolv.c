@@ -13,16 +13,10 @@
  * `volatile` in this file was measured individually or as a group and is load-bearing
  * (MMIO, or state the oracle provably re-reads) -- do not strip them.  Receipt:
  * scratchpad/w85/S8_receipt.md. */
-
-
-extern int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr);  /* sgettag  */
-extern int iSNDpsxmalloc(int size);                                                 /* sdmemman */
-extern void iSNDpsxfree(void *p);                                                   /* sdmemman */
-extern int iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio); /* sdma */
-extern int iSNDdmcomplete(int handle);                                              /* sdma */
-
-extern int iSNDplatformresolve(int cursor, int bank, int patch);     /* @0x8010B75C */
-extern int iSNDplatformremove(int cursor, int *patch);               /* @0x8010B958 */
+#include "sdma.h"
+#include "sdresolv.h"
+#include "sgettag.h"
+#include "sdmemman.h"
 
 struct SNDResolveEntry {
     int offset;
@@ -88,7 +82,7 @@ struct SNDResolveEntry {
  *   3. STATEMENT ORDER `scan = cur + 1;` BEFORE `idx++;` -- independent-chain issue order is fixed
  *      by luid (catalog w43); with `idx++` first the two tail addiu's come out swapped (4 diffs).
  */
-extern int iSNDplatformresolve(int cursor, int bank, int patch)
+int iSNDplatformresolve(int cursor, int bank, int patch)
 {
     unsigned int  id;
     int           val, ptr;
@@ -164,7 +158,7 @@ resolve:
 
 /* iSNDplatformremove @0x8010B958 : release a patch's resolved SPU data -- record it in the remove table and
  *   free the SPU block. */
-extern int iSNDplatformremove(int cursor, int *patch)
+int iSNDplatformremove(int cursor, int *patch)
 {
     unsigned int  id;
     int           val, ptr;

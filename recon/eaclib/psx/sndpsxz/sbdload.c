@@ -6,10 +6,8 @@
  *   Patch ptrs are stored as offsets relative to their own field (+0x14 for bank type 4, else +0xc):
  *   abs = fieldAddr + offset.
  */
-
-extern int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch);   /* stagpat */
-
-extern int iSNDdownloadbank(int bankData, int patchData);   /* @0x8010266C */
+#include "sbdload.h"
+#include "stagpat.h"
 
 /* iSNDdownloadbank @0x8010266C : rebase + resolve all patches of the bank at `bankData`.  Returns 7 (all
  *   ok) or 8 (a patch failed).
@@ -35,7 +33,7 @@ extern int iSNDdownloadbank(int bankData, int patchData);   /* @0x8010266C */
  *   (4) `i++` moved to the END of the increment run (3 -> PASS) -- see the site.
  *   The residual notes below are kept for their measurement history but their CONCLUSIONS are now
  *   superseded: the function matches under the tree's normal flags. */
-extern int iSNDdownloadbank(int bankData, int patchData)
+int iSNDdownloadbank(int bankData, int patchData)
 {
     /* SHAPE (from the IDA per-variable register annotations of sub_8010266C, w32):
      *   v3 $s6=ret  v4/v6 $s0=ONE counter shared by the clear loop and the scan loop

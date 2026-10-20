@@ -4,14 +4,12 @@
  *   Ghidra nfs4-f.exe.c (spat2hdr) + IDA sigs.  Ghidra-ism: iSNDpatchtohdr's 4th out-arg (in_a3) was dropped;
  *   iSNDgettag is the 4-arg (cursor,&id,&val,&ptr) form (Ghidra showed 2, the others adjacent on stack).
  */
-extern int  iSNDgettag(int *cursor, int *id, int *val, int *ptr);   /* sgettag */
-
-extern int  SNDattributessetdef(int *attr);                         /* @0x801035B0 */
-extern int  iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut); /* @0x801035E4 (returns 0) */
+#include "spat2hdr.h"
+#include "sgettag.h"
 
 /* SNDattributessetdef @0x801035B0 : reset a 0xc-byte attribute block to defaults (level -1, pan 0x40,
  *   sustain 0x7f). */
-extern int SNDattributessetdef(int *attr)
+int SNDattributessetdef(int *attr)
 {
     *attr = -1;
     *((unsigned char *)attr + 7)  = 0x7f;
@@ -26,7 +24,7 @@ extern int SNDattributessetdef(int *attr)
 
 /* iSNDpatchtohdr @0x801035E4 : build the SPU playback header (`hdr`, magic 0x5622) + attribute block (`attr`)
  *   + extra word (`extraOut`) from the sample's tag stream (after its 4- or 8-byte prefix per flags bit 1). */
-extern int iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut)
+int iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut)
 {
     short *cursor;
     int    id, val, ptr;

@@ -1,13 +1,12 @@
 /* eaclib/psx/sndpsxz/sautovol.c -- RECONSTRUCTED. NOT original.  *** 1/1 ***  obj sautovol.obj @0x800E82D0 */
-extern int sndgs[];
-extern int  iSNDgetchan(unsigned int tag);    /* salloc  */
-extern int  iSNDpatchkey(int chan, int tag);  /* spatkey */
-extern void iSNDenteraudio(void);             /* sserver */
-extern void iSNDleaveaudio(void);
-extern void trap(unsigned int code);
-extern int  SNDautovol(unsigned int tag, unsigned int rate, int target);   /* @0x800E82D0 */
+#include "salloc.h"
+#include "sautovol.h"
+#include "sdata.h"
+#include "spatkey.h"
+#include "sserver.h"
+
 /* SNDautovol : ramp a sound's voices toward `target` volume over `rate` ticks (sets +0x18 target, +0x14 step). */
-extern int SNDautovol(unsigned int tag, unsigned int rate, int target)
+int SNDautovol(unsigned int tag, unsigned int rate, int target)
 {
     int ch, cur[2];
     if ((signed char)sndgs[0xf] == 0) return -10;  /* signed -> lb (ccpsx char is unsigned) */

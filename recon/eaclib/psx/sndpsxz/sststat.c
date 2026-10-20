@@ -1,13 +1,12 @@
 /* eaclib/psx/sndpsxz/sststat.c -- RECONSTRUCTED. NOT original.  *** 1/1 PASS ***  obj sststat.obj @0x800E86D8 */
-extern int sndgs[];
-extern int  iSNDstreamgetstreamptr(int tag);                       /* sst      */
-extern int  SNDPKTPLAY_unsafeframesoutstanding(int player);        /* spktplay */
-extern void iSNDenteraudio(void);                                  /* sserver  */
-extern void iSNDleaveaudio(void);
-extern void trap(unsigned int code);
-extern int  SNDSTRM_status(int tag, int s);   /* @0x800E86D8 */
+#include "sdata.h"
+#include "spktplay.h"
+#include "sserver.h"
+#include "sst.h"
+#include "sststat.h"
+
 /* SNDSTRM_status : fill the 3-int status block `s` (active, bytes, permille) for stream `tag`. */
-extern int SNDSTRM_status(int tag, int s)
+int SNDSTRM_status(int tag, int s)
 {
     int *sp;
     unsigned int frames, outstanding;

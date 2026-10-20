@@ -2,15 +2,13 @@
  *   Source obj : nfs4\eaclib\psx\sballoc.obj ; archive C:\nfs4\EACLIB\PSX\SNDPSXZ.LIB (xlsx col11)
  *   1 fn @0x801027BC.  iSNDbankalloc -- find the first free bank-table slot.  Ghidra (void) + IDA (int).
  */
-
-extern int sndgs[];
-
-extern int iSNDbankalloc(void);   /* @0x801027BC */
+#include "sballoc.h"
+#include "sdata.h"
 
 /* iSNDbankalloc @0x801027BC : return the index of the first empty bank table entry (sndgs[0x26], 0xc
  *   stride, +0 == 0 means free), or -9 (SND_BANKFULL) if the table is empty/full.  (Ghidra lost the
  *   return value; IDA gives int.) */
-extern int iSNDbankalloc(void)
+int iSNDbankalloc(void)
 {
     int  i = 0;
     unsigned short rawcount = (unsigned short)sndgs[3];

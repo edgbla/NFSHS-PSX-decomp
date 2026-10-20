@@ -6,16 +6,14 @@
  *   the SYM/xlsx -- a PSYLINK ghost aliasing this very code.  sdasync contributes no unique function; this
  *   IS that code.  SNDPSXZ is therefore code-complete (sdasync needs no separate .cpp).
  */
-
-extern int sndgs[];
-extern int iSNDvalidbank(int bankId);                       /* sbvalid */
-extern int iSNDremovetaggedpatch(int bank, int *patch);     /* stagpat */
-
-extern int iSNDbankremovepat(int bank, int patch_idx, int *scratch);   /* @0x800FE5B4 */
+#include "sbirmpat.h"
+#include "sbvalid.h"
+#include "sdata.h"
+#include "stagpat.h"
 
 /* iSNDbankremovepat @0x800FE5B4 : free patch `patch_idx` of bank `bank` (its tagged SPU data), clearing the
  *   patch pointer (+0x14 for bank type 4, else +0xc).  Returns 0 / -8. */
-extern int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
+int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
 {
     int data = *(int *)(bank * 0xc + sndgs[0x26]);
     int base = (*(char *)(data + 4) == 4) ? data : 0;

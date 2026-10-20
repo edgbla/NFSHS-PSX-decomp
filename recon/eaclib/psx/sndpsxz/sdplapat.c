@@ -7,8 +7,11 @@
  *   Tags: 0x82 channel count, 0x84 sample rate, 0x85 loop length, 0x8a sample-data ptr, 0x92 output mode.
  *   iSNDgettag is 4-arg (Ghidra dropped to 2).
  */
+#include "sdata.h"
+#include "sdplapat.h"
+#include "sdriver.h"
+#include "sgettag.h"
 
-extern int sndgs[];
 extern unsigned char sndpd[];
 extern unsigned char DAT_801479f0;   /* voice base (+0x00) */
 extern unsigned char DAT_801479f4;   /* +0x04 */
@@ -25,12 +28,6 @@ extern unsigned char DAT_80147a11;   /* +0x21 link flag */
 extern unsigned char DAT_80147a12;   /* +0x22 level */
 extern unsigned char DAT_80147a13;   /* +0x23 fx level */
 
-extern int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr);  /* sgettag */
-extern int iSNDplatformpitch(int chan, int pitch);                                  /* sdriver */
-
-extern int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
-                            int volAngle, int pitchOffset);
-
 /* iSNDplatformplay @0x8010BA48 : launch `voice` playing the patch whose tag stream starts at `chan`.
  * MATCH (W31, was 32 diffs): (1) the tag parser is a NATURAL `while` loop, not a goto chain -- real
  * loop notes weight the in-loop defs' ref counts, which is what allocates sampleData->s3 / voice->s4
@@ -39,7 +36,7 @@ extern int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, i
  * volatile like the record's other stores, which keeps gcc's reorg from stealing the shared sb into
  * the 0x82 case's j delay slot (oracle has the unfilled nop); (4) `slot[0x20] = -1` needs a signed
  * char store (plain char is unsigned under ccpsx). IDA sub_8010BA48 supplied the loop/store shape. */
-extern int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
+int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
                             int volAngle, int pitchOffset)
 {
     int           *sampleData = 0;         /* 0x8a tag -> sample-header ptr */

@@ -20,6 +20,8 @@
  *   1 fn @0x800E7BA8.  SNDbankheadercopy -- copy a loaded bank's header into `dst` and rebase its patch
  *   pointers to the new buffer, repointing the bank table at the copy.  Ghidra nfs4-f.exe.c (sbhdrcpy).
  */
+#include "sbhdrcpy.h"
+#include "sbhdrsze.h"
 
 struct SNDGlobals {
     char pad0[0x3c];
@@ -28,10 +30,7 @@ struct SNDGlobals {
     int bank_table;
 };
 extern struct SNDGlobals sndgs;
-extern int SNDbankheadersize(int bankId);          /* sbhdrsze */
 extern void *memcpy(void *dst, const void *src, int n);   /* C42 (BIOS thunk) */
-
-extern int SNDbankheadercopy(void *dst, int bankId);   /* @0x800E7BA8 */
 
 /* SNDbankheadercopy @0x800E7BA8 : memcpy the bank header to `dst`, relocate each patch pointer (+0x14 for
  *   bank type 4, else +0xc) relative to `dst`, then point the bank table entry at `dst`.
@@ -123,7 +122,7 @@ extern int SNDbankheadercopy(void *dst, int bankId);   /* @0x800E7BA8 */
  * the new basin: the `i = 0` position sweep (36/36/36/32/28/20/10, optimum still LAST) and
  * hoisting `i = 0` above the count guard (36 -- `i` loses $v1; a do{}while(0) ref inflator on the
  * hoisted init restores the rank and returns to exactly 10, so the hoist is a no-op, not a win). */
-extern int SNDbankheadercopy(void *dst, int bankId)
+int SNDbankheadercopy(void *dst, int bankId)
 {
     register int id;
     unsigned char *dest = (unsigned char *)dst;

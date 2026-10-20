@@ -3,14 +3,12 @@
  *   1 fn @0x8010C894.  iSNDlibatodlrv -- the shared sine pan law (angle -> L/R gains, clamped 0..0x7f),
  *   used by saetolrv/saetodv.  Ghidra nfs4-f.exe.c (saelib) + IDA sig (4-arg; Ghidra __thiscall).
  */
-
-extern int iSNDsin(int phase);     /* ssine */
-
-extern int iSNDlibatodlrv(int angle, int level, int *out_l, int *out_r);   /* @0x8010C894 */
+#include "saelib.h"
+#include "ssine.h"
 
 /* iSNDlibatodlrv @0x8010C894 : split `level` into left/right gains for pan `angle` via a quarter-wave sine
  *   crossfade (angle>>6 indexes the sine table), each clamped to 0..0x7f. */
-extern int iSNDlibatodlrv(int angle, int level, int *out_l, int *out_r)
+int iSNDlibatodlrv(int angle, int level, int *out_l, int *out_r)
 {
     int r;
     unsigned int s = (unsigned int)iSNDsin(angle >> 6);

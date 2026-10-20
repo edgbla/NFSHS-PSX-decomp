@@ -11,16 +11,11 @@
  *   State: DAT_80147920 handle counter, DAT_80147924 in-flight count, DAT_80147925 active slot,
  *          DAT_80147926 busy flag, DAT_80147919 pre-load guard (shared with sdpacket).
  */
+#include "sdata.h"
+#include "sdma.h"
+#include "slib.h"
+#include "snd_state.h"
 
-extern int            sndgs[];
-extern unsigned char  sndpd[];              /* voice/queue state base @0x80147918 (shared) -- UNSIZED
-                                              * array: forces the oracle's `lui;addiu &sndpd; op N(base)`
-                                              * base+offset shape instead of folding each field into its
-                                              * own absolute symbol (same lever as spatkey.c). ALL the
-                                              * DMA-queue state below is really `sndpd+offset`, confirmed
-                                              * byte-for-byte from the raw oracle (e.g. iSNDdmcallback's
-                                              * `lbu v1,0xD(a0)` where a0=sndpd -- NOT a separately
-                                              * materialized DAT_80147925 symbol). */
 #define SNDPD_PRELOAD    (*(unsigned char *)(sndpd + 0x1))    /* pre-load guard (shared w/ sdpacket) */
 #define SNDPD_HANDLEID   (*(int *)(sndpd + 0x8))              /* rolling DMA handle id */
 #define SNDPD_INFLIGHT   (*(signed char *)(sndpd + 0xC))      /* in-flight transfer count */
@@ -53,12 +48,7 @@ extern unsigned int  *DAT_80147e1c;         /* DMA4 BCR  reg ptr  */
 extern unsigned int  *DAT_80147e20;         /* DMA4 CHCR reg ptr  */
 extern void (*gPreLoadTicks)(void);         /* pre-load tick hook @0x80148040 */
 
-extern void iSNDdmtransfer(void);                                              /* @0x8010A880 */
-extern void iSNDdmcallback(void);                                              /* @0x8010AA64 */
-extern void iSNDdmservice(void);                                               /* @0x8010AC20 */
-extern int  iSNDdmqueue(int dst_spu, unsigned int src_ram, int len,
-                            int prio, int flag);                                    /* @0x8010ACA0 */
-extern int  iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio);
+
 
 /* cop0 Status read/write -- the queue mutations run with interrupts masked on target (host: plain).
  * The callback uses one explicit CP0 transaction macro because the R3000 Status write requires three
@@ -87,7 +77,7 @@ static inline void wr_sr(unsigned int s) { g_sr = s; }
 #endif
 
 /* iSNDdmtransfer @0x8010A880 : pick the highest-priority queued transfer and kick the SPU-write DMA for it. */
-extern void iSNDdmtransfer(void)
+void iSNDdmtransfer(void)
 {
     unsigned int sr;
     int i;
@@ -184,7 +174,7 @@ extern void iSNDdmtransfer(void)
 }
 
 /* iSNDdmcallback @0x8010AA64 : DMA-done handler -- settle SPUCNT, retire the active entry, fire the next. */
-extern void iSNDdmcallback(void)
+void iSNDdmcallback(void)
 {
     unsigned int sr;
     volatile int i;
@@ -262,7 +252,7 @@ extern void iSNDdmcallback(void)
 }
 
 /* iSNDdmservice @0x8010AC20 : per-tick pump -- start a transfer if idle, or complete one past its deadline. */
-extern void iSNDdmservice(void)
+void iSNDdmservice(void)
 {
     unsigned char *pd = sndpd;
     if (*(unsigned char *)(pd + 0xe) == 0)
@@ -285,7 +275,7 @@ extern void iSNDdmservice(void)
  *   low bytes of prio/flag. Reusing the saved Status value and walking sndpd+0x10 fixes the earlier
  *   critical-section and split-storage bugs. Snapshotting the new handle before the verified interrupt-mask
  *   sequence preserves the oracle's load and all three COP0 hazard slots (39->28 detailed diffs). */
-extern int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
+int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
 {
     int queuedFlag = flag;
     int i;
@@ -355,7 +345,7 @@ occupied:
 /* iSNDdmqueuesplit @0x8010AD94 : enqueue a large transfer as 4 KB chunks, draining the queue when it backs
  *   up (>3 in flight).  Returns the last chunk's handle. MATCH (54/54): signed queue depth, strict
  *   4 KB chunk selection, raw integer priority and the pre-tested service loop all follow the oracle. */
-extern int iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio)
+int iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio)
 {
     int r = 0, chunk;
     if (0 < len) {
@@ -384,7 +374,7 @@ extern int iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio
 
 /* iSNDdmcomplete @0x8010AE6C : has the transfer with handle `handle` finished?  Services the queue, then
  *   scans for the handle -- returns 0 if still pending, 1 if done/absent. */
-extern int iSNDdmcomplete(int handle)
+int iSNDdmcomplete(int handle)
 {
     int i, result;
     unsigned char *base;

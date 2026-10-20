@@ -6,16 +6,13 @@
  *   play-info `info`: [0] = patch index, [1] = bank id (byte).
  *   bank @ (bankid*0xc + sndgs[0x26]): +4 type(b), +6 patch count(u16), +0xc/+0x14 patch ptr table.
  */
-
-extern int sndgs[];
-extern int iSNDvalidbank(int bankid);                /* sbvalid */
-extern int iSNDplaytaggedpatch(int patch, int info); /* stagpat */
-
-extern int  cSNDplay(int *info, int recurse);   /* @0x800E7A68 ; a1 always 0 at every call */
-extern int  SNDplay(int *info);             /* @0x800E7A30 */
+#include "sbvalid.h"
+#include "sdata.h"
+#include "splay.h"
+#include "stagpat.h"
 
 /* SNDplay @0x800E7A30 : play `info` if the audio system is up; -10 if down. */
-extern int SNDplay(int *info)
+int SNDplay(int *info)
 {
     if ((signed char)sndgs[0xf] == 0)
         return -10;
@@ -27,7 +24,7 @@ extern int SNDplay(int *info)
  * the oracle's exact basic-block layout for the in-range test (branch-polarity + which path needs the
  * extra `j`-trampoline); a nested `if (cond) { body }` or an explicit `goto fail;` both left the
  * in-range test's branch inverted (7-diff residual) even though they're semantically identical. */
-extern int cSNDplay(int *info, int recurse)
+int cSNDplay(int *info, int recurse)
 {
     int patch, bank, pp;
     (void)recurse;

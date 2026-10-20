@@ -12,8 +12,15 @@
  *   +0x20/+0x24/+0x28 sweep step/accum/count, +0x2d vol, +0x30 sweep cnt, +0x31 sweep idx, +0x39/0x3a/0x3b
  *   lfo/vel/pitch phase, +0x40 sweep tbl, +0x5e pitch cache, +0x62 final pitch.
  */
+#include "sclcptch.h"
+#include "sdata.h"
+#include "sdfx.h"
+#include "sdriver.h"
+#include "slib.h"
+#include "snd_state.h"
+#include "sserver.h"
+#include "sstop.h"
 
-extern int           sndgs[];
 extern int           timerhz[];          /* hardware tick rate            */
 /* sndgs = 0x80147860 (configs/symbol_addrs.txt); DAT_80147910/DAT_80147912 are FIELDS of sndgs itself
  * (+0xB0 / +0xB2), not separate globals -- confirmed by oracle's lhu/sh %B2(s0) off the SAME &sndgs base
@@ -21,20 +28,8 @@ extern int           timerhz[];          /* hardware tick rate            */
 #define DAT_80147910 (*(short *)((char *)sndgs + 0xB0))   /* last-seen timerhz             */
 #define DAT_80147912 (*(short *)((char *)sndgs + 0xB2))   /* deferred-server request count */
 
-extern void SNDI_mutexlock(void);        /* sdfx     */
-extern void SNDI_mutexunlock(void);      /* sdfx     */
-extern void iSNDserve(void);             /* slib     */
-extern int  iSNDcalcpitch(int note);     /* sclcptch */
-extern int  iSNDplatformpitch(int chan, int pitch);   /* sdriver */
-extern int  iSNDvol(int chan, int level);             /* sdriver */
-extern void iSNDcalcvol(int chan);            /* spatkey */
-extern int  SNDstop(unsigned int tag);                /* sstop   */
 extern void trap(unsigned int code);
 
-extern void iSNDserver(void);                         /* @0x800EA138 */
-extern void iSND100hzserver(void);                    /* @0x800EA254 */
-extern void iSNDenteraudio(void);                     /* @0x800EA534 */
-extern void iSNDleaveaudio(void);                     /* @0x800EA56C */
 
 #define GB(idx) (((char *)sndgs)[idx])            /* signed byte of sndgs    */
 #define GUB(idx) (((unsigned char *)sndgs)[idx])  /* unsigned byte of sndgs  */
@@ -87,7 +82,7 @@ extern void iSNDleaveaudio(void);                     /* @0x800EA56C */
  *     for the whole function (71/71 insns but 56 diffs).  The 0x3e re-entrancy flag is genuinely volatile
  *     (it guards against re-entry from the IRQ/leaveaudio path), so its read and its `=1` store carry the
  *     qualifier too -- all four spellings byte-match, the consistent one is kept. */
-extern void iSNDserver(void)
+void iSNDserver(void)
 {
     char *p;
     char *g;
@@ -127,7 +122,7 @@ extern void iSNDserver(void)
  *   p[0x10] = SND_ENVELOPE_POINT{int duration; int volume;}[] (the stride-8 table; <<16 = 16.16 volume);
  *   the 100 Hz client array generalizes NFS2's discrete midiserver/speechserver/crowdserver/pathserver
  *   pointers; NFS4 dropped NFS2's malformed-envelope abortmessage and added the pitch-LFO block. */
-extern void iSND100hzserver(void)
+void iSND100hzserver(void)
 {
     int *g;
     int i;
@@ -234,7 +229,7 @@ next_chan:
 }
 
 /* iSNDenteraudio @0x800EA534 : take the audio re-entrancy lock (mutex + depth++). */
-extern void iSNDenteraudio(void)
+void iSNDenteraudio(void)
 {
     char *g;
     SNDI_mutexlock();
@@ -243,7 +238,7 @@ extern void iSNDenteraudio(void)
 }
 
 /* iSNDleaveaudio @0x800EA56C : release the audio lock; at depth 0, flush any servers deferred while held. */
-extern void iSNDleaveaudio(void)
+void iSNDleaveaudio(void)
 {
     char *g = (char *)sndgs;      /* held across the call (oracle: callee-saved $s0) */
     *(volatile unsigned char *)(g + 0x3f) =
@@ -261,7 +256,7 @@ extern void iSNDleaveaudio(void)
 /* iSNDserveradd100hzclient @0x800EA5F0 : register a 100 Hz tick callback `cb`; returns sndgs.
  *   Count read SIGNED (lb) for the index, UNSIGNED (lbu) for the increment-store.
  * MATCH: byte-base cast keeps oracle's sll(lb*4) then addu then sw a0,0x4c(v1) displacement form */
-extern short *iSNDserveradd100hzclient(int cb)
+short *iSNDserveradd100hzclient(int cb)
 {
     /* MATCH: index sndgs by the raw client count ONLY (base = sndgs + count*4, scaled by sizeof(int)
      * with no other term folded into the index) and fold the 0x13-slot (0x4c-byte) client-array
@@ -284,7 +279,7 @@ extern short *iSNDserveradd100hzclient(int cb)
  * the {i,base,cb} = {$a0,$a1,$a2} rotation lands; the `"0"` matching constraint makes reload emit
  * retail's `addu $a2,$a0,$zero` at insn 0 at zero cost.  Full mechanism + the -dg receipt is on the
  * twin in ssysserv.c.  (Retires the w33/w34 `volatile`-param 3-diff floor on BOTH twins.) */
-extern void iSNDserverremove100hzclient(int cb)
+void iSNDserverremove100hzclient(int cb)
 {
     int i;
     int j;

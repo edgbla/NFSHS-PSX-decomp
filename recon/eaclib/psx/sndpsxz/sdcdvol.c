@@ -10,15 +10,14 @@
  * `volatile` in this file was measured individually or as a group and is load-bearing
  * (MMIO, or state the oracle provably re-reads) -- do not strip them.  Receipt:
  * scratchpad/w85/S8_receipt.md. */
-
-extern void iSNDpvtolrv(int pan, int level, int *out_l, int *out_r);   /* spvtolrv */
-extern unsigned char sndpd[];   /* EA sound-driver state base @0x80147918 */
-
-extern int iSNDplatformcdpanvol(int pan, int vol);   /* @0x801094EC */
+#include "sdcdvol.h"
+#include "slib.h"
+#include "snd_state.h"
+#include "spvtolrv.h"
 
 /* iSNDplatformcdpanvol @0x801094EC : derive CD L/R from (pan, vol) and write SPU_CD_VOL_L/R (base+0x1b0/2),
  *   scaling each by 0x102 and clamping to 15-bit. */
-extern int iSNDplatformcdpanvol(int pan, int vol)
+int iSNDplatformcdpanvol(int pan, int vol)
 {
     int *base;
     int outL, outR;

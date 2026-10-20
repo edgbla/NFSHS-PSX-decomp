@@ -15,9 +15,9 @@
  * `volatile` in this file was measured individually or as a group and is load-bearing
  * (MMIO, or state the oracle provably re-reads) -- do not strip them.  Receipt:
  * scratchpad/w85/S8_receipt.md. */
+#include "sdata.h"
+#include "spatkey.h"
 
-
-extern int sndgs[];
 extern unsigned char sndpd[];   /* EA sound-driver state base @0x80147918 (unsized array: forces
                                      * the oracle's `lui;addiu &sndpd; lw r,0x514(base)` base+offset shape
                                      * instead of folding &sndpd+const into one absolute %lo load) */
@@ -49,7 +49,7 @@ extern int iSNDsetslot(int chan, int addr, int pitch);   /* @0x800FF394 */
 /* iSNDpatchkey @0x800FEF4C : iterate the voices keyed to a channel group.  For a standalone channel,
  *   hands back `chan` once; for a group, walks the pool returning each held member.  `tag` points at a
  *   cursor (init -1).  Returns 1 while voices remain, 0 when exhausted. */
-extern int iSNDpatchkey(int chan, int tag)
+int iSNDpatchkey(int chan, int tag)
 {
     int pbase = sndgs[0x25];
     char grp;

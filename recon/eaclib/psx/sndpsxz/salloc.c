@@ -49,6 +49,9 @@
  *     +0x00 owning tag (id|priority)   +0x0B in-use state (0 free / 1 held / 2 linked)
  *     +0x0C age   +0x10 alloc timestamp   +0x3C link-back   +0x3D..  voice fields
  */
+#include "sstop.h"
+#include "sover.h"
+#include "salloc.h"
 
 extern int           sndgs[];
 /* DISTINCT SYMBOL VIEW (catalog, w35-a4 device): a second declaration of the SAME storage under its
@@ -63,8 +66,6 @@ extern int           DAT_80136dec[];             /* rolling allocation id counte
                                                   extern HERE -- a local tentative def would make it
                                                   small-common/gp-rel, but the oracle reaches it ABSOLUTE
                                                   (lui/lw; sec 3.12 #6 caveat: no %gp_rel oracles). */
-extern int  SNDstop(unsigned int tag);                          /* sstop  */
-extern int  SNDover(unsigned int tag);                          /* sover  */
 extern int  DAT_801478f4;
 /* DISTINCT UNSIZED VIEW of the same word (w50-a7).  Reading the scalar generates the `(high sym)`
  * AT the load, after the partner*100 scale chain; retail emits the `lui %hi` at the JOIN-BLOCK HEAD
@@ -75,12 +76,10 @@ extern int  DAT_801478f4;
  * "ARRAY DECAY != &scalar".) */
 extern int  DAT_801478f4_v[] __asm__("DAT_801478f4");                                      /* channel-pool pointer (sndgs + 0x94) */
 
-extern int iSNDischanreserved(int chan, int count);             /* @0x800FE724 */
-
 #define SNDNUMCHAN (((unsigned char *)sndgs)[0x11])  /* sndgs[4]._1_1_ : channels in the pool */
 
 /* iSNDischanreserved @0x800FE724 : is channel `chan` already in the chosen list (first `count` entries)? */
-extern int iSNDischanreserved(int chan, int count)
+int iSNDischanreserved(int chan, int count)
 {
     int i;
     for (i = 0; i < count; i++)
@@ -234,7 +233,7 @@ extern int iSNDischanreserved(int chan, int count)
  *   keep it in a register.  The remaining residual is that one hoist plus the $s6<->$s7 rotation.
  *   Raw nfs4-f.exe EEF64..EF40B SHA-256:
  *   4af4cae9357cee8d5c94a064c543b15d4d1edb7a6f5d1c0d5ccd8c8f259740fc. */
-extern int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *out)
+int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *out)
 {
     int          reserved = 0;
     int          result = -9;
@@ -519,7 +518,7 @@ done:
    W58 2026-08-11: PASS. Factoring chan*100 as `(chan*25)*4` creates exactly that missing source
    boundary: gcc emits the *25 chain, schedules the independent pool load, then emits the final
    shift by two. This is retail's exact 110-instruction order and introduces no extra code. */
-extern void iSNDfreechan(int chan)
+void iSNDfreechan(int chan)
 {
     unsigned int group;
     int count = 0;
@@ -642,7 +641,7 @@ extern void iSNDfreechan(int chan)
 
 /* iSNDgetchan @0x800FEDC4 : resolve a sound tag back to its channel index, validating that the channel is
  *   still held by that exact tag.  Returns the channel, or a negative error. */
-extern int iSNDgetchan(unsigned int tag)
+int iSNDgetchan(unsigned int tag)
 {
     unsigned char *base;
     int ch;   /* signed -- oracle compares via slt (both operands non-negative so behavior is unchanged) */

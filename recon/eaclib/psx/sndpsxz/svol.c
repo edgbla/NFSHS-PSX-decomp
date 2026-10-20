@@ -6,9 +6,10 @@
  *   recompute (iSNDcalcvol), clear the ramp accumulator @+0x14, and poke the SPU (iSNDvol) with
  *   the voice's left base volume @+0x2D.  SNDvol is the locked public wrapper (-10 when disabled).
  */
+#include "svol.h"
 #include "../../../lib/snd.h"
 
-extern int iSNDunsafevol(int handle, int vol)   /* @0x800E69D0 */
+int iSNDunsafevol(int handle, int vol)   /* @0x800E69D0 */
 {
     int chan = iSNDgetchan(handle);
     int iter;
@@ -36,7 +37,7 @@ done:
     return chan;
 }
 
-extern int SNDvol(int handle, int vol)   /* @0x800E6A94 */
+int SNDvol(int handle, int vol)   /* @0x800E6A94 */
 {
     int r;
     if (SND->enabled == 0)

@@ -9,6 +9,8 @@
  * data globals and no function).  The interior labels are the views other TUs address directly (see ssysinit.c).
  * CLOSED 2026-09-22: iSNDplatformfree is sdasync.obj's -- retail pulls sdata.obj for sbremove.obj's `sndgs` and sdasync.obj for
  * its `iSNDplatformfree`, in that order (tools/psyq_pipe/slink_pullsim.py). */
+#include "sdata.h"
+
 __asm__("\t.globl\tsndgs\n\t.globl\tgSndState\n\t.globl\tD_80147871\n"
         "\t.globl\tD_80147898\n\t.globl\tDAT_801478f4\n\t.globl\tiSNDplatformrate\n"
         "\t.section\t.bss\n\t.align\t2\n"

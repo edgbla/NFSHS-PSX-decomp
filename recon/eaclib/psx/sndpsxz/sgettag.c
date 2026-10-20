@@ -7,13 +7,11 @@
  *   tags (id only); any other id is a data tag whose value (iSNDgetdata) lands in *val and whose stream
  *   pointer lands in *ptr.  A 0xff length byte selects an extended 4-byte length.
  */
-
-extern int iSNDgetdata(unsigned char *p, int n);   /* sgetdata */
-
-extern int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr);  /* @0x8010BD50 */
+#include "sgetdata.h"
+#include "sgettag.h"
 
 /* iSNDgettag @0x8010BD50 : returns 1 while a tag was read, 0 at end of stream (id 0xff). */
-extern int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr)
+int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr)
 {
     unsigned char  id;
     int            at;

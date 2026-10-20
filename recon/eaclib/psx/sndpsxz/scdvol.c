@@ -4,18 +4,12 @@
  *   forwards (pan,vol) to the platform layer.  Ghidra nfs4-f.exe.c (scdvol) + IDA sig.
  *   Ghidra-ism: IDA typed 1 arg, but vol_l/vol_r are both passed on to iSNDplatformcdpanvol (kept 2).
  */
-extern int  sndgs[];        /* (signed char)sndgs[0xf] byte1 (@+0x3d) = master volume */
-/* scdvol.obj .data @0x80136CAC: [0]=pan (64), [1]=master-scaled level (127 initially).  TWO shorts -- LIBMCRD.obj's
- * data starts right after.  The unsized extern view keeps the oracle's absolute addressing; the definition closes
- * the file. */
-extern short sndcdvs[];
-
-extern int iSNDplatformcdpanvol(int pan, int vol);   /* sdcdvol */
-
-extern int SNDcdvol(int vol_l, int vol_r);   /* @0x800FAA44 */
+#include "scdvol.h"
+#include "sdata.h"
+#include "sdcdvol.h"
 
 /* SNDcdvol @0x800FAA44 : cache (vol_l * masterVol)/0x7f and apply the CD pan/volume. */
-extern int SNDcdvol(int vol_l, int vol_r)
+int SNDcdvol(int vol_l, int vol_r)
 {
     sndcdvs[1] = (short)((vol_l * (int)*((signed char *)sndgs + 0x3d)) / 0x7f);
     /* @0x800FAA90/94: iSNDplatformcdpanvol(*(short*)0x80136CAC = cached pan, (int)(short)level). The

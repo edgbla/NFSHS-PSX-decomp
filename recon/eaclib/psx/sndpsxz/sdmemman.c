@@ -185,8 +185,10 @@
  * iSNDpsxmemconstrain above, so this file's own reads/writes of the free-list genuinely alias with
  * slib.c's iSNDinit (writer) and sdmemlu.c's SNDmemlargestunused (reader) -- all three now compute
  * addresses off the same `sndpd` base instead of three disconnected storage locations. */
-extern unsigned char sndpd[];                 /* voice/queue state base @0x80147918 (shared, sdma.c) */
-extern unsigned short D_80147E34[];            /* sndpd+0x51C, exact retail tail-scan relocation */
+#include "sdmemman.h"
+#include "slib.h"
+#include "snd_state.h"
+
 #define SNDPD_ENGINEVER   (*(unsigned short *)(sndpd + 0x51A))  /* min SPU block (reserved low area) */
 #define SNDPD_BLOCKTOTAL  (*(unsigned short *)(sndpd + 0x51C))  /* top of the SPU sample area */
 #define SNDPD_REVERBMODE  (*(unsigned short *)(sndpd + 0x51E))  /* reverb-work-area boundary */
@@ -198,8 +200,6 @@ extern unsigned short D_80147E34[];            /* sndpd+0x51C, exact retail tail
 #define snd_spu_alloc_count  SNDPD_ALLOCCOUNT
 #define DAT_80147e38          (*(int *)(sndpd + 0x520))          /* {block:u16, size:u16}[] alloc table */
 
-extern void iSNDpsxmemconstrain(unsigned int *size, int *avail);  /* @0x8010A550 */
-extern int iSNDpsxmalloc(int size);                               /* @0x8010A5CC */
 
 /* iSNDpsxmemconstrain @0x8010A550 : clamp a candidate [block, avail] window to the SPU sample area limits
  *   (floor at engine_ver, ceil at block_total, and at reverb_mode).  Returns the reverb-bounded
@@ -324,7 +324,7 @@ extern int iSNDpsxmalloc(int size);                               /* @0x8010A5CC
  *   ready list and luid/priority numbers directly, or the LAUNCH_BOOST route (`birthing_insn_p`
  *   needs REG_N_SETS==1) -- e.g. make the *avail temp MUTATED (2+ sets) so it can never boost above
  *   the subu.  Floor stands at 14; the mechanism note above is corrected, not the number. */
-extern void iSNDpsxmemconstrain(unsigned int *size, int *avail)
+void iSNDpsxmemconstrain(unsigned int *size, int *avail)
 {
     unsigned char *pd = sndpd;
     unsigned int lo;
@@ -353,7 +353,7 @@ extern void iSNDpsxmemconstrain(unsigned int *size, int *avail)
 /* iSNDpsxmalloc @0x8010A5CC : allocate `size` bytes (rounded to 64-byte blocks) of SPU local RAM, first-fit
  *   into the gaps of the sorted free-list, inserting the new {block,size} entry in order.  Returns the SPU
  *   byte address (block << 6) or 0 on failure. */
-extern int iSNDpsxmalloc(int size)
+int iSNDpsxmalloc(int size)
 {
     /* MATCH: this split base lifetime plus the label-shaped scan reproduces the oracle's five saved-register
      * layout without turning the indexed table accesses into walking induction pointers.  Keep the empty path
@@ -863,7 +863,7 @@ commit:
  *   the value goes unused) -- not a behavior change for any caller. Their stale `void`/`(void*)`-arg
  *   forward decls elsewhere are harmless under C linkage (no signature-based mangling) and are OUT OF
  *   SCOPE for this file to retarget. */
-extern int iSNDpsxfree(int ptr)
+int iSNDpsxfree(int ptr)
 {
     /* MATCH: same early &sndpd materialization lever as iSNDpsxmalloc/SNDmemlargestunused/iSNDpsxfxinit.
      * __builtin_memcpy on the packed slot is intentional: CC1PSX lowers it to the oracle's direct unaligned

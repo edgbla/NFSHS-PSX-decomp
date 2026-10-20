@@ -7,10 +7,12 @@
  *   Reverb preset table sndpe[]: 0x42-byte coefficient blocks indexed by `mode` (1..9); block[0]
  *   is the work-area size, block[1..0x20] the 0x20 SPU reverb coefficient registers (SPUctrl+0x1c0..).
  */
+#include "sdata.h"
+#include "sdfx.h"
+#include "sdma.h"
+#include "slib.h"
+#include "snd_state.h"
 
-extern int            sndgs[];
-extern unsigned char  sndpd[];               /* EA sound-driver state base @0x80147918 (shared,
-                                                   * sdma.c/sdpacket.c/slib.c/sdmemlu.c/sdmemman.c) */
 #define DAT_8014791c (*(int *)(sndpd + 4))         /* current fx mode */
 /* SPLIT-STORAGE FIX (wave-22 a1): snd_spu_reverb_mode was a standalone extern "own storage" global
  * (sdmemlu.c's old comment credited it to "sdmemman", but it's really the same sndpd+0x51E field
@@ -23,7 +25,7 @@ extern unsigned char  sndpd[];               /* EA sound-driver state base @0x80
  * already models it sndpd-relative -- this file's reads were the disconnected half of that same pair.
  * (Other consumers -- spatkey.c/sdspuirq.c/sdpacket.c/sdcdvol.c -- were left untouched; out of scope.) */
 #define DAT_80147e2c (*(int *)(sndpd + 0x514))
-extern unsigned char  sndpe[];    /* reverb preset coefficient table */
+    /* reverb preset coefficient table */
 /* @0x80136E00 byte-exact from image: 10 blocks (modes 0..9) x 0x42 bytes = 660.
  * block[+0] u16 = SPU reverb work-area size, [+2..0x41] = the 0x20 reverb coefficient regs.
  * VA proven from iSNDpsxfxinit @0x801002D8: `s0 = mode*0x42 + 0x80136E00`. (Old [512]={0} stub
@@ -75,30 +77,20 @@ unsigned char sndpe[660] = {
     0x00, 0x80, 0x00, 0x80
 };
 
-extern unsigned int iSNDpsxeffectoff(int mask);            /* spatkey */
-extern int          iSNDpsxeffectvol(int left, int right); /* spatkey */
 extern void blockmove(int *src, int *dst, int n);         /* blkmov  */
 extern int  blockclear(int buf, int len);                 /* blkfill (2-arg per IDA; Ghidra dropped both) */
-extern int  iSNDdmqueue(int ram, unsigned int spu, int len, int prio, int flag); /* sdma */
-extern int  iSNDdmcomplete(int handle);                   /* sdma */
 
-extern void SNDI_mutexalloc(void);                         /* @0x801001EC */
-extern void SNDI_mutexfree(void);                          /* @0x801001F4 */
-extern void SNDI_mutexlock(void);                          /* @0x801001FC */
-extern void SNDI_mutexunlock(void);                        /* @0x80100204 */
-extern unsigned int iSNDpsxfxinit(int mode);               /* @0x8010020C */
-extern int          iSNDplatformfxinit(int reserved, int mode, int depthL, int depthR); /* @0x80100584 */
 
 /* --- audio mutex: the PSX is single-threaded, so these are no-ops --- */
-extern void SNDI_mutexalloc(void)  { }
-extern void SNDI_mutexfree(void)   { }
-extern void SNDI_mutexlock(void)   { }
-extern void SNDI_mutexunlock(void) { }
+void SNDI_mutexalloc(void)  { }
+void SNDI_mutexfree(void)   { }
+void SNDI_mutexlock(void)   { }
+void SNDI_mutexunlock(void) { }
 
 /* iSNDpsxfxinit @0x8010020C : load the reverb preset `mode` into the SPU -- program the 0x20 reverb
  *   coefficient registers, set the reverb work-area base, DMA-clear the reverb RAM, then enable reverb.
  *   Modes 5/10/20/30/40/50/100/110/120 map to preset indices; modes 7/8 scale a few taps by sndgs depth. */
-extern unsigned int iSNDpsxfxinit(int mode)
+unsigned int iSNDpsxfxinit(int mode)
 {
     unsigned char * pd;
     int work;
@@ -223,7 +215,7 @@ extern unsigned int iSNDpsxfxinit(int mode)
 /* iSNDplatformfxinit @0x80100584 : record the requested fx `mode` and, if audio is up, apply it now. */
 /* MATCH: DAT_8014791c is sndpd+4, not independent scalar storage. The shared-state field form makes
  * gcc retain its explicit v0 base and sink the mode store into the guard branch's delay slot. */
-extern int iSNDplatformfxinit(int reserved, int mode, int depthL, int depthR)
+int iSNDplatformfxinit(int reserved, int mode, int depthL, int depthR)
 {
     (void)reserved;
     (void)depthL;
@@ -237,7 +229,7 @@ extern int iSNDplatformfxinit(int reserved, int mode, int depthL, int depthR)
 /* ---- moved here from sfxlevel.c 2026-09-21 (see the note there) ---- */
 /* iSNDplatformfxmasterlevel @0x801005BC : drive the SPU reverb output volume from the bus master `level`
  *   (the PSX has a single reverb, so `bus` is ignored). */
-extern int iSNDplatformfxmasterlevel(int bus, int level)
+int iSNDplatformfxmasterlevel(int bus, int level)
 {
     (void)bus;
     iSNDpsxeffectvol(level * 0x102, level * 0x102);

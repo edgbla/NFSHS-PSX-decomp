@@ -27,7 +27,7 @@
  *   ===== voice ch = sndgs[0x25] + note*100 (the global channel pool slot) =====
  */
 
-extern int  sndpps[];                /* @0x80148574 -- one-slot player pointer array */
+                /* @0x80148574 -- one-slot player pointer array */
 /* W65-A6 DATA-MAT: `sndpps` was extern-only tree-wide (22 reloc-referenced undefined sites);
  * spktplay.obj is its sole referencer.  Retail: .bss @0x80148574, size 4 (= sndpp @0x80148578
  * - 0x80148574); VA > t_addr+t_size (0x8013E000) => pure zero-init BSS.
@@ -37,14 +37,20 @@ extern int  sndpps[];                /* @0x80148574 -- one-slot player pointer a
  * addressing, while the oracle has ZERO `%gp_rel(sndpps)` sites (grep asm/nonmatchings) i.e.
  * retail addressed it absolutely.  Keeping the C view `extern` is byte-neutral by
  * construction; 13/13 PASS unchanged.  Receipts: scratchpad/w65a6/RECEIPTS.md */
+#include "sdata.h"
+#include "slib.h"
+#include "snd_state.h"
+#include "spktplay.h"
+#include "sserver.h"
+
 __asm__("\t.globl\tsndpps\n\t.section\t.bss\n\t.align\t2\nsndpps:\n\t.space\t4\n\t.text");
-extern int  sndgs[];                  /* (signed char)sndgs[0xf]=init, sndgs[0x25]=channel pool base */
+                  /* (signed char)sndgs[0xf]=init, sndgs[0x25]=channel pool base */
 /* HEADER WISH: the oracle actually loads this global from D_80147900 (SNDPKTPLAY_start @0x80102C34,
  * iSNDplaytaggedtimbre @0x801020D8 -- same "rate * ch-field * ch-field, magic-const mult, dur"
  * idiom both places), NOT 0x80147840 as this decl previously claimed. Doesn't affect verify_asm
  * (relocations are name/addend-erased) but the address comment was wrong; not chased further this
  * pass -- flag for whoever materializes/cross-checks sndpsxz globals next. */
-extern int  iSNDplatformrate[];       /* @0x80147900 -- platform sample rate (pitch calc); UNSIZED: oracle loads it absolute (lui+lw), a sized [1] goes gp-rel */
+       /* @0x80147900 -- platform sample rate (pitch calc); UNSIZED: oracle loads it absolute (lui+lw), a sized [1] goes gp-rel */
 
 /* ---- backends ---- */
 extern int  iSNDplatformpacketoverhead(void);                           /* sdpacket */
@@ -57,10 +63,8 @@ extern void iSNDplatformpacketplaydestroy(int p);
 extern int  iSNDallocchan(int a, int b, int c, int *out);               /* salloc */
 extern void iSNDfreechan(int note);
 extern void iSNDcalcpitch(int note);                                    /* sclcptch */
-extern void iSNDcalcvol(int note);                                      /* spatkey  */
 extern void SNDstop(unsigned int voice);                                /* sstop    */
-extern void iSNDenteraudio(void);                                       /* sserver  */
-extern void iSNDleaveaudio(void);
+
 
 #define MI(p,o)  (*(int*)((p)+(o)))
 #define MB(p,o)  (*(unsigned char*)((p)+(o)))
@@ -81,14 +85,6 @@ extern void iSNDleaveaudio(void);
 #define VHR(p,o) (((int)(*(volatile unsigned short *)((p)+(o)))) << 16)
 
 /* forward decls (mutual) */
-extern int iSNDpacketplayoverhead(int n);                /* @0x801028BC */
-extern int SNDPKTPLAY_overhead(int n);                   /* @0x801028D0 */
-extern int SNDPKTPLAY_create(int mem, int memsize, int relcb, int notifycb); /* @0x801028FC */
-extern int SNDPKTPLAY_start(int p, int rate, int hdr, int params);       /* @0x80102A10 */
-extern int SNDPKTPLAY_submit(int p, int frame);          /* @0x80102CFC */
-extern int SNDPKTPLAY_submitspace(int p);                /* @0x80102E70 */
-extern int SNDPKTPLAY_unsafeframesoutstanding(int p);    /* @0x80102EC4 */
-extern int SNDPKTPLAY_framesoutstanding(int p);          /* @0x80102EEC */
 typedef struct SNDSAMPLEFORMAT {
     unsigned short samplerate;
     unsigned char channels, samplerep;
@@ -112,22 +108,17 @@ typedef struct PacketFramePrefix {
 typedef struct PacketFrameTail {
     int channel[2];
 } PacketFrameTail;
-extern int SNDPKTPLAY_purge(int p, int lo, int hi);      /* @0x80102F3C */
-extern int SNDPKTPLAY_stop(int p);                       /* @0x80103118 */
-extern int SNDPKTPLAY_destroy(int p);                    /* @0x801031F4 */
-extern int iSNDpacketget(int p, int idx, int *out);      /* @0x80103248 */
-extern unsigned int iSNDpacketfreeframes(int p, int idx, int bytes);     /* @0x801033C4 */
 
 /* ====================================================================================== */
 
 /* iSNDpacketplayoverhead @0x801028BC : bytes of player bookkeeping for `n` frames. */
-extern int iSNDpacketplayoverhead(int n)
+int iSNDpacketplayoverhead(int n)
 {
     return n * 0x18 + 0x40;
 }
 
 /* SNDPKTPLAY_overhead @0x801028D0 : total player overhead (bookkeeping + platform). */
-extern int SNDPKTPLAY_overhead(int n)
+int SNDPKTPLAY_overhead(int n)
 {
     int a = iSNDpacketplayoverhead(n);
     return a + iSNDplatformpacketoverhead();
@@ -150,7 +141,7 @@ extern int SNDPKTPLAY_overhead(int n)
  *   (3) `mem` is DEAD after the offset add (lever #14 in-place mutate): reassigned in place to become
  *       `ppp` and used directly for every subsequent field store; the pre-offset value is saved to
  *       `savedmem` (oracle's `$s0`) before the reassignment for the +0x18 store. */
-extern int SNDPKTPLAY_create(int mem, int memsize, int relcb, int notifycb)
+int SNDPKTPLAY_create(int mem, int memsize, int relcb, int notifycb)
 {
     int slot, off, savedmem;
     if ((signed char)sndgs[0xf] == 0)
@@ -193,7 +184,7 @@ found:
  *   Ghidra's hdr/arg3 param naming is swapped), computes the playback pitch/duration, and hands off to the
  *   platform.  Returns the voice id, or a negative error.
  *   Args (per the caller, sst): rate = locked rate word, hdr = 0x14-byte header, params = 5-word params. */
-extern int SNDPKTPLAY_start(int p, int rate, int hdr, int params)
+int SNDPKTPLAY_start(int p, int rate, int hdr, int params)
 {
     int ppp, note, allocOut, ch, dur, r;
     int rateb2;
@@ -477,7 +468,7 @@ extern int SNDPKTPLAY_start(int p, int rate, int hdr, int params)
  *   | opacity fence on j 2   (all 93/93).
  * i.e. every form that puts j's evaluation first pays 12, and no fence position buys the order
  * without the colour.  Do not re-run the order sweep. */
-extern int SNDPKTPLAY_submit(int p, int frame)
+int SNDPKTPLAY_submit(int p, int frame)
 {
     int ppp, slot;
     if ((signed char)sndgs[0xf] == 0)
@@ -577,7 +568,7 @@ leave:
  *   the lower pseudo while `j = 0;` is written first.  Fences were not swept here this wave. */
 
 /* SNDPKTPLAY_submitspace @0x80102E70 : free frame slots in the ring. */
-extern int SNDPKTPLAY_submitspace(int p)
+int SNDPKTPLAY_submitspace(int p)
 {
     if ((signed char)sndgs[0xf] == 0)
         return -10;
@@ -595,14 +586,14 @@ extern int SNDPKTPLAY_submitspace(int p)
 }
 
 /* SNDPKTPLAY_unsafeframesoutstanding @0x80102EC4 : bytes still to be played (no critical section). */
-extern int SNDPKTPLAY_unsafeframesoutstanding(int p)
+int SNDPKTPLAY_unsafeframesoutstanding(int p)
 {
     int ppp = sndpps[p];
     return MI(ppp, 0x10) + MI(ppp, 0x14);
 }
 
 /* SNDPKTPLAY_framesoutstanding @0x80102EEC : same, inside a critical section. */
-extern int SNDPKTPLAY_framesoutstanding(int p)
+int SNDPKTPLAY_framesoutstanding(int p)
 {
     int r;
     if ((signed char)sndgs[0xf] == 0)
@@ -635,7 +626,7 @@ extern int SNDPKTPLAY_framesoutstanding(int p)
  *   W31 findings that still hold: goto loop kills the strength-reduced store anchor; VH() volatile
  *   short reads for wr/rd/total/ringsize; REMOVE ("lo<=fr0<=hi") is the branch-away/fallthrough arm
  *   and KEEP is the oracle's explicit two-`bnez`-to-the-same-label branch target. */
-extern int SNDPKTPLAY_purge(int p, int lo, int hi)
+int SNDPKTPLAY_purge(int p, int lo, int hi)
 {
     int   ppp, i, wrptr, wr, rd, total, rdoff;
 
@@ -708,7 +699,7 @@ purge_next: {
  * sink the +0 store into iSNDleaveaudio's jal delay slot, both of which gcc's CSE/scheduler undo unless
  * the accesses are `volatile` (this player slot IS touched by async playback/IRQ, so the qualifier is
  * semantically correct, not just a match hack). */
-extern int SNDPKTPLAY_stop(int p)
+int SNDPKTPLAY_stop(int p)
 {
     int ppp;
     if ((signed char)sndgs[0xf] == 0)
@@ -727,7 +718,7 @@ extern int SNDPKTPLAY_stop(int p)
 }
 
 /* SNDPKTPLAY_destroy @0x801031F4 : release the player slot. */
-extern int SNDPKTPLAY_destroy(int p)
+int SNDPKTPLAY_destroy(int p)
 {
     if ((signed char)sndgs[0xf] == 0)
         return -10;
@@ -739,7 +730,7 @@ extern int SNDPKTPLAY_destroy(int p)
 /* iSNDpacketget @0x80103248 : platform pull -- hand out the next sample pointer for channel `idx` of the
  *   head frame, advancing the ring (and firing the release callback) once the last channel is taken.
  *   Writes the frame size to *out.  Returns the channel's sample pointer (0 if none). */
-extern int iSNDpacketget(int p, int idx, int *out)
+int iSNDpacketget(int p, int idx, int *out)
 {
     int   ppp = sndpps[p];
     short m;
@@ -794,7 +785,7 @@ extern int iSNDpacketget(int p, int idx, int *out)
 
 /* iSNDpacketfreeframes @0x801033C4 : platform notify -- once the last channel of a frame is consumed,
  *   credit `bytes` back and call the notify callback. */
-extern unsigned int iSNDpacketfreeframes(int p, int idx, int bytes)
+unsigned int iSNDpacketfreeframes(int p, int idx, int bytes)
 {
     int          ppp = sndpps[p];
     unsigned int v = (unsigned int)MB(ppp, 0x26);

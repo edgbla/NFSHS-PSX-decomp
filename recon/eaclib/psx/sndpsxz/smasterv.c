@@ -3,8 +3,13 @@
  *   1 fn @0x800E7FF0.  SNDmastervol -- set the global master volume and re-derive every voice's SPU volume.
  *   Ghidra nfs4-f.exe.c (smasterv).
  */
+#include "sdata.h"
+#include "sdriver.h"
+#include "slib.h"
+#include "snd_state.h"
+#include "smasterv.h"
+#include "sserver.h"
 
-extern int sndgs[];
 struct SNDMasterState {
     unsigned char pad0[0x11];
     unsigned char channel_count;
@@ -12,15 +17,9 @@ struct SNDMasterState {
     int play_records;
 };
 #define SNDMASTER_STATE (*(struct SNDMasterState *)sndgs)
-extern void iSNDcalcvol(int chan);    /* spatkey */
-extern int  iSNDvol(int chan, int level);     /* sdriver */
-extern void iSNDenteraudio(void);             /* sserver */
-extern void iSNDleaveaudio(void);
-
-extern int SNDmastervol(int vol);             /* @0x800E7FF0 */
 
 /* SNDmastervol @0x800E7FF0 : store the master volume (sndgs[0xf]._1_1_) and refresh all held voices. */
-extern int SNDmastervol(int vol)
+int SNDmastervol(int vol)
 {
     int chan;
     if ((signed char)sndgs[0xf] == 0)

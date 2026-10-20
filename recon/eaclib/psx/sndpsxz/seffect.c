@@ -5,17 +5,13 @@
  *
  *   Per-bus state in sndgs (bus*4 stride): +0x27 mode, +0x28 master level, +0x29/+0x2a depth params.
  */
-
-extern int sndgs[];
-extern int iSNDplatformfxinit(int bus, int mode, int depthL, int depthR); /* sdfx */
-extern int iSNDplatformfxmasterlevel(int bus, int level);    /* sfxlevel */
-extern int SNDfxlevel(int chanTag, int bus, int level);      /* sfxlevel */
-
-extern int SNDfxmasterlevel(int bus, int level);   /* @0x800E6DD0 */
-extern int SNDfxinitbus(int bus, int mode, int arg2, int arg3, int arg4);  /* @0x800E6D58 */
+#include "sdata.h"
+#include "sdfx.h"
+#include "seffect.h"
+#include "sfxlevel.h"
 
 /* SNDfxinitbus @0x800E6D58 : initialise effect bus `bus` (mode + depth params), then set its master level. */
-extern int SNDfxinitbus(int bus, int mode, int arg2, int arg3, int arg4)
+int SNDfxinitbus(int bus, int mode, int arg2, int arg3, int arg4)
 {
     int *e = &sndgs[0x27] + bus * 4;
     e[0] = arg2;
@@ -30,7 +26,7 @@ extern int SNDfxinitbus(int bus, int mode, int arg2, int arg3, int arg4)
 /* SNDfxmasterlevel @0x800E6DD0 : record bus `bus`'s master level and re-push each channel's send level.
  * MATCH: the short-lived `base` keeps the bus-store address rooted at sndgs, while the indexed record
  * loop naturally creates the oracle's separate base, count and 100-byte induction registers. */
-extern int SNDfxmasterlevel(int bus, int level)
+int SNDfxmasterlevel(int bus, int level)
 {
     int r, i;
     unsigned char *loopBase;

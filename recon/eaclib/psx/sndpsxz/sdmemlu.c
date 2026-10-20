@@ -27,15 +27,14 @@
  *   sdmemman.c's iSNDpsxmalloc/iSNDpsxfree and sdfx.cpp's iSNDpsxfxinit (the OTHER readers/writers of
  *   this same storage) were updated identically in the same commit so every access genuinely aliases.
  */
-
-extern unsigned char sndpd[];   /* EA sound-driver state base @0x80147918 (shared, sdma.c/sdpacket.c/slib.c) */
+#include "sdmemlu.h"
+#include "slib.h"
+#include "snd_state.h"
 
 #define SND_ALLOCCNT (*(unsigned short *)(sndpd + 0x518))  /* # of live SPU allocations */
 #define SND_REVERB   (*(unsigned short *)(sndpd + 0x51E))  /* reverb-work-area boundary */
 #define SND_PREVTBL  ((unsigned short *)(sndpd + 0x51C))   /* virtual entry[-1] = {block_total,reverb_mode} */
 #define SND_TBL      ((unsigned short *)(sndpd + 0x520))   /* real free-list table */
-
-extern int SNDmemlargestunused(int *out);   /* @0x800E7CEC */
 
 /* SNDmemlargestunused @0x800E7CEC : scan the gaps between SPU allocations for the biggest, in 64-byte
  *   blocks; report start (*out) and size, both converted to bytes (<<6).
@@ -45,7 +44,7 @@ extern int SNDmemlargestunused(int *out);   /* @0x800E7CEC */
  *   prev entries are INDEX-form (oracle `sll i,2` in the loop-top delay slot, NOT strength-reduced --
  *   see the gap-reuse comment); `tbl` is a WALKED u16 pointer (oracle `addiu a2,a2,4` in the loop-back
  *   delay slot); both hit-arms assign `best` before `*out`. */
-extern int SNDmemlargestunused(int *out)
+int SNDmemlargestunused(int *out)
 {
     int             best, gap, i, end, n;
     unsigned short  count;

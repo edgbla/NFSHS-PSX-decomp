@@ -4,14 +4,11 @@
  *   previous (prevL,prevR) so the shorter side moves, picking which channel gets negated by quadrant.
  *   Ghidra nfs4-f.exe.c (saetodv) + IDA sig (6-arg; Ghidra dropped out_r/prevL/prevR as in_a3/in_stack_*).
  */
-
-extern void iSNDlibatodlrv(int angle, int level, int *out_l, int *out_r);   /* saelib */
-
-extern int iSNDabs(int a);                                                   /* @0x8010AEDC */
-extern void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int prevR); /* @0x8010AEF4 */
+#include "saetodv.h"
+#include "saelib.h"
 
 /* iSNDabs @0x8010AEDC : integer absolute value. */
-extern int iSNDabs(int a)
+int iSNDabs(int a)
 {
     if (a < 0)
         a = -a;
@@ -20,7 +17,7 @@ extern int iSNDabs(int a)
 
 /* iSNDatodlrv @0x8010AEF4 : pan `level` at `angle` (via saelib), then resolve the new L/R against the prior
  *   (prevL,prevR) quadrant so playback pans smoothly -- one channel is negated to encode the move direction. */
-extern void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int prevR)
+void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int prevR)
 {
     iSNDlibatodlrv(angle, level, out_l, out_r);
     {

@@ -49,11 +49,12 @@
  *     +0x10 data rate   +0x14 bytes consumed   +0x18 total size (round-up 0x1C)   +0x1C remaining
  *     +0x20 submitted count   +0x24 num chunks   +0x28(short) name
  */
+#include "sdata.h"
+#include "spat2hdr.h"
+#include "spvoices.h"
+#include "sserver.h"
+#include "sst.h"
 
-/* ---- globals ---- */
-extern int sndss[];                     /* @0x8013EA80 -- single stream slot (loops are `<1`) */
-extern int sndgs[];                      /* SND global state: (char)sndgs[0xf]=init, sndgs[0x22]=destroyall hook */
-extern unsigned char sndStreamMap[];     /* @0x8013EA84 (=sndss+4): pktplay-handle -> stream slot */
 /* W65-A6 DATA-MAT (BSS run @0x8013EA80, 8 bytes, ends exactly at gFileDevice @0x8013EA88):
  *   sndss @0x8013EA80 size 4   +   sndStreamMap @0x8013EA84 size 4.
  * `sndss` was extern-only tree-wide (24 reloc-referenced undefined sites).  The old
@@ -89,32 +90,15 @@ extern int  SNDPKTPLAY_overhead(int arg);
 extern int  SNDPKTPLAY_create(int buf, int size, void *relcb, void *notifycb);
 
 /* ---- other SND helpers ---- */
-extern int  iSNDpatchtohdr(short *src, int *rateDst, int *fmtDst, int *outSize); /* spat2hdr */
 extern int  iSNDplatformcalcdatarate(void *rate);                                /* sdpacket  */
-extern void iSNDenteraudio(void);                                                /* sserver   */
-extern void iSNDleaveaudio(void);
+
 extern void iSNDserveraddclient(void *cb);                                       /* ssysserv  */
 extern void SNDSTRM_setgreedylevel(int strm, int lvl);                           /* sstsetgl  */
-extern int  SNDSTRM_destroy(int s);                                              /* spvoices  */
-extern int  SNDSTRM_purge(int s);
+
 extern int  memcmp(const void *a, const void *b, int n);
 extern void *memcpy(void *d, const void *s, int n);
 
 /* ---- internal forward decls (mutually recursive) ---- */
-extern int  iSNDstreamdestroyall(void);                       /* @0x800E8C14 */
-extern int  iSNDstreamgetstreamptr(int idx);                  /* @0x800E8C48 */
-extern void iSNDstreamremoverequest(unsigned int reqid);      /* @0x800E8C64 */
-extern void iSNDstreamreleasecallback(int sample);            /* @0x800E8D90 */
-extern void iSNDstreamnotifycallback(int handle, unsigned int bytes); /* @0x800E8DD4 */
-extern int  iSNDstreamparseheader(int S, int data);           /* @0x800E8E9C */
-extern int  iSNDstreamparsenumchunks(int S, int data);        /* @0x800E9044 */
-extern int  iSNDstreamparsedata(int S, int chunk);            /* @0x800E90AC (oracle: always returns 1) */
-extern int  iSNDstreamparseend(int S, int chunk);             /* @0x800E9230 */
-extern int  iSNDstreamparsechunk(int S, int chunk);           /* @0x800E9270 */
-extern int  iSNDstreamisheld(int S);                          /* @0x800E9318 */
-extern void iSNDstreamhotroddatachunks(void);                 /* @0x800E9438 */
-extern void iSNDstreamservice(void);                          /* @0x800E9590 */
-extern int  iSNDstreamnumcreated(void);                       /* @0x800E96F8 */
 
 /* byte-offset accessors on an object held as an int address */
 #define MI(p,o)  (*(int*)((p)+(o)))
@@ -161,7 +145,7 @@ typedef struct SndStreamReq {
 /* ====================================================================================== */
 
 /* iSNDstreamdestroyall @0x800E8C14 : destroy every stream (addexit/shutdown hook). */
-extern int iSNDstreamdestroyall(void)
+int iSNDstreamdestroyall(void)
 {
     int s = 0;
     do {
@@ -172,7 +156,7 @@ extern int iSNDstreamdestroyall(void)
 }
 
 /* iSNDstreamgetstreamptr @0x800E8C48 : map a stream index to its object (only index 0 exists). */
-extern int iSNDstreamgetstreamptr(int idx)
+int iSNDstreamgetstreamptr(int idx)
 {
     if (idx != 0)
         return 0;
@@ -181,7 +165,7 @@ extern int iSNDstreamgetstreamptr(int idx)
 
 /* iSNDstreamremoverequest @0x800E8C64 : drop the request whose id == `reqid` from a stream's packet
  *   array, compacting the remaining requests down and fixing up parseIdx/curReqCount. */
-extern void iSNDstreamremoverequest(unsigned int reqid)
+void iSNDstreamremoverequest(unsigned int reqid)
 {
     /* struct-assignment (not a memcpy() call) for the compaction copy below -- oracle expands it
      * inline as a manual 4-word+3-word unrolled load/store (this build's memcpy() is a genuine
@@ -231,7 +215,7 @@ extern void iSNDstreamremoverequest(unsigned int reqid)
 /* iSNDstreamreleasecallback @0x800E8D90 : SNDPKTPLAY release hook -- a finished sample buffer carries a
  *   back-pointer to its chunk 4 bytes ahead; the chunk's first word holds the request id whose low byte
  *   is the stream slot.  Free the chunk back to that stream's ring. */
-extern void iSNDstreamreleasecallback(int sample)
+void iSNDstreamreleasecallback(int sample)
 {
     int chunk = *(int *)(sample - 4);
     int slot  = *(unsigned char *)chunk;
@@ -243,7 +227,7 @@ extern void iSNDstreamreleasecallback(int sample)
 /* iSNDstreamnotifycallback @0x800E8DD4 : SNDPKTPLAY play-progress hook.  `bytes` were just played on
  *   `handle`; credit them to the head request's consumed/remaining counters, and when a request is fully
  *   played out remove it.  Overflow rolls into the next request. */
-extern void iSNDstreamnotifycallback(int handle, unsigned int bytes)
+void iSNDstreamnotifycallback(int handle, unsigned int bytes)
 {
     int *base = sndss;
     int S = base[*(signed char *)((char *)base + handle + 4)]; /* oracle lb @0x800e8df0 sign-extends */
@@ -281,7 +265,7 @@ extern void iSNDstreamnotifycallback(int handle, unsigned int bytes)
 /* iSNDstreamparseheader @0x800E8E9C : 'SChl' chunk -- decode the audio header (rate/format) via
  *   iSNDpatchtohdr, compute the data rate, and lock the format on first sight (a mid-stream change errors
  *   to state 2).  Once locked, (re)start the packet player. */
-extern int iSNDstreamparseheader(int S, int data)
+int iSNDstreamparseheader(int S, int data)
 {
     int req = MI(S, 0) + (((int)(*(volatile unsigned char *)(S + 0x17)) << 24) >> 24) * 0x2c;
     int outsize;
@@ -322,7 +306,7 @@ formatsame:
  * (blocks that specific reassociation, forcing the oracle's `lbu;sll24;sra24`). Also: the scaled-index
  * term must come FIRST in the `+ MI(S,0)` addition (index-first commutative-addu tie-break, matching
  * `addu v0,v0,v1` not `addu v1,v1,v0`). */
-extern int iSNDstreamparsenumchunks(int S, int data)
+int iSNDstreamparsenumchunks(int S, int data)
 {
     int req;
     STREAM_release(MI(S, 4), (void *)(unsigned int)data);
@@ -334,7 +318,7 @@ extern int iSNDstreamparsenumchunks(int S, int data)
 /* iSNDstreamparsedata @0x800E90AC : 'SCDl' chunk -- build the per-channel sample descriptor (flat or
  *   interleaved per the format), stamp the chunk with its owning request id (for the release hook), and
  *   submit it to the packet player. */
-extern int iSNDstreamparsedata(int S, int chunk)
+int iSNDstreamparsedata(int S, int chunk)
 {
     /* MATCH (oracle re-traced in full, incl. delay slots -- was untouched, 123 diffs):
      * -- the `datalen` local is SPILLED to the stack at fn entry and only reread once, at the
@@ -522,7 +506,7 @@ extern int iSNDstreamparsedata(int S, int chunk)
  * latency slot and emits the store through a2 without any fence, extra instruction, or asm. */
 
 /* iSNDstreamparseend @0x800E9230 : 'SCEl' chunk -- end of one queued sound; advance parseIdx. */
-extern int iSNDstreamparseend(int S, int chunk)
+int iSNDstreamparseend(int S, int chunk)
 {
     STREAM_release(MI(S, 4), (void *)(unsigned int)chunk);
     MB(S, 0x17) = MB(S, 0x17) + 1;
@@ -530,7 +514,7 @@ extern int iSNDstreamparseend(int S, int chunk)
 }
 
 /* iSNDstreamparsechunk @0x800E9270 : dispatch a chunk by its tag. */
-extern int iSNDstreamparsechunk(int S, int chunk)
+int iSNDstreamparsechunk(int S, int chunk)
 {
     int tag = *(int *)chunk;
     int ret = 1;
@@ -550,7 +534,7 @@ extern int iSNDstreamparsechunk(int S, int chunk)
 
 /* iSNDstreamisheld @0x800E9318 : true if the stream should hold (not feed more) because the ring buffer
  *   has run low relative to the data rate -- prevents starving the player on a slow disc. */
-extern int iSNDstreamisheld(int S)
+int iSNDstreamisheld(int S)
 {
     int req = MI(S, 0) + (((int)(*(volatile unsigned char *)(S + 0x17)) << 24) >> 24) * 0x2c;
 
@@ -585,7 +569,7 @@ check_state:
 /* iSNDstreamhotroddatachunks @0x800E9438 : opportunistically pull and submit pending data chunks (up to
  *   ~0x4000 bytes total) for any playing, non-held stream that has player space -- keeps the buffer fed
  *   ahead of demand. */
-extern void iSNDstreamhotroddatachunks(void)
+void iSNDstreamhotroddatachunks(void)
 {
     int total = 0;
     int slot  = 0;
@@ -659,7 +643,7 @@ extern void iSNDstreamhotroddatachunks(void)
 /* iSNDstreamservice @0x800E9590 : per-tick service.  For each active stream: restart the player if it
  *   flagged a format change (state 2), then, unless held, drain chunks from the ring through
  *   iSNDstreamparsechunk into the player. */
-extern void iSNDstreamservice(void)
+void iSNDstreamservice(void)
 {
     int slot;
     int *p;
@@ -715,7 +699,7 @@ extern void iSNDstreamservice(void)
  * caller-saved v0/v1 swap in the following state test. */
 
 /* iSNDstreamnumcreated @0x800E96F8 : count the live streams. */
-extern int iSNDstreamnumcreated(void)
+int iSNDstreamnumcreated(void)
 {
     int count = 0;
     int slot;
@@ -742,7 +726,7 @@ extern int iSNDstreamnumcreated(void)
  *     parameter be reassigned, and the whole carve walks the caller's buffer forward in place.
  * (b) `i = 0;` must be written BEFORE `pp = sndss;` -- the oracle emits `addu a1,zero,zero` ahead of
  *     the sndss `lui/addiu`; the `for (i = 0; ...)` init form put it after. */
-extern int iSNDstreamcreate(int *priority, int numReq, int pktArg, int objbuf,
+int iSNDstreamcreate(int *priority, int numReq, int pktArg, int objbuf,
                                 int memsize, int extHandle, int extFlag)
 {
     int i, slot;
@@ -850,7 +834,7 @@ found:
 /* iSNDstreamqueue @0x800E9970 : queue a sound on a stream -- from a file, a memory image, or an
  *   already-built STREAM request id.  Fills a fresh packet slot, stamps a unique id, and returns it.
  *   `mode`: 0=file (filename/off), 1=memory (filename=block), other=pre-built id (off). */
-extern int iSNDstreamqueue(unsigned int s, int name, char *filename, int off, int mode)
+int iSNDstreamqueue(unsigned int s, int name, char *filename, int off, int mode)
 {
     int p, req;
 

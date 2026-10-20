@@ -7,9 +7,11 @@
  *   current @+0x3D) optionally remapped through a per-voice pan curve (@+0x48), clamps to
  *   [0,0x7F], and pokes the SPU via iSNDplatform3dpos.  Returns the channel index (or -10 off).
  */
+#include "span.h"
+
 #include "../../../lib/snd.h"
 
-extern int SNDpan(int handle, int pan)   /* @0x800E6884 */
+int SNDpan(int handle, int pan)   /* @0x800E6884 */
 {
     int chan;
     if (SND->enabled == 0)

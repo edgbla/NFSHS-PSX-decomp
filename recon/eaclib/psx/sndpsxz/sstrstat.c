@@ -1,15 +1,13 @@
 /* eaclib/psx/sndpsxz/sstrstat.c -- RECONSTRUCTED. NOT original.  *** 1/1 ***  obj sstrstat.obj @0x800E87D0 */
-extern int sndgs[];
-extern int  iSNDstreamgetstreamptr(int tag);                  /* sst      */
-extern int  iSNDstreamgetrequestptr(unsigned int tag);        /* sstgetrp */
-extern void iSNDmulu64(int *out, unsigned int a, unsigned int b);   /* smath64 */
-extern int  iSNDdivu64(int lo, int hi, unsigned int div);           /* smath64 */
-extern void iSNDenteraudio(void);                             /* sserver */
-extern void iSNDleaveaudio(void);
-extern void trap(unsigned int code);
-extern int  SNDSTRM_requeststatus(unsigned int reqTag, int s);   /* @0x800E87D0 */
+#include "sdata.h"
+#include "sserver.h"
+#include "sst.h"
+#include "sstgetrp.h"
+#include "sstrstat.h"
+#include "smath64.h"
+
 /* SNDSTRM_requeststatus : fill the 4-int request-status block `s` (state, played, remaining, permille). */
-extern int SNDSTRM_requeststatus(unsigned int reqTag, int s)
+int SNDSTRM_requeststatus(unsigned int reqTag, int s)
 {
     int *sp, *rp;
     unsigned int div;

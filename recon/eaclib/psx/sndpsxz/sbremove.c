@@ -3,6 +3,11 @@
  *   3 fns @[0x800E65F8 .. 0x800E6694].  Unload sound banks: stop their voices, release SPU data, clear the
  *   bank table.  Ghidra nfs4-f.exe.c (sbremove) + IDA sigs (`this` is the bank id).
  */
+#include "sbremove.h"
+#include "sbvalid.h"
+#include "sstop.h"
+#include "sbirmpat.h"
+#include "sdata.h"
 
 struct SNDGlobals {
     char pad0[0x0c];
@@ -16,18 +21,10 @@ struct SNDGlobals {
     int bank_table;
 };
 extern struct SNDGlobals sndgs;
-extern int  iSNDvalidbank(int bankId);                 /* sbvalid  */
-extern int  SNDstop(unsigned int tag);                 /* sstop    */
-extern void iSNDbankremovepat(int bank, int idx, int *scratch);  /* sbirmpat */
-extern void iSNDplatformfree(void *p);                 /* sdata    */
-
-extern int  iSNDremovepatches(int bank, int count);    /* @0x800E65F8 */
-extern void SNDbankremove(int bankId);                 /* @0x800E6674 */
-extern int  cSNDbankremove(int bankId, int recurse);   /* @0x800E6694 ; a1 always 0 at every call */
 
 /* iSNDremovepatches @0x800E65F8 : release each of a bank's `count` resolved patches (de-dup via a local
  *   scratch table seeded to -1). */
-extern int iSNDremovepatches(int bank, int count)
+int iSNDremovepatches(int bank, int count)
 {
     int scratch[512];
     int *p;
@@ -46,14 +43,14 @@ extern int iSNDremovepatches(int bank, int count)
 }
 
 /* SNDbankremove @0x800E6674 : the exit-time hook (sndgs[0x1f]); unloads bank `bankId`. */
-extern void SNDbankremove(int bankId)
+void SNDbankremove(int bankId)
 {
     cSNDbankremove(bankId, 0);
 }
 
 /* cSNDbankremove @0x800E6694 : unload bank `bankId` (or all banks when bankId == -1) -- stop its playing
  *   voices, free its patches/SPU data, and clear its bank-table entry. */
-extern int cSNDbankremove(int bankId, int recurse)
+int cSNDbankremove(int bankId, int recurse)
 {
     struct SNDGlobals *base = &sndgs;
     int i;

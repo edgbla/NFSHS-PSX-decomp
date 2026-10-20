@@ -8,17 +8,16 @@
  *   2-arg (chan, fxon) -- sdriver's IDA sig is actually (a1,a2,a3), so sdriver should gain the `bus` arg
  *   on a reconcile pass.  extern links regardless; flagged in 00_current_state.md.
  */
+#include "salloc.h"
+#include "sdata.h"
+#include "sdfx.h"
+#include "sfxlevel.h"
+#include "slib.h"
+#include "snd_state.h"
+#include "spatkey.h"
+#include "sserver.h"
 
-extern int sndgs[];
-extern int  iSNDpsxeffectvol(int left, int right);          /* spatkey */
-extern int  iSNDgetchan(unsigned int tag);                  /* salloc  */
-extern int  iSNDpatchkey(int chan, int tag);                /* spatkey */
 extern int  iSNDplatformfxlevel(int chan, int bus, int fxon); /* sdriver (3-arg) */
-extern void iSNDenteraudio(void);                           /* sserver */
-extern void iSNDleaveaudio(void);
-
-extern int iSNDplatformfxmasterlevel(int bus, int level);   /* @0x801005BC */
-extern int SNDfxlevel(int tag, int bus, int level);         /* @0x801005E8 */
 
 struct SNDfxBusView {
     unsigned char pad[0xa0];
@@ -32,7 +31,7 @@ struct SNDfxBusView {
 /* SNDfxlevel @0x801005E8 : set the effect-send `level` for sound `tag` on `bus` -- for each voice, scale the
  *   requested level by the voice's per-bus send (slot[bus+0x34]) and the bus master (sndgs[bus*4+0x28]),
  *   normalise by 127, and push it to the SPU.  Returns the channel, or a negative error. */
-extern int SNDfxlevel(int tag, int bus, int level)
+int SNDfxlevel(int tag, int bus, int level)
 {
     int chanIdx;
     int cur[2];

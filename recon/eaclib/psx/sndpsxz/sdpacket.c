@@ -121,10 +121,6 @@
  *     +0x20 dmaHandle  +0x2c frameSizeTbl  +0x34..0x46 fill state  +0x42(b) activeNote(-1 idle)
  *     +0x44(u16) blockBytes  +0x46(u16) framesPerBlock  +0x48.. per-channel SPU buffer ptrs
  */
-
-extern int           sndgs[];
-/* Exact scalar byte symbol for sndgs+0x11, supplied by undefined_syms_auto.txt. */
-extern unsigned char D_80147871;
 /* W65-A6 DATA-MAT: `sndpp` was extern-only tree-wide (8 reloc-referenced undefined sites);
  * sdpacket.obj is its sole referencer.  Retail: .bss @0x80148578, size 52 (= windowbuf
  * @0x801485AC - 0x80148578); VA > t_addr+t_size (0x8013E000) => pure zero-init BSS, no file
@@ -133,14 +129,17 @@ extern unsigned char D_80147871;
  * byte-neutral by construction.  Receipts: scratchpad/w65a6/RECEIPTS.md */
 /* sndpp itself is ONE word (retail 0x80148578..0x8014857c); the 48 bytes up to
  * windowbuf are PADMAIN.obj's _padVbCb/_padFrames, which PADMAIN.c now owns. */
+#include "sdata.h"
+#include "sdma.h"
+#include "sdpacket.h"
+#include "sdriver.h"
+#include "slib.h"
+#include "snd_state.h"
+#include "spktplay.h"
+#include "sst.h"
+
 __asm__("\t.globl\tsndpp\n\t.section\t.bss\n\t.align\t2\nsndpp:\n\t.space\t4\n\t.text");
-extern int           sndpp[];               /* current-player IRQ cursor (one-int symbol; array view keeps
-                                              * the shared %hi base with %lo displacements) */
-extern unsigned char sndpd[];               /* EA sound-driver state base @0x80147918 (unsized array:
-                                              * forces the oracle's `lui;addiu &sndpd; lw/sw r,0x4F8(base)`
-                                              * base+offset shape for the per-player ctx ptr array, which
-                                              * lives INSIDE the sndpd block at +0x4F8, not as its own
-                                              * separately-materialized symbol -- see spatkey.c SNDPD_*) */
+
 #define DAT_80147e10 (((int *)sndpd)[0x4F8/4])   /* per-player ctx ptr array @0x80147e10 == sndpd+0x4F8 */
 #define SNDPD_CTRLREG (*(int *)(sndpd + 0x514))      /* SPU control reg base stored in sndpd */
 /* 🔴 BUG FIX + HEADER WISH: DAT_801234e4 was double-defined here AND in snddata.c (real dup-symbol
@@ -198,31 +197,17 @@ extern void iSNDpsxfree(void *p);                          /* sdmemman */
 extern void iSNDpsxdisablespuirq(void);                    /* sdspuirq */
 extern void iSNDpsxenablespuirq(void);                     /* sdspuirq */
 extern void InterruptCallback(int idx, void (*handler)(void));  /* syslib INTR (real 2-arg sig -- see INTR_DMA.cpp/INTR_VB.c/drv.cpp) */
-extern int  iSNDpacketget(int p, int chanIdx, int *frameSizeOut);   /* spktplay */
-extern unsigned int iSNDpacketfreeframes(int p, int idx, int bytes);   /* spktplay @0x801033C4, real 3-arg sig
-                                                                          * (see spktplay.cpp) -- the oracle call
-                                                                          * site sets up a0=p/a1=i/a2=taken. */
-extern void iSNDstreamhotroddatachunks(void);              /* sst */
-extern int  iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag);  /* sdma
-                                                             * -- real 5-arg sig (see sdma.c): the fillspu
-                                                             * DMA-kick call was a DROPPED-ARGS bug (1-arg
-                                                             * called as if void(spuBuf)); oracle sets up
-                                                             * all 5: a0=chBuf, a1=pp->0+chunk<<pp->0x43+
-                                                             * pp->8*i, a2=pp->0x44(blockBytes), a3=2,
-                                                             * stack=flag(chunk==0&&i==0). */
-extern int  iSNDdmcomplete(int dmaHandle);                 /* sdma */
 extern void blockmove(int *dst, int *src, unsigned int len);  /* blkmov */
-extern int  iSNDplatformpitch(int chan, int pitch);        /* sdriver */
 extern void trap(unsigned int code);                       /* compiler div-by-zero break */
 
 /* forward decls (mutually referential within this obj) */
-extern void iSNDpacketgetirq(void);
-extern void iSNDpacketsetirq(void);
-extern void iSNDpacketirqcallback(void);
-extern int  iSNDfillspuwithpackets(int p, int chunk);
-extern unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count);
-extern void iSNDpsxpacketstop(void *p);
-extern void iSNDpsxzerospu(int *addr, int len);
+
+
+
+
+
+
+
 
 #define VB(base,idx)  ((&(base))[idx])                 /* byte at base+idx        */
 
@@ -264,7 +249,7 @@ static inline void sdpacket_setirq_cs(void)
 
 /* iSNDpacketgetirq @0x80103784 : on the SPU end-of-block IRQ, latch the current play byte-position of the
  *   active voice (and its linked partner) into the served-position slot, clamping at loop bounds. */
-extern void iSNDpacketgetirq(void)
+void iSNDpacketgetirq(void)
 {
     unsigned char *base = sndpd;                    /* materialize the bare sndpd address ONCE (oracle $a3) */
     unsigned char *slot = base + sndpp[0] * 4;       /* runtime index first, fixed OFFSET as load displacement */
@@ -333,7 +318,7 @@ extern void iSNDpacketgetirq(void)
 
 /* iSNDpacketsetirq @0x801038BC : advance to the next playing player and arm the SPU IRQ on its next block
  *   boundary (writes the SPU IRQ-address register and re-installs the InterruptCallback). */
-extern void iSNDpacketsetirq(void)
+void iSNDpacketsetirq(void)
 {
     int i = 0;
     int pp;
@@ -412,7 +397,7 @@ success:
 }
 
 /* iSNDpacketirqcallback @0x8010399C : the SPU IRQ handler -- latch positions then re-arm. */
-extern void iSNDpacketirqcallback(void)
+void iSNDpacketirqcallback(void)
 {
     iSNDpacketgetirq();
     iSNDpacketsetirq();
@@ -420,7 +405,7 @@ extern void iSNDpacketirqcallback(void)
 
 /* iSNDpsxzerospu @0x801039C4 : write SPU "silent loop" ADPCM (0x200 flag word + zero data) over `len`
  *   bytes at `addr`.  (Ghidra dropped the length arg as in_a1.) */
-extern void iSNDpsxzerospu(int *addr, int len)
+void iSNDpsxzerospu(int *addr, int len)
 {
     int i = 0;
     len = len >> 2;                     /* mutate param in place -- reused as the loop bound (oracle: $a1) */
@@ -439,7 +424,7 @@ extern void iSNDpsxzerospu(int *addr, int len)
  *   ring from byte offset `byteoff` for `count` bytes and calling iSNDpacketfreeframes per channel as each
  *   frame's outstanding-byte counter drains.  Returns whether the cursor stayed within the buffer.
  *   (Ghidra rendered as __thiscall(this,p,arg2): this=player, p=byteoff, arg2=count.) */
-extern unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count)
+unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count)
 {
     /* MATCH (86/86): typed sndpd views preserve the split packet-pointer (+0x4f8) and voice-table
      * (+0xd8, field +0x1f) addresses. Keeping the block product in `wrapped` selects the oracle's
@@ -501,7 +486,7 @@ extern unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count
  *   their ADPCM into each channel's SPU buffer, set the ADPCM loop/end flags for `chunk` of the double
  *   buffer, and queue the SPU DMA (iSNDdmqueue).  (Ghidra __thiscall(this,p): this=player, p=chunk; the
  *   uninit local_30 is iSNDpacketget's frameSize out-param.) */
-extern int iSNDfillspuwithpackets(int p, int chunk)
+int iSNDfillspuwithpackets(int p, int chunk)
 {
     /* RESIDUAL 16 diffs, 308/308 PARITY (was 43 @307/308 after w32; w33-a6 cracked cluster 1/3/4).
      * The three w33 fixes, all oracle-proven and worth generalizing:
@@ -842,7 +827,7 @@ function_exit:
 
 /* iSNDpacketserve @0x80104024 : per-tick service -- pull fresh stream chunks, advance each player's served
  *   position from the SPU play-cursor, purge finished frames, and top up the SPU double buffer. */
-extern void iSNDpacketserve(void)
+void iSNDpacketserve(void)
 {
     int p;
     unsigned char *base;
@@ -901,7 +886,7 @@ have_advance:
 
 /* iSNDplatformpacketoverhead @0x801041B8 : per-player SPU-context byte overhead (the malloc'd voice ctx
  *   sized from DAT_801234e4, /4096 rounded up to 4, *2, + 0x1050).  (Ghidra emptied the delay-slot return.) */
-extern int iSNDplatformpacketoverhead(void)
+int iSNDplatformpacketoverhead(void)
 {
     int v = DAT_801234e4;
     if (v < 0)
@@ -912,14 +897,14 @@ extern int iSNDplatformpacketoverhead(void)
 
 /* iSNDplatformcalcdatarate @0x801041EC : bytes/second for a sample of rate `sample_rate[0]` and channel
  *   count `sample_rate[1]`, scaled by 0x92/256 (ADPCM ratio). */
-extern int iSNDplatformcalcdatarate(unsigned short *sample_rate)
+int iSNDplatformcalcdatarate(unsigned short *sample_rate)
 {
     return (int)((unsigned)*sample_rate * (unsigned)(unsigned char)sample_rate[1] * 0x92) >> 8;
 }
 
 /* iSNDplatformpacketplaycreate @0x8010421C : allocate a player's SPU context, install the voice-done hook,
  *   register the ctx in DAT_80147e10[p].  Returns 0 / -9 on malloc failure. */
-extern int iSNDplatformpacketplaycreate(int p, int *mem)
+int iSNDplatformpacketplaycreate(int p, int *mem)
 {
     /* MATCH: materialize the BARE &sndpd once and keep it live ACROSS the malloc call (oracle: `s2`,
      * a callee-saved reg) -- both the HOOK_voice_done store (before the call) and the
@@ -945,7 +930,7 @@ extern int iSNDplatformpacketplaycreate(int p, int *mem)
 /* iSNDplatformpacketplaydestroy @0x801042C0 : free a player's SPU context and clear its slot.
  * (true return is void -- spktplay.cpp already declares `void`; $v0 after the tail-call
  * to iSNDpsxfree is incidental/unused, per §3.2.) */
-extern void iSNDplatformpacketplaydestroy(int p)
+void iSNDplatformpacketplaydestroy(int p)
 {
     unsigned char *sndpdbase = sndpd;              /* force the sndpd address materialization first */
     unsigned char *base = sndpdbase + p * 4;       /* base = sndpd + p*4 (runtime index) */
@@ -957,7 +942,7 @@ extern void iSNDplatformpacketplaydestroy(int p)
 /* iSNDplatformpacketplay @0x80104304 : start a voice playing a packet stream -- program the voice state
  *   table, derive the SPU block geometry from the player ctx, prime two buffers via iSNDfillspuwithpackets,
  *   install the serve + IRQ hooks, set initial pitch, and key the voice.  8-arg (Ghidra dropped a3..a8). */
-extern int iSNDplatformpacketplay(int p, int note, unsigned short volAngle, unsigned char level,
+int iSNDplatformpacketplay(int p, int note, unsigned short volAngle, unsigned char level,
                                       int pitch, int a6, unsigned char fxlevel, unsigned short *hdr)
 {
     /* MATCH: same base-sharing lever as iSNDfillspuwithpackets/iSNDpacketgetirq -- ONE bare &sndpd
@@ -1104,7 +1089,7 @@ extern int iSNDplatformpacketplay(int p, int note, unsigned short volAngle, unsi
 
 /* iSNDpsxpacketstop @0x801046C8 : tear down a finished voice -- mark its player + voice slot idle, and if no
  *   voices remain active, drop the serve hook and point the pre-load tick back at the bare IRQ re-arm. */
-extern void iSNDpsxpacketstop(void *parg)
+void iSNDpsxpacketstop(void *parg)
 {
     unsigned char *p = (unsigned char *)parg;   /* MATCH: real sig is void(void*) -- HOOK_voice_done;
                                                   * the oracle NEVER sets up $v0 at any epilogue (§3.2 void). Our

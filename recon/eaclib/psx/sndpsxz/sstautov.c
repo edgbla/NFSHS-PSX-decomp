@@ -3,14 +3,13 @@
  *   1 fn @0x800E9DE8.  SNDSTRM_autovol -- set a stream's auto-volume ramp.  Ghidra nfs4-f.exe.c + IDA sig
  *   (`this` is the stream tag).
  */
-extern int  sndgs[];
-extern int  iSNDstreamgetstreamptr(int tag);    /* sst */
-extern void SNDautovol(int chan, int steps, int targetVol);   /* sautovol */
-
-extern int SNDSTRM_autovol(int tag, int steps, int vol);   /* @0x800E9DE8 */
+#include "sdata.h"
+#include "sst.h"
+#include "sstautov.h"
+#include "sautovol.h"
 
 /* SNDSTRM_autovol @0x800E9DE8 : store the target vol (+0x54) and start an auto-volume ramp over steps/10. */
-extern int SNDSTRM_autovol(int tag, int steps, int vol)
+int SNDSTRM_autovol(int tag, int steps, int vol)
 {
     int s;
     if ((signed char)sndgs[0xf] == '\0')

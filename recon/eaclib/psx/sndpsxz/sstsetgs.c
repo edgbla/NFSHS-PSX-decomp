@@ -3,14 +3,14 @@
  *   1 fn @0x800E9D8C.  SNDSTRM_setgreedystate -- forward a stream's greedy on/off state to the STREAM layer.
  *   Ghidra nfs4-f.exe.c + IDA sig (`this` is the stream tag).
  */
-extern int  sndgs[];
-extern int  iSNDstreamgetstreamptr(int tag);            /* sst */
+#include "sdata.h"
+#include "sst.h"
+#include "sstsetgs.h"
+
 extern void STREAM_setgreedystate(int stream, int s);   /* eacpsxz stream.obj */
 
-extern int SNDSTRM_setgreedystate(int tag, int s);      /* @0x800E9D8C */
-
 /* SNDSTRM_setgreedystate @0x800E9D8C : -10 if uninit, -8 if no such stream, else set its greedy state. */
-extern int SNDSTRM_setgreedystate(int tag, int s)
+int SNDSTRM_setgreedystate(int tag, int s)
 {
     int p;
     if ((signed char)sndgs[0xf] == '\0')

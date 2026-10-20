@@ -3,11 +3,10 @@
  *   1 fn @0x8010C928.  iSNDgetdata -- read an `n`-byte big-endian field, sign-extended to int.
  *   Ghidra nfs4-f.exe.c (sgetdata).
  */
-
-extern int iSNDgetdata(unsigned char *p, int n);   /* @0x8010C928 */
+#include "sgetdata.h"
 
 /* iSNDgetdata @0x8010C928 : assemble `n` big-endian bytes at `p` into a signed int (n = 1/2/3 sign-extend). */
-extern int iSNDgetdata(unsigned char *p, int n)
+int iSNDgetdata(unsigned char *p, int n)
 {
     int v = 0;
     int i = n - 1;

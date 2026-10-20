@@ -3,20 +3,16 @@
  *   2 fns @[0x800E78F8 .. 0x800E79D0].  SNDpitchbend -- retune the voices of a playing sound.
  *   Ghidra nfs4-f.exe.c (sbend) + IDA sigs.
  */
-
-extern int sndgs[];
-extern int  iSNDgetchan(unsigned int tag);            /* salloc   */
-extern int  iSNDpatchkey(int chan, int tag);          /* spatkey  */
-extern int  iSNDcalcpitch(int note);                  /* sclcptch */
-extern int  iSNDplatformpitch(int chan, int pitch);   /* sdriver  */
-extern void iSNDenteraudio(void);                     /* sserver  */
-extern void iSNDleaveaudio(void);
-
-extern int iSNDunsafebend(unsigned int tag, unsigned int chan);   /* @0x800E78F8 */
-extern int SNDpitchbend(unsigned int tag, int bend);              /* @0x800E79D0 */
+#include "salloc.h"
+#include "sbend.h"
+#include "sclcptch.h"
+#include "sdata.h"
+#include "sdriver.h"
+#include "spatkey.h"
+#include "sserver.h"
 
 /* iSNDunsafebend @0x800E78F8 : set the detune (+0x2f) on every voice of `tag`, recomputing SPU pitch. */
-extern int iSNDunsafebend(unsigned int tag, unsigned int chan)
+int iSNDunsafebend(unsigned int tag, unsigned int chan)
 {
     int chanIdx = iSNDgetchan(tag);
     int cur[2];
@@ -43,7 +39,7 @@ extern int iSNDunsafebend(unsigned int tag, unsigned int chan)
 }
 
 /* SNDpitchbend @0x800E79D0 : audio-locked wrapper around iSNDunsafebend. */
-extern int SNDpitchbend(unsigned int tag, int bend)
+int SNDpitchbend(unsigned int tag, int bend)
 {
     int r;
     if ((signed char)sndgs[0xf] == 0)

@@ -3,19 +3,16 @@
  *   1 fn @0x800E7F08.  SNDpitchmult -- set the pitch-multiplier word (+0x60) on a sound's voices.
  *   Ghidra nfs4-f.exe.c (spitch) + IDA sig (this=tag).
  */
-
-extern int sndgs[];
-extern int  iSNDgetchan(unsigned int tag);            /* salloc   */
-extern int  iSNDpatchkey(int chan, int tag);          /* spatkey  */
-extern int  iSNDcalcpitch(int note);                  /* sclcptch */
-extern int  iSNDplatformpitch(int chan, int pitch);   /* sdriver  */
-extern void iSNDenteraudio(void);                     /* sserver  */
-extern void iSNDleaveaudio(void);
-
-extern int SNDpitchmult(unsigned int tag, unsigned int mult);     /* @0x800E7F08 */
+#include "salloc.h"
+#include "sclcptch.h"
+#include "sdata.h"
+#include "sdriver.h"
+#include "spatkey.h"
+#include "spitch.h"
+#include "sserver.h"
 
 /* SNDpitchmult @0x800E7F08 : set the pitch-multiplier (+0x60) on each voice of `tag` and recompute pitch. */
-extern int SNDpitchmult(unsigned int tag, unsigned int mult)
+int SNDpitchmult(unsigned int tag, unsigned int mult)
 {
     int chanIdx;
     int cur[2];
