@@ -42,9 +42,6 @@ extern unsigned char sndpd[];          /* driver-state base; voice table starts 
 
 /* "voice has finished" notifier installed by the host (@0x8014803C) */
 
-/* dependencies in sibling objs */
-
-
 /* iSNDstop @0x800FFE90 : silence a hardware voice (and its linked partner).  Fires the voice-done hook
  *   unless already flagged, releases the channel(s) back to the pool, marks them idle and strobes the SPU
  *   key-off for the combined voice mask. */

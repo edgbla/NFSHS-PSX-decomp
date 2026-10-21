@@ -10,11 +10,7 @@
  *   INFERRED.  What is evidence is the reference chain -- it is what puts the members in the retail order. */
 #include "sdasync.h"
 #include "sdmemman.h"
-
 #include "../../../link_stripped.h"
-
-/* ---- the surviving function (moved verbatim from sdata.c) ---- */
-
 
 /* iSNDplatformfree @0x800FE594 : free the SPU block at `ptr`. */
 void iSNDplatformfree(int ptr)

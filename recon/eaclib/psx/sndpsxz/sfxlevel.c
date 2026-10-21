@@ -18,7 +18,6 @@
 #include "spatkey.h"
 #include "sserver.h"
 
-
 struct SNDfxBusView {
     unsigned char pad[0xa0];
     int master;

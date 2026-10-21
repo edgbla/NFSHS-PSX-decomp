@@ -198,15 +198,6 @@ extern void iSNDpsxenablespuirq(void);                     /* sdspuirq */
 extern void InterruptCallback(int idx, void (*handler)(void));  /* syslib INTR (real 2-arg sig -- see INTR_DMA.cpp/INTR_VB.c/drv.cpp) */
 extern void blockmove(int *dst, int *src, unsigned int len);  /* blkmov */
 
-/* forward decls (mutually referential within this obj) */
-
-
-
-
-
-
-
-
 #define VB(base,idx)  ((&(base))[idx])                 /* byte at base+idx        */
 
 struct SNDPDPacketPtrView {
