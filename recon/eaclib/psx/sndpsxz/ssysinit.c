@@ -7,6 +7,12 @@
  *     0x80147860 constant RESOLVED to &sndgs (no bare VA); the option block is sndgs[0..0xe].
  */
 
+#include "sdfx.h"
+#include "slib.h"
+#include "smemman.h"
+#include "sserver.h"
+#include "sstopall.h"
+
 extern int  sndgs[];
 /* W65-A6 DATA-MAT: `sndgs` was extern-only tree-wide -- 201 reloc-referenced undefined sites,
  * the single biggest link hole.  Retail: .bss @0x80147860, size 180 (= sndchanreserved
@@ -39,18 +45,6 @@ extern int  sndgs[];
 extern int  DAT_80134a68[];                /* output-caps flag; owned by snddata.c (array view forces
                                              * the oracle's retained absolute address, not GP-relative) */
 
-extern int  iSNDplatformoutputcaps(void);  /* slib -- MATCH: non-void, $v0 threads through as
-                                             * SNDSYS_getopts's own return value (see below) */
-extern void iSNDplatformoutputset(void);   /* slib    */
-extern int  iSNDinit(void);                /* slib -- returns the platform bring-up status */
-extern int  iSNDrestore(void);             /* slib    */
-extern void iSNDmeminit(int membase, int memsize);   /* smemman */
-extern int  iSNDmalloc(unsigned int size);           /* smemman */
-extern int  iSNDmemrestore(void);                    /* smemman */
-extern void iSND100hzserver(void);         /* sserver */
-extern void SNDI_mutexalloc(void);         /* sdfx    */
-extern void SNDI_mutexfree(void);          /* sdfx    */
-extern void SNDstopall(void);              /* sstopall */
 extern void *memset(void *dst, int c, int n);        /* C43 (BIOS thunk) */
 
 typedef struct SNDSYSCAP {

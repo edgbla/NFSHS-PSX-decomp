@@ -6,12 +6,12 @@
  *   to the platform STREAM_setpriority.  Returns -10 if sound is disabled, -8 if the stream is
  *   unknown, else 0.
  */
+#include "../eacpsxz/stream.h"
+#include "sst.h"
 #include "sstsetpr.h"
 
 #include "../../../lib/snd.h"
 
-extern void *iSNDstreamgetstreamptr(int streamid);          /* @0x800E8C48 (sst.obj) */
-extern int   STREAM_setpriority(int handle, int prio, int a3); /* @0x800FD1F8 platform */
 
 int SNDSTRM_setpriority(int streamid, int prio, int a3)   /* @0x800E6CF0 */
 {

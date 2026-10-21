@@ -130,6 +130,9 @@
  * windowbuf are PADMAIN.obj's _padVbCb/_padFrames, which PADMAIN.c now owns. */
 #include "sdata.h"
 #include "sdma.h"
+#include "sdmemman.h"
+#include "sdspuirq.h"
+#include "../eacpsxz/blkmov.h"
 #include "sdpacket.h"
 #include "sdriver.h"
 #include "slib.h"
@@ -191,12 +194,7 @@ extern void  *gPreLoadTicks;                       /* @0x80148040 (fn-ptr) */
 #define HOOK_preload     (*(void **)(sndpd + 0x728))          /* @0x80148040, sndpd-relative */
 
 /* sibling-obj dependencies */
-extern int  iSNDpsxmalloc(int size);                       /* sdmemman */
-extern void iSNDpsxfree(void *p);                          /* sdmemman */
-extern void iSNDpsxdisablespuirq(void);                    /* sdspuirq */
-extern void iSNDpsxenablespuirq(void);                     /* sdspuirq */
 extern void InterruptCallback(int idx, void (*handler)(void));  /* syslib INTR (real 2-arg sig -- see INTR_DMA.cpp/INTR_VB.c/drv.cpp) */
-extern void blockmove(int *dst, int *src, unsigned int len);  /* blkmov */
 
 #define VB(base,idx)  ((&(base))[idx])                 /* byte at base+idx        */
 
@@ -924,7 +922,7 @@ void iSNDplatformpacketplaydestroy(int p)
     unsigned char *sndpdbase = sndpd;              /* force the sndpd address materialization first */
     unsigned char *base = sndpdbase + p * 4;       /* base = sndpd + p*4 (runtime index) */
     int *pp = *(int **)(base + 0x4F8);             /* deref at base+0x4F8 (fixed field OFFSET, not folded) */
-    iSNDpsxfree((void *)*pp);                      /* pp dies here -- caller-saved, no s-reg needed */
+    iSNDpsxfree(*pp);                      /* pp dies here -- caller-saved, no s-reg needed */
     *(int *)(base + 0x4F8) = 0;
 }
 

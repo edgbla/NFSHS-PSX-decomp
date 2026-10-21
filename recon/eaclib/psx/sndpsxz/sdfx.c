@@ -9,6 +9,8 @@
  */
 #include "sdata.h"
 #include "sdfx.h"
+#include "../eacpsxz/blkfill.h"
+#include "../eacpsxz/blkmov.h"
 #include "sdma.h"
 #include "slib.h"
 #include "snd_state.h"
@@ -77,8 +79,6 @@ unsigned char sndpe[660] = {
     0x00, 0x80, 0x00, 0x80
 };
 
-extern void blockmove(int *src, int *dst, int n);         /* blkmov  */
-extern int  blockclear(int buf, int len);                 /* blkfill (2-arg per IDA; Ghidra dropped both) */
 
 
 /* --- audio mutex: the PSX is single-threaded, so these are no-ops --- */

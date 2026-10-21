@@ -50,6 +50,10 @@
  *     +0x20 submitted count   +0x24 num chunks   +0x28(short) name
  */
 #include "sdata.h"
+#include "../eacpsxz/stream.h"
+#include "sdpacket.h"
+#include "ssysserv.h"
+#include "sstsetgl.h"
 #include "spat2hdr.h"
 #include "spvoices.h"
 #include "sserver.h"
@@ -70,16 +74,6 @@ __asm__("\t.globl\tsndss\n\t.globl\tsndStreamMap\n\t.section\t.bss\n\t.align\t2\
         "sndss:\n\t.space\t4\n"
         "sndStreamMap:\n\t.space\t4\n\t.text");
 
-/* ---- stream.obj ring (the layer below; already reconstructed) ---- */
-extern void         STREAM_release(int strm, void *chunk);
-extern void        *STREAM_get(int consumer);
-extern int          STREAM_gettable(int strm);
-extern int          STREAM_state(int strm);
-extern int          STREAM_buffersize(int strm);
-extern int          STREAM_create(int nReq, int nFilt, int nCons, void *objbuf, int bufsize);
-extern unsigned int STREAM_queuefile(int strm, char *name, int off, int len);
-extern unsigned int STREAM_queuemem(int strm, void *blocklist, void *ptr, int len);
-
 /* ---- SNDPKTPLAY packet player (spktplay.obj) ---- */
 extern int  SNDPKTPLAY_start(int pktplay, int rate, int fmt, int *params);
 extern int  SNDPKTPLAY_submit(int pktplay, void *desc);
@@ -90,10 +84,6 @@ extern int  SNDPKTPLAY_overhead(int arg);
 extern int  SNDPKTPLAY_create(int buf, int size, void *relcb, void *notifycb);
 
 /* ---- other SND helpers ---- */
-extern int  iSNDplatformcalcdatarate(void *rate);                                /* sdpacket  */
-
-extern void iSNDserveraddclient(void *cb);                                       /* ssysserv  */
-extern void SNDSTRM_setgreedylevel(int strm, int lvl);                           /* sstsetgl  */
 
 extern int  memcmp(const void *a, const void *b, int n);
 extern void *memcpy(void *d, const void *s, int n);
@@ -802,7 +792,7 @@ found:
                         * the tail. */
 
     if (iSNDstreamnumcreated() == 0) {                   /* first stream -> register the service hook */
-        iSNDserveraddclient((void *)iSNDstreamservice);
+        iSNDserveraddclient((int)iSNDstreamservice);
         sndgs[0x22] = (int)iSNDstreamdestroyall;
     }
     sndss[slot] = S;

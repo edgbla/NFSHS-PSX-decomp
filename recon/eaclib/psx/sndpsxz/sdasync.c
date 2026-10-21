@@ -9,6 +9,7 @@
  *   Function names and bodies are NOT retained anywhere; the names below are the natural ones for the member and are
  *   INFERRED.  What is evidence is the reference chain -- it is what puts the members in the retail order. */
 #include "sdasync.h"
+#include "sdma.h"
 #include "sdmemman.h"
 #include "../../../link_stripped.h"
 
@@ -22,5 +23,4 @@ void iSNDplatformfree(int ptr)
 /* WHICH sdma.obj name: ASPSX writes this member's reference records in hash order, and retail pulls sdmemman.obj (iSNDpsxfree)
  * BEFORE sdma.obj -- that rules out iSNDdmqueue and iSNDdmservice (they sort ahead of iSNDpsxfree) and leaves iSNDdmcallback,
  * iSNDdmqueuesplit, iSNDdmcomplete, iSNDdmtransfer.  The transfer entry is the natural one for an async download. */
-extern int iSNDdmtransfer();
-LINK_STRIPPED int iSNDplatformasync(int a, int b, int c) { return iSNDdmtransfer(a, b, c); }
+LINK_STRIPPED int iSNDplatformasync(int a, int b, int c) { iSNDdmtransfer(); return 0; }

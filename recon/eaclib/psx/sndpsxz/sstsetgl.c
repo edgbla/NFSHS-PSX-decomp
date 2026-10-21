@@ -3,11 +3,11 @@
  *   1 fn @0x800E9D30.  SNDSTRM_setgreedylevel -- forward a stream's greedy-prefetch level to the STREAM layer.
  *   Ghidra nfs4-f.exe.c + IDA sig (`this` is the stream tag).
  */
+#include "../eacpsxz/stream.h"
 #include "sdata.h"
 #include "sst.h"
 #include "sstsetgl.h"
 
-extern void STREAM_setgreedylevel(int stream, int s);   /* eacpsxz stream.obj */
 
 /* SNDSTRM_setgreedylevel @0x800E9D30 : -10 if uninit, -8 if no such stream, else set its greedy level. */
 int SNDSTRM_setgreedylevel(int tag, int s)

@@ -1,8 +1,8 @@
 /* eaclib/psx/sndpsxz/sstovrhd.c -- RECONSTRUCTED. NOT original.  *** 2/2 ***  obj sstovrhd.obj @[0x800EA054..0x800EA094] */
+#include "../eacpsxz/stream.h"
 #include "spktplay.h"
 #include "sstovrhd.h"
 
-extern int STREAM_overhead(int numReq, int a, int b);/* stream   */
 /* SNDSTRM_overheadtap : per-consumer + packet-player byte overhead.  (Ghidra dropped SNDPKTPLAY_overhead's
    return into in_v0; restored here.) */
 int SNDSTRM_overheadtap(int numConsumers, int numReq)
