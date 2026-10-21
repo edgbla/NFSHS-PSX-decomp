@@ -22,14 +22,8 @@
  */
 #include "sbhdrcpy.h"
 #include "sbhdrsze.h"
+#include "snd_globals.h"
 
-struct SNDGlobals {
-    char pad0[0x3c];
-    signed char initialized;
-    char pad3d[0x5b];
-    int bank_table;
-};
-extern struct SNDGlobals sndgs;
 extern void *memcpy(void *dst, const void *src, int n);   /* C42 (BIOS thunk) */
 
 /* SNDbankheadercopy @0x800E7BA8 : memcpy the bank header to `dst`, relocate each patch pointer (+0x14 for

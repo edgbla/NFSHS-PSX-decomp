@@ -28,9 +28,8 @@ int iSNDplatformcdpanvol(int pan, int vol)
      *     produces the oracle's `lui;addiu &sndpd` + `lw r,0x514(base)` pair -- a plain
      *     `*(int *)(sndpd + 0x514)` folds base+offset into ONE absolute %lo load and then CSEs
      *     the second read away (the oracle re-reads it: two `lw ...,0x514($a0)`).
-     *  2. iSNDpvtolrv is declared VOID here: an `int` return makes cc1 emit `(set (reg $v0) call)`,
-     *     which keeps $v0 out of the allocator's reach for the whole body -- every value then
-     *     colors one slot high (product $v1 not $v0, operand $a1 not $v1).  Prototype = coloring.
+     *  2. iSNDpvtolrv is declared void in its owner header: this call consumes its output parameters,
+     *     not a return value.  That signature is also necessary for the oracle register allocation.
      *  3. `r = outR;` read BEFORE the first store is the oracle's hoisted `lw $v1,0x14($sp)`:
      *     &outR escaped into the call, so the scheduler may NOT move that load across the SPU
      *     store on its own (it would have to prove no alias) -- retail's source read it early.

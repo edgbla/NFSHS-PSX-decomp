@@ -11,7 +11,7 @@ int SNDSTRM_requeststatus(unsigned int reqTag, int s)
 {
     int *sp, *rp;
     unsigned int div;
-    int q[2];
+    struct SNDu64Value q;
     *(int *)s = 0;
     *(int *)(s + 4) = 0;
     *(int *)(s + 8) = 0;
@@ -29,10 +29,10 @@ int SNDSTRM_requeststatus(unsigned int reqTag, int s)
     } else {
         if (*sp == (int)rp) { *(int *)s = 2; div = *(unsigned short *)(sp + 7); }
         else                { *(int *)s = 1; div = *(unsigned short *)(sp + 8); }
-        iSNDmulu64(q, (unsigned int)rp[5], 1000);
-        *(int *)(s + 4) = iSNDdivu64(q[0], q[1], div);
-        iSNDmulu64(q, (unsigned int)(rp[6] - rp[5]), 1000);
-        *(int *)(s + 8) = iSNDdivu64(q[0], q[1], div);
+        (void)iSNDmulu64(&q, (unsigned int)rp[5], 1000);
+        *(int *)(s + 4) = iSNDdivu64(q, div);
+        (void)iSNDmulu64(&q, (unsigned int)(rp[6] - rp[5]), 1000);
+        *(int *)(s + 8) = iSNDdivu64(q, div);
         *(unsigned int *)(s + 0xc) = (unsigned int)(rp[7] * 1000) / div;
     }
     goto status_done;

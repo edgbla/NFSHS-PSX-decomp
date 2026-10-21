@@ -7,20 +7,8 @@
 #include "sbvalid.h"
 #include "sstop.h"
 #include "sbirmpat.h"
-#include "sdata.h"
-
-struct SNDGlobals {
-    char pad0[0x0c];
-    unsigned short bank_count;
-    char pad0e[3];
-    unsigned char channel_count;
-    char pad12[0x2a];
-    signed char initialized;
-    char pad3d[0x57];
-    int play_records;
-    int bank_table;
-};
-extern struct SNDGlobals sndgs;
+#include "sdasync.h"
+#include "snd_globals.h"
 
 /* iSNDremovepatches @0x800E65F8 : release each of a bank's `count` resolved patches (de-dup via a local
  *   scratch table seeded to -1). */
@@ -83,7 +71,7 @@ int cSNDbankremove(int bankId, int recurse)
         entry = (unsigned char *)(bankId * 0xc +
             *(volatile int *)&base2->bank_table);
         if (*(signed char *)(entry + 9) != 0) {
-            iSNDplatformfree(*(void **)(entry + 4));
+            iSNDplatformfree((int)(unsigned int)*(void **)(entry + 4));
             *(unsigned char *)(bankId * 0xc + sndgs.bank_table + 9) = 0;
         } else
             iSNDremovepatches(bankId, (int)(unsigned)*(unsigned short *)(data + 6));

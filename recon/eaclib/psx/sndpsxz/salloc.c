@@ -49,9 +49,9 @@
  *     +0x00 owning tag (id|priority)   +0x0B in-use state (0 free / 1 held / 2 linked)
  *     +0x0C age   +0x10 alloc timestamp   +0x3C link-back   +0x3D..  voice fields
  */
+#include "salloc.h"
 #include "sstop.h"
 #include "sover.h"
-#include "salloc.h"
 
 extern int           sndgs[];
 /* DISTINCT SYMBOL VIEW (catalog, w35-a4 device): a second declaration of the SAME storage under its
@@ -59,13 +59,7 @@ extern int           sndgs[];
  * tail -- retail keeps them separate because their base regs differ; giving this arm its own RTL
  * symbol stops cse from unifying the two `&sndgs` materializations. */
 extern unsigned char sndgs_v[] __asm__("sndgs");
-extern signed char    sndchanreserved[];       /* scratch list of chosen channel indices */
 __asm__("\t.globl\tsndchanreserved\n\t.section\t.bss\nsndchanreserved:\n\t.space\t4\n\t.text");
-extern int           DAT_80136dec[];             /* rolling allocation id counter (+=0x20); OWNED by
-                                                  snddata.c (strong def there). MATCH: must stay a pure
-                                                  extern HERE -- a local tentative def would make it
-                                                  small-common/gp-rel, but the oracle reaches it ABSOLUTE
-                                                  (lui/lw; sec 3.12 #6 caveat: no %gp_rel oracles). */
 extern int  DAT_801478f4;
 /* DISTINCT UNSIZED VIEW of the same word (w50-a7).  Reading the scalar generates the `(high sym)`
  * AT the load, after the partner*100 scale chain; retail emits the `lui %hi` at the JOIN-BLOCK HEAD
