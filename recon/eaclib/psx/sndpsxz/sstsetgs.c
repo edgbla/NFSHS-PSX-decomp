@@ -8,7 +8,6 @@
 #include "sst.h"
 #include "sstsetgs.h"
 
-
 /* SNDSTRM_setgreedystate @0x800E9D8C : -10 if uninit, -8 if no such stream, else set its greedy state. */
 int SNDSTRM_setgreedystate(int tag, int s)
 {

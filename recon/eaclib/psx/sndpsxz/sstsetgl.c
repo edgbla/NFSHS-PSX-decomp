@@ -8,7 +8,6 @@
 #include "sst.h"
 #include "sstsetgl.h"
 
-
 /* SNDSTRM_setgreedylevel @0x800E9D30 : -10 if uninit, -8 if no such stream, else set its greedy level. */
 int SNDSTRM_setgreedylevel(int tag, int s)
 {

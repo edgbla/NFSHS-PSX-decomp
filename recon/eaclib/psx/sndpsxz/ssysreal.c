@@ -6,15 +6,6 @@
 #include "../eacpsxz/systask.h"
 #include "ssysreal.h"
 #include "ssysserv.h"
-/* W65-A6: `DAT_80134a6c` was a reloc-referenced UNDEFINED symbol (3 sites) AND a seal-criterion
- * #3 violation (a Ghidra-ism in code).  It is not missing data at all -- 0x80134A6C is INSIDE
- * the initialised image (VA < t_addr+t_size 0x8013E000) and is already defined by the splat
- * blob as `D_80134A6C` (asm/data/data_8010CCD4_r17.data.s, `dlabel D_80134A6C`).  The two
- * spellings differ only in case, i.e. exactly the casing-phantom class (methodology gotcha #17)
- * that an nm frontier count hides as "one more unsealed callee".  Renaming the reference to the
- * blob's exact spelling resolves it and is BYTE-NEUTRAL (only the relocation NAME changes;
- * verify_asm is reloc-name lenient and the TU re-gates 2/2 PASS). */
-
 
 /* iSNDsystemtaskreal @0x800F2130 : the per-frame system-task entry -- run the sound service. */
 int iSNDsystemtaskreal(void)

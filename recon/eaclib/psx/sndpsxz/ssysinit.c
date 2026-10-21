@@ -82,11 +82,6 @@ typedef struct SNDSYSOPTS {
     SNDSYSVEC vec;
 } SNDSYSOPTS;
 
-extern int  SNDSYS_getopts(SNDSYSOPTS *opts); /* @0x800F1D58 */
-extern int  SNDSYS_setopts(SNDSYSOPTS *opts); /* @0x800F1E14 */
-extern int  SNDSYS_init(int membase, int memsize);   /* @0x800F1F10 */
-extern int  SNDSYS_restore(void);          /* @0x800F204C */
-
 /* SNDSYS_getopts @0x800F1D58 : copy the live option block sndgs[0..0xe] into the caller's struct (lazily
  *   publishing the platform output caps first, defaulting maxbanks to 0x10).
  *   MATCH: non-void -- $v0 at exit is iSNDplatformoutputcaps()'s return (or 0 if that path wasn't

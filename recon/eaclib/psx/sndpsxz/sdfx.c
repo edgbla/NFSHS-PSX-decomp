@@ -79,8 +79,6 @@ unsigned char sndpe[660] = {
     0x00, 0x80, 0x00, 0x80
 };
 
-
-
 /* --- audio mutex: the PSX is single-threaded, so these are no-ops --- */
 void SNDI_mutexalloc(void)  { }
 void SNDI_mutexfree(void)   { }

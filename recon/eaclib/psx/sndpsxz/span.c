@@ -8,7 +8,6 @@
  *   [0,0x7F], and pokes the SPU via iSNDplatform3dpos.  Returns the channel index (or -10 off).
  */
 #include "span.h"
-
 #include "../../../lib/snd.h"
 
 int SNDpan(int handle, int pan)   /* @0x800E6884 */

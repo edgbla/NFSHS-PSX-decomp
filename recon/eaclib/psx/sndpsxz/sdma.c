@@ -48,8 +48,6 @@ extern unsigned int  *DAT_80147e1c;         /* DMA4 BCR  reg ptr  */
 extern unsigned int  *DAT_80147e20;         /* DMA4 CHCR reg ptr  */
 extern void (*gPreLoadTicks)(void);         /* pre-load tick hook @0x80148040 */
 
-
-
 /* cop0 Status read/write -- the queue mutations run with interrupts masked on target (host: plain).
  * The callback uses one explicit CP0 transaction macro because the R3000 Status write requires three
  * architectural hazard slots.  Keeping that handwritten instruction sequence localized here also

@@ -9,9 +9,7 @@
 #include "../eacpsxz/stream.h"
 #include "sst.h"
 #include "sstsetpr.h"
-
 #include "../../../lib/snd.h"
-
 
 int SNDSTRM_setpriority(int streamid, int prio, int a3)   /* @0x800E6CF0 */
 {

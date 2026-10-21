@@ -98,8 +98,6 @@ extern unsigned char DAT_80147a15;   /* +0x25 R cache */
 extern unsigned char DAT_80147a16;   /* +0x26 flag */
 extern unsigned char DAT_80147a17;   /* +0x27 partner-addr mode (bit7) / table index */
 
-
-
 #define SB(base,idx) ((&(base))[idx])              /* (&DAT)[idx] -- byte at base+idx */
 
 
