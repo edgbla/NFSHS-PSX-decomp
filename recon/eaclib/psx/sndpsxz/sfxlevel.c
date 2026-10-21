@@ -12,12 +12,12 @@
 #include "sdata.h"
 #include "sdfx.h"
 #include "sfxlevel.h"
+#include "sdriver.h"
 #include "slib.h"
 #include "snd_state.h"
 #include "spatkey.h"
 #include "sserver.h"
 
-extern int  iSNDplatformfxlevel(int chan, int bus, int fxon); /* sdriver (3-arg) */
 
 struct SNDfxBusView {
     unsigned char pad[0xa0];

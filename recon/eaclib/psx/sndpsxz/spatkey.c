@@ -17,6 +17,8 @@
  * scratchpad/w85/S8_receipt.md. */
 #include "sdata.h"
 #include "spatkey.h"
+#include "sdriver.h"
+#include "slib.h"
 
 extern unsigned char sndpd[];   /* EA sound-driver state base @0x80147918 (unsized array: forces
                                      * the oracle's `lui;addiu &sndpd; lw r,0x514(base)` base+offset shape
@@ -39,10 +41,6 @@ extern unsigned char DAT_80147a15;   /* +0x25 R cache */
 extern unsigned char DAT_80147a16;   /* +0x26 flag */
 extern unsigned char DAT_80147a17;   /* +0x27 partner-addr mode (bit7) / table index */
 
-extern void iSNDvol(int chan, int level);            /* sdriver */
-extern int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon);
-
-extern int iSNDsetslot(int chan, int addr, int pitch);   /* @0x800FF394 */
 
 #define SB(base,idx) ((&(base))[idx])              /* (&DAT)[idx] -- byte at base+idx */
 

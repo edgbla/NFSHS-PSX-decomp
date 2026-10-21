@@ -105,8 +105,7 @@
  *   Ghidra nfs4-f.exe.c (sdpacket) + disasm-v3 L<80103784+> -- disasm AUTHORITATIVE for every dropped arg:
  *     iSNDpsxzerospu(addr,LEN) [Ghidra in_a1]; iSNDpacketpurgeframes(p,byteoff,count) [Ghidra __thiscall];
  *     iSNDfillspuwithpackets(p,chunk) + its local frameSize is iSNDpacketget's 3rd (out) arg [Ghidra
- *     local_30]; iSNDplatformpacketplay is 8-ARG (p,note,volAngle:u16,level:u8,pitch:int,a6:int,fx:u8,
- *     hdr:u16*) [Ghidra dropped a3..a8 -> in_a2/in_a3/in_stack_*]; iSNDplatformpacketoverhead RETURNS a
+ *     local_30]; iSNDplatformpacketplay is 9-ARG (p,note,volAngle,level,pitch,a6,fxlevel,hdr,a9) [Ghidra dropped a3..a9]; iSNDplatformpacketoverhead RETURNS a
  *     computed size [Ghidra emptied the delay-slot return]; iSNDpacketget(this,chanIdx,&frameSize) 3-arg.
  *
  *   PACKET-VOICE STATE TABLE @0x801479F0 (0x2c byte / 0xb int stride per voice, indexed [voice]):
@@ -198,7 +197,6 @@ extern void iSNDpsxdisablespuirq(void);                    /* sdspuirq */
 extern void iSNDpsxenablespuirq(void);                     /* sdspuirq */
 extern void InterruptCallback(int idx, void (*handler)(void));  /* syslib INTR (real 2-arg sig -- see INTR_DMA.cpp/INTR_VB.c/drv.cpp) */
 extern void blockmove(int *dst, int *src, unsigned int len);  /* blkmov */
-extern void trap(unsigned int code);                       /* compiler div-by-zero break */
 
 /* forward decls (mutually referential within this obj) */
 
@@ -941,9 +939,9 @@ void iSNDplatformpacketplaydestroy(int p)
 
 /* iSNDplatformpacketplay @0x80104304 : start a voice playing a packet stream -- program the voice state
  *   table, derive the SPU block geometry from the player ctx, prime two buffers via iSNDfillspuwithpackets,
- *   install the serve + IRQ hooks, set initial pitch, and key the voice.  8-arg (Ghidra dropped a3..a8). */
-int iSNDplatformpacketplay(int p, int note, unsigned short volAngle, unsigned char level,
-                                      int pitch, int a6, unsigned char fxlevel, unsigned short *hdr)
+ *   install the serve + IRQ hooks, set initial pitch, and key the voice.  9-arg (Ghidra dropped a3..a9); `a9` is passed but unused here. */
+int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
+                                      int pitch, int a6, int fxlevel, unsigned short *hdr, int a9)
 {
     /* MATCH: same base-sharing lever as iSNDfillspuwithpackets/iSNDpacketgetirq -- ONE bare &sndpd
      * (oracle: v1) feeds BOTH the DAT_80147e10[p] load (base+p*4, +0x4F8 as the LOAD DISPLACEMENT,

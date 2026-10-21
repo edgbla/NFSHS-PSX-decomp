@@ -60,6 +60,7 @@
 #include "sdfx.h"
 #include "sdma.h"
 #include "slib.h"
+#include "sdriver.h"
 #include "slib_state.h"
 #include "sserver.h"
 #include "ssysserv.h"
@@ -97,8 +98,6 @@ extern unsigned char DAT_80147a15;   /* +0x25 R cache */
 extern unsigned char DAT_80147a16;   /* +0x26 flag */
 extern unsigned char DAT_80147a17;   /* +0x27 partner-addr mode (bit7) / table index */
 
-extern void iSNDvol(int chan, int level);            /* sdriver */
-extern int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon);
 
 
 #define SB(base,idx) ((&(base))[idx])              /* (&DAT)[idx] -- byte at base+idx */

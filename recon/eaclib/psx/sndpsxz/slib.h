@@ -4,7 +4,7 @@
 extern void iSNDcalcvol(int chan); /* spatkey */
 extern int iSNDpsxkeyon(int mask);
 extern int iSNDpsxkeyoff(int mask); /* spatkey */
-extern unsigned int iSNDpsxeffecton(int mask);
+extern unsigned int iSNDpsxeffecton(int mask); /* spatkey */
 extern unsigned int iSNDpsxeffectoff(int mask); /* spatkey */
 extern int iSNDpsxeffectvol(int left, int right); /* spatkey */
 extern void iSNDsetvol(int chan, int left, int right); /* spatkey */

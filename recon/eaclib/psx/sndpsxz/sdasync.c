@@ -9,11 +9,11 @@
  *   Function names and bodies are NOT retained anywhere; the names below are the natural ones for the member and are
  *   INFERRED.  What is evidence is the reference chain -- it is what puts the members in the retail order. */
 #include "sdasync.h"
+#include "sdmemman.h"
 
 #include "../../../link_stripped.h"
 
 /* ---- the surviving function (moved verbatim from sdata.c) ---- */
-extern void iSNDpsxfree(int ptr);   /* sdmemman */
 
 
 /* iSNDplatformfree @0x800FE594 : free the SPU block at `ptr`. */

@@ -6,15 +6,13 @@
  */
 
 /* ---- sst.obj internals (the layer below) + stream/pktplay/ssysserv backends ---- */
+#include "../eacpsxz/stream.h"
+#include "spktplay.h"
+#include "ssysserv.h"
 #include "sdata.h"
 #include "spvoices.h"
 #include "sst.h"
 
-extern void SNDPKTPLAY_destroy(int pktplay);                            /* spktplay */
-extern void SNDPKTPLAY_stop(int pktplay);
-extern void STREAM_destroy(int strm);                                   /* stream.obj */
-extern void STREAM_kill(int strm);
-extern void iSNDserverremoveclient(void *cb);                           /* ssysserv */
 extern void *memset(void *d, int c, int n);
 
                       /* @0x8013EA80 stream slot ptr array */
@@ -44,7 +42,7 @@ int SNDSTRM_destroy(int s)
 
     SNDSTRM_purge(s);
     if (iSNDstreamnumcreated() == 1) {                  /* this is the last live stream */
-        iSNDserverremoveclient((void *)iSNDstreamservice);
+        iSNDserverremoveclient((int)iSNDstreamservice);
         sndgs[0x22] = 0;
     }
     SNDPKTPLAY_destroy(MI(S, 0xc));

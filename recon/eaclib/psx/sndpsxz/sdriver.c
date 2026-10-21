@@ -17,7 +17,10 @@
  *     b    +0x28 (DAT_80147a18) pitch-dirty flag
  */
 #include "salloc.h"
+#include "saetodv.h"
+#include "saetolrv.h"
 #include "sdriver.h"
+#include "slib.h"
 
 /* --- packet-voice table fields (0x2c stride) --- */
 extern int           DAT_801479f8;     /* +0x08 hw pitch/rate (int view: [chan*0xb]) */
@@ -40,12 +43,6 @@ extern unsigned char sndpd[];          /* driver-state base; voice table starts 
 /* "voice has finished" notifier installed by the host (@0x8014803C) */
 
 /* dependencies in sibling objs */
-extern int          iSNDpsxkeyoff(int mask);                      /* spatkey */
-extern unsigned int iSNDpsxeffecton(int mask);                    /* spatkey */
-extern unsigned int iSNDpsxeffectoff(int mask);                   /* spatkey */
-extern void iSNDsetvol(int chan, int left, int right);    /* spatkey */
-extern void iSNDatolrv(unsigned int pan, int level, int *outL, int *outR);                 /* saetolrv */
-extern void iSNDatodlrv(unsigned int pan, int level, int *outL, int *outR, int pL, int pR);/* saetodv  */
 
 
 /* iSNDstop @0x800FFE90 : silence a hardware voice (and its linked partner).  Fires the voice-done hook

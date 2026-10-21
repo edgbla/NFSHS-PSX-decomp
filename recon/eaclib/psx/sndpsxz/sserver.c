@@ -28,7 +28,6 @@ extern int           timerhz[];          /* hardware tick rate            */
 #define DAT_80147910 (*(short *)((char *)sndgs + 0xB0))   /* last-seen timerhz             */
 #define DAT_80147912 (*(short *)((char *)sndgs + 0xB2))   /* deferred-server request count */
 
-extern void trap(unsigned int code);
 
 
 #define GB(idx) (((char *)sndgs)[idx])            /* signed byte of sndgs    */

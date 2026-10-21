@@ -3,13 +3,13 @@
  *   Callers pass a third `y` value, but the callee never reads $a2. The original C formal count is not recoverable
  *   from this binary alone; keep the unused parameter here to match the three-argument caller interface. */
 #include "s3dpos.h"
+#include "saetodv.h"
+#include "saetolrv.h"
 #include "sdata.h"
 #include "slib.h"
 #include "snd_state.h"
 
 extern unsigned char DAT_80147a08, DAT_80147a0c, DAT_80147a0e, DAT_80147a14, DAT_80147a15;
-extern void iSNDatolrv(unsigned int pan, int level, int *outL, int *outR);                 /* saetolrv */
-extern void iSNDatodlrv(unsigned int pan, int level, int *outL, int *outR, int pL, int pR);/* saetodv  */
 
 /* iSNDplatform3dpos @0x800FEE30 : store pan angle `x` (+0x18) and, if the voice is playing, recompute its
  *   SPU L/R from the routing mode and push it. MATCH: the voice fields are one volatile sndpd+0xd8 record;

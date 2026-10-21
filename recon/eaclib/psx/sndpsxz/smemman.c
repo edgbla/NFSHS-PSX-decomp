@@ -55,7 +55,6 @@ extern unsigned char sndmm_b[] __asm__("sndmm");
 #define DAT_80148786 (sndmm.poolWords)
 #define DAT_80148788 (sndmm.highWater)
 #define DAT_8014878c (sndmm.entries[0].blk)
-extern void           trap(unsigned int code);
 
 
 /* iSNDmemconstrain @0x801061A8 : clamp a candidate [block, size] so block+size stays within the pool top.
@@ -82,7 +81,7 @@ int *iSNDmeminit(int membase, int memsize)
 
 /* iSNDmemrestore @0x801061F4 : return pool utilisation percent = high_water*100/poolsize.
  *   The unsigned divide auto-emits the BREAK 0x1c00 div-by-zero guard (oracle 0x80106228),
- *   so the trap only fires when the pool was never initialised (poolsize==0). */
+ *   so the compiler-generated BREAK fires only when the pool was never initialised (poolsize==0). */
 unsigned int iSNDmemrestore(void)
 {
     /* high-water (+8) and poolsize (+6) are fields of the sndmm struct @0x80148780; read both off the

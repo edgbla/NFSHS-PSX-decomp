@@ -37,10 +37,17 @@
  * addressing, while the oracle has ZERO `%gp_rel(sndpps)` sites (grep asm/nonmatchings) i.e.
  * retail addressed it absolutely.  Keeping the C view `extern` is byte-neutral by
  * construction; 13/13 PASS unchanged.  Receipts: scratchpad/w65a6/RECEIPTS.md */
+#include "salloc.h"
+#include "sclcptch.h"
+#include "sdpacket.h"
+#include "salloc.h"
+#include "sclcptch.h"
+#include "sdpacket.h"
 #include "sdata.h"
 #include "slib.h"
 #include "snd_state.h"
 #include "spktplay.h"
+#include "sstop.h"
 #include "sserver.h"
 
 __asm__("\t.globl\tsndpps\n\t.section\t.bss\n\t.align\t2\nsndpps:\n\t.space\t4\n\t.text");
@@ -53,17 +60,8 @@ __asm__("\t.globl\tsndpps\n\t.section\t.bss\n\t.align\t2\nsndpps:\n\t.space\t4\n
        /* @0x80147900 -- platform sample rate (pitch calc); UNSIZED: oracle loads it absolute (lui+lw), a sized [1] goes gp-rel */
 
 /* ---- backends ---- */
-extern int  iSNDplatformpacketoverhead(void);                           /* sdpacket */
-extern int  iSNDplatformpacketplaycreate(int slot, int *mem);
 /* H10: 9-arg per oracle call @0x80102C94 (a0..a3 + sp+16/20/24/28/32). sdpacket's def reads 8
  *   (volAngle,level,pitch,a6,fxlevel,hdr-ptr); a9=hdr+0xc is pushed-but-unused, matching the binary. */
-extern int  iSNDplatformpacketplay(int p, int note, int volAngle, int level,
-                                       int pitch, int a6, int fxlevel, int hdr, int a9);
-extern void iSNDplatformpacketplaydestroy(int p);
-extern int  iSNDallocchan(int a, int b, int c, int *out);               /* salloc */
-extern void iSNDfreechan(int note);
-extern void iSNDcalcpitch(int note);                                    /* sclcptch */
-extern void SNDstop(unsigned int voice);                                /* sstop    */
 
 
 #define MI(p,o)  (*(int*)((p)+(o)))
