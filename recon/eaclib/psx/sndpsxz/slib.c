@@ -73,6 +73,8 @@
 #include "sserver.h"
 #include "ssysserv.h"
 #include "ssysinit.h"
+#include "../eacpsxz/addtimer.h"
+#include "../eacpsxz/exit.h"
 
 __asm__("\t.globl\tsndpd\n\t.globl\tD_801479F0\n\t.globl\tDAT_801479f0\n\t.globl\tD_80147A0C\n"
         "\t.globl\tDAT_80147e28\n\t.globl\tD_80147E34\n"
@@ -324,23 +326,9 @@ unsigned char sndpdsafeloop[16] = {0x00, 0x07, 0x00, 0x00}; /* @0x80136DF0 */
  * (below, `spu`) rather than independent literal macros: gcc-2.8 -O2 keeps the pointer in a register
  * and reuses it via load/store displacements. This is the exact shape required by the oracle. */
 
-/* dependencies */
-                  /* spatkey */
-/* spatkey */
-       /* spatkey */
-                  /* salloc  */
-                 /* sdfx    */
-                        /* sserver */
-                    /* sserver */
- /* sdma */
-extern int          DMACallback(int ch, int func);            /* libetc INTR.obj @0x800F28AC -- Ghidra/our
-                                                                * previous decl dropped BOTH real args (channel,
-                                                                * new-callback-fn); see cdcont.cpp/SYS.cpp for
-                                                                * the true signature used tree-wide */
-                    /* sdma -- installed as the DMA4 callback */
-extern int          addtimer(int callback);                  /* addtimer */
-extern int          deltimer(int callback);                  /* addtimer */
-extern int          addexit(int handler);                    /* exit     */
+/* `syslib.h` has an obsolete no-argument declaration; retain the evidence-backed two-argument consumer prototype locally. */
+extern int DMACallback(int ch, int func); /* libetc INTR.obj @0x800F28AC; installed as DMA4 callback.
+                                          * Ghidra/older declarations dropped both args; see cdcont.cpp/SYS.cpp. */
 
    /* @0x800FF5A8 -- oracle explicitly zeroes $v0 before return */
     /* @0x800FF600 */
@@ -577,9 +565,9 @@ int iSNDinit(void)
         *(volatile unsigned short *)(post_ctrl + 0x1aa) | 1;
     iSNDpsxfxinit(*(int *)(post + 4));
     *(volatile unsigned char *)(post + 1) = 0;
-    addtimer((int)iSNDserver);
+    addtimer(iSNDserver);
     if (sndpd[0] == 0) {
-        addexit((int)SNDSYS_restore);
+        addexit((void (*)(void))SNDSYS_restore);
         sndpd[0] = 1;
     }
     return 0;
@@ -649,7 +637,7 @@ int iSNDrestore(void)
         }
         SNDSYS_service();
     } while (!quiet);
-    deltimer((int)iSNDserver);
+    deltimer(iSNDserver);
     iSNDpsxfxinit(0);
     dma = 4;
     MASK_SR_FOR_DMA(sr, dma);

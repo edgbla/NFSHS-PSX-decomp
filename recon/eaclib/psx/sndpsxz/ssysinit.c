@@ -8,6 +8,7 @@
  */
 
 #include "sdfx.h"
+#include "sdata.h"
 #include "sndchpriv.h"
 #include "sndserverpriv.h"
 #include "sndbankpriv.h"
@@ -17,7 +18,6 @@
 #include "sserver.h"
 #include "sstopall.h"
 
-extern int  sndgs[];
 /* W65-A6 DATA-MAT: `sndgs` was extern-only tree-wide -- 201 reloc-referenced undefined sites,
  * the single biggest link hole.  Retail: .bss @0x80147860, size 180 (= sndchanreserved
  * @0x80147914 - 0x80147860); VA > t_addr+t_size (0x8013E000) so it carries NO file bytes =
@@ -71,7 +71,6 @@ int SNDSYS_getopts(SNDSYSOPTS *opts)
     return r;
 }
 
-extern int D_80147898[];   /* linker alias for sndgs + 0x38 (SNDSYSOPTS::vec) */
 
 /* SNDSYS_setopts @0x800F1E14 : apply the canonical 44-byte opts->set block at
  *   +0x0c and the opts->vec callback at +0x38, then re-derive the output

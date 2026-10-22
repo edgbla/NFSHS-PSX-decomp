@@ -50,12 +50,12 @@
  *     +0x0C age   +0x10 alloc timestamp   +0x3C link-back   +0x3D..  voice fields
  */
 #include "salloc.h"
+#include "sndgsbase.h"
 #include "sndchpriv.h"
 #include "sndserverpriv.h"
 #include "sstop.h"
 #include "sover.h"
 
-extern int           sndgs[];
 /* DISTINCT SYMBOL VIEW (catalog, w35-a4 device): a second declaration of the SAME storage under its
  * own asm label.  iSNDfreechan's final-else return block must NOT cross-jump-merge with the group==0
  * tail -- retail keeps them separate because their base regs differ; giving this arm its own RTL
