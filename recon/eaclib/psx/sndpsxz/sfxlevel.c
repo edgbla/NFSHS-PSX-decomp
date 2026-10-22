@@ -45,13 +45,13 @@ int SNDfxlevel(int tag, int bus, int level)
     if (-1 < chanIdx) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
-            int slot   = ((struct SndGlobalServerStateView *)sndgs)->play_records + cur[0] * sizeof(SndChannel) + bus;
-            int scaled = level * ((SndChannelFxLevelStepView *)(unsigned int)(slot + 0x34))->previous_level;
+            unsigned char *slot = (unsigned char *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + cur[0] * sizeof(SndChannel) + bus);
+            int scaled = level * ((SndChannelFxLevelStepView *)(slot + 0x34))->previous_level;
             int fxArg;
-            ((SndChannelFxLevelStepView *)(unsigned int)(slot + 0x34))->next_level = (signed char)level;
+            ((SndChannelFxLevelStepView *)(slot + 0x34))->next_level = (signed char)level;
             /* The displacement view keeps GCC's exact retail lw 0xA0(s4) form; direct SndFxBus
              * indexing adds an address instruction and changes this function's exact match. */
-            fxArg = (scaled * ((struct SndFxBusMasterDisplacementView *)((unsigned char *)sndgs + bus * 0x10))->master) / 16129; /* /(127*127): normalises BOTH the send byte
+            fxArg = (scaled * ((const struct SndFxBusMasterDisplacementView *)((unsigned char *)sndgs + bus * 0x10))->master) / 16129; /* /(127*127): normalises BOTH the send byte
                                                                  * and the bus-master 0..127 fractions (oracle
                                                                  * magic 0x82061029 sra 13 == signed /16129) */
             iSNDplatformfxlevel(cur[0], bus, fxArg);

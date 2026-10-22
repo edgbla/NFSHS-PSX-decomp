@@ -14,7 +14,7 @@
 int SNDSTRM_autovol(int tag, int steps, int vol)
 {
     SndStream *s;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == '\0')
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     s = (SndStream *)iSNDstreamgetstreamptr(tag);
     if (s == 0)

@@ -19,7 +19,7 @@ int SNDtimeremaining(unsigned int tag)
                                        * matching the oracle's `li s0,-1024` in the prologue */
     int          chan;
     int          voice[2];
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == '\0')
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
     chan = iSNDgetchan(tag);

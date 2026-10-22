@@ -1,5 +1,8 @@
-/* Private PSX SND effect-bus record. The shared SND state places two buses at +0x9C;
- * recon/lib/snd.h independently records the same 0x10-byte type/master/depth/delay layout. */
+/* Private PSX SND effect-bus record. Local setters/readers establish the
+ * type/master/depth/delay layout and bus-0 base at sndgs+0x9C. The indexed code
+ * retains a 0x10 stride, but +0xAC overlaps live server-state fields and the
+ * known game callsites use bus 0; do not infer an independent PSX bus-1 record
+ * from the generic shared SndState view alone. */
 #ifndef _SNDPSXZ_SNDFXPRIV_H_
 #define _SNDPSXZ_SNDFXPRIV_H_
 

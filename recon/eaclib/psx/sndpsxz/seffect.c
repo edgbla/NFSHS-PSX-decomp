@@ -3,8 +3,9 @@
  *   2 fns @[0x800E6D58 .. 0x800E6DD0].  SNDfxinitbus/SNDfxmasterlevel -- configure an effect (reverb) bus
  *   and broadcast its master level to every channel.  Ghidra nfs4-f.exe.c (seffect) + IDA sigs (this=bus).
  *
- *   Effect buses begin at byte offset +0x9C (word index 0x27), stride 0x10; each SndFxBus has
- *   int fields type/master/depth/delay at byte offsets +0/+4/+8/+0xC.
+ *   The PSX bus-0 record begins at byte offset +0x9C (word index 0x27); indexed paths retain a 0x10
+ *   stride. Each SndFxBus record has int fields type/master/depth/delay at offsets +0/+4/+8/+0xC.
+ *   Known game callsites use bus 0; the apparent bus-1 range overlaps server-state fields.
  */
 #include "sdata.h"
 #include "sndserverpriv.h"
@@ -17,7 +18,7 @@
 /* SNDfxinitbus @0x800E6D58 : initialise effect bus `bus` (mode + depth params), then set its master level. */
 int SNDfxinitbus(int bus, int mode, int arg2, int arg3, int arg4)
 {
-    SndFxBus *e = (SndFxBus *)&sndgs[0x27] + bus;
+    SndFxBus *e = (SndFxBus *)((unsigned char *)sndgs + 0x9C) + bus;
     e->type = arg2;
     e->depth = arg3;
     e->delay = arg4;
@@ -33,19 +34,19 @@ int SNDfxinitbus(int bus, int mode, int arg2, int arg3, int arg4)
 int SNDfxmasterlevel(int bus, int level)
 {
     int r, i;
-    unsigned char *loopBase;
-    unsigned char *base = (unsigned char *)sndgs;
-    SndFxBus *fx = (SndFxBus *)(base + bus * 16 + 0x9c);
+    struct SndGlobalServerStateView *loopBase;
+    struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
+    SndFxBus *fx = (SndFxBus *)((unsigned char *)base + bus * (int)sizeof(SndFxBus) + 0x9c);
     fx->master = level;
     r = iSNDplatformfxmasterlevel(bus, level);
     if (r < 0)
         return r;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (base->initialized == 0)
         return 0;
-    for (i = 0; i < ((unsigned char *)sndgs)[0x11]; i++) {
+    for (i = 0; i < ((struct SndGlobalServerStateView *)sndgs)->channel_count; i++) {
         unsigned char *rec;
-        loopBase = (unsigned char *)sndgs;
-        rec = (unsigned char *)(i * sizeof(SndChannel) + ((struct SndGlobalServerStateView *)loopBase)->play_records);
+        loopBase = (struct SndGlobalServerStateView *)sndgs;
+        rec = (unsigned char *)(i * sizeof(SndChannel) + loopBase->play_records);
         SNDfxlevel((int)((SndChannel *)(unsigned int)rec)->owner_tag,
                    bus, (int)((SndChannelFxLevelStepView *)(unsigned int)(rec + bus + 0x34))->next_level);
     }

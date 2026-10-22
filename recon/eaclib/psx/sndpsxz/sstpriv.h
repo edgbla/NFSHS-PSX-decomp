@@ -28,11 +28,15 @@ typedef struct SndStreamReq {
 } SndStreamReq;
 typedef char SndStreamReq_size_check[(sizeof(SndStreamReq) == 0x2c) ? 1 : -1];
 
-/* Common 16-byte prefix observed in the SCCl/SCDl chunk parsers. The word at +0x0C is
- * type-specific (chunk count in SCCl, byte count in SCDl), so retain a neutral name. */
+/* At +0x0C the common SCCl/SCDl prefix carries different typed values. */
+typedef union SndStreamChunkValue {
+    int chunk_count; /* SCCl */
+    int data_size;   /* SCDl */
+} SndStreamChunkValue;
+
 typedef struct SndStreamChunkHeaderPrefix {
     unsigned char opaque_00_0B[0x0C];
-    int word_0C;
+    SndStreamChunkValue value;
 } SndStreamChunkHeaderPrefix;
 typedef char SndStreamChunkHeaderPrefix_size_check[(sizeof(SndStreamChunkHeaderPrefix) == 0x10) ? 1 : -1];
 

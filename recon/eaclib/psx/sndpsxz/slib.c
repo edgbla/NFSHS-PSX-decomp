@@ -194,8 +194,8 @@ int iSNDpsxeffectvol(int left, int right)
 void iSNDsetvol(int chan, int left, int right)
 {
     int            vt = chan * 0x2c;
-    volatile unsigned char *voiceBase = sndpd + 0xd8;
-    volatile unsigned char *slot = voiceBase + vt;
+    unsigned char *voiceBase = sndpd + 0xd8;
+    SndPacketVoiceState *slot = (SndPacketVoiceState *)(voiceBase + vt);
     unsigned char  *pd = (unsigned char *)voiceBase - 0xd8;
     int            voiceRegs = (int)((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base;
     unsigned short *vreg = (unsigned short *)(voiceRegs + chan * 0x10);
@@ -211,7 +211,7 @@ void iSNDsetvol(int chan, int left, int right)
             return;
         }
         sum = left + right;
-        if (((SndPacketVoiceState *)slot)->route == chan) { /* L/R-spread routing */
+        if (slot->route == chan) { /* L/R-spread routing */
             if (left < 0)  left = -left;
             if (right < 0) right = -right;
             if (0x7f < left)  left = 0x7f;
@@ -269,10 +269,10 @@ unsigned int iSNDstartvoice(unsigned int chan)
     int          pitch;
     unsigned int mask;
 
-    voice->pad24_25[0] = 0;
-    voice->pad24_25[1] = 0;
-    pitch = voice->word08 / 441u;
-    iSNDsetslot(chan, voice->header_word0, pitch); /* +0x00 SPU start address / tag */
+    voice->pan_left_cache = 0;
+    voice->pan_right_cache = 0;
+    pitch = voice->position_step / 441u;
+    iSNDsetslot(chan, voice->spu_start_address, pitch); /* +0x00 SPU start address / tag */
     mask = 1u << (chan);
     voice->play_state = 2;
     voice->voice_status = 2;
@@ -290,14 +290,14 @@ unsigned int iSNDstartvoice(unsigned int chan)
             a3 = *(int *)((char *)pt + 8);
         } else {                                     /* bit7 set: index from +0x04 via 1/0x1c reciprocal */
             unsigned int checkNumerator;
-            a3 = (unsigned int)voice->word04 / 0x1c;
-            checkNumerator = (unsigned int)voice->word04;
+            a3 = (unsigned int)voice->loop_length_param / 0x1c;
+            checkNumerator = (unsigned int)voice->loop_length_param;
             if (checkNumerator != (checkNumerator / 0x1c) * 0x1c)
                 a3 = a3 + 1;
             a3 = a3 << 4;
         }
         iSNDsetslot(((int)((unsigned int)voice->link_index.vu << 24)) >> 24,
-                    voice->header_word0 + a3, pitch);
+                    voice->spu_start_address + a3, pitch);
         maskLink = (signed char)voice->link_index.vu;
         ((volatile SndPacketVoiceState *)vte2)->play_state = 2;
         ((volatile SndPacketVoiceState *)vte2)->voice_status = 2;
@@ -408,7 +408,7 @@ int iSNDplatformoutputset(void)
                               * `channel_count = 0x18` member store anchors the compiler's base at +0x11;
                               * the preceding output-mode clamp reads then use negative displacements,
                               * matching the measured register/address schedule. */
-    unsigned char *vp;       /* WALKING &sndpd+0xd8 pointer (voice-table row base), +=0x2c per
+    volatile SndPacketVoiceState *vp;       /* WALKING &sndpd+0xd8 pointer (voice-table row base), +=0x2c per
                                * iter -- matches iSNDserve's established `vp = &DAT_801479f0 + vt`
                                * lever: keeps the 4 field accesses (0x1c/0x21/0x24/0x25) as load
                                * DISPLACEMENTS off ONE walking base instead of 4 separately-folded
@@ -422,7 +422,7 @@ int iSNDplatformoutputset(void)
     if (base->initialized != 0 && ((struct SndDriverBootstrapPrefixView *)sndpd)->last_channel_mode != base->output_mode) {  /* signed `initialized` at +0x3C: retail uses lb */
         chan = 0;
         vbase = base;
-        vp = &DAT_801479f0;
+        vp = (volatile SndPacketVoiceState *)&DAT_801479f0;
     voiceloop:
         {
             /* goto-loop (catalog §B): a label+goto back-edge carries no NOTE_INSN_LOOP_BEG, so
@@ -430,14 +430,14 @@ int iSNDplatformoutputset(void)
              * the state compare into a callee-saved reg ($s2, which the oracle needs for the
              * persistent sndgs base) and reproduces the oracle's per-iteration
              * `addiu v0,zero,2` remat in the lbu's load-delay slot. */
-            if (((volatile SndPacketVoiceState *)vp)->play_state == 2) {
-                if (((volatile SndPacketVoiceState *)vp)->link_flag == 0) {
+            if (vp->play_state == 2) {
+                if (vp->link_flag == 0) {
                     iSNDsetvol(chan,
-                        (((volatile SndPacketVoiceState *)vp)->pad24_25[0] << 24) >> 24,
-                        (((volatile SndPacketVoiceState *)vp)->pad24_25[1] << 24) >> 24);
+                        (vp->pan_left_cache << 24) >> 24,
+                        (vp->pan_right_cache << 24) >> 24);
                 }
             }
-            vp += 0x2c;
+            vp++;
             /* Preincrement makes the channel-count load precede the counter increment. */
             if (++chan < vbase->channel_count) goto voiceloop;
         }
@@ -543,7 +543,7 @@ int iSNDinit(void)
             *(short *)(vr + 0xa) = 0;
             i++;
             *(signed char *)(vp + 0xff) = done;             /* mark voice done */
-            vp += 0x2c;
+            vp += (int)sizeof(SndPacketVoiceState);
         } while (i < ((struct SndGlobalServerStateView *)loop_gs)->channel_count);
     }
     iSNDpsxkeyon(0xffffff);
@@ -912,15 +912,15 @@ void iSNDserve(void)
                     }
                 }
                 if (((struct SndPacketVoiceState *)vp)->pitch_dirty != 0) {                                 /* pitch dirty -> reprogram */
-                    vreg[2] = (short)(((struct SndPacketVoiceState *)vp)->word08 / 0x1b9);
+                    vreg[2] = (short)(((struct SndPacketVoiceState *)vp)->position_step / 0x1b9);
                     ((struct SndPacketVoiceState *)vp)->pitch_dirty = 0;
                 }
                 if (*(volatile int *)&((struct SndPacketVoiceState *)vp)->served_position > 0) {              /* advance play position */
                     *(volatile int *)&((struct SndPacketVoiceState *)vp)->served_position = *(volatile int *)&((struct SndPacketVoiceState *)vp)->served_position -
-                                                   *(volatile int *)&((struct SndPacketVoiceState *)vp)->word08;
+                                                   *(volatile int *)&((struct SndPacketVoiceState *)vp)->position_step;
                 } else {
                     *(volatile int *)&((struct SndPacketVoiceState *)vp)->byte_position = *(volatile int *)&((struct SndPacketVoiceState *)vp)->byte_position +
-                                                  *(volatile int *)&((struct SndPacketVoiceState *)vp)->word08;
+                                                  *(volatile int *)&((struct SndPacketVoiceState *)vp)->position_step;
                     if (*(volatile unsigned int *)&((struct SndPacketVoiceState *)vp)->byte_position >=
                         *(volatile unsigned int *)&((struct SndPacketVoiceState *)vp)->loop_length) {
                         if ((int)((unsigned)((struct SndPacketVoiceState *)vp)->voice_done << 0x18) >= 0)

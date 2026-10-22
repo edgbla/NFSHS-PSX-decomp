@@ -4,6 +4,7 @@
  */
 #include "sdata.h"
 #include "sndchpriv.h"
+#include "sndserverpriv.h"
 #include "sstop.h"
 #include "sstopall.h"
 
@@ -12,17 +13,17 @@
 void SNDstopall(void)
 {
     int i, off;
-    int *base = sndgs;
-    if (((unsigned char *)base)[0x11] != 0) {
-        int *gs;
+    struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
+    if (base->channel_count != 0) {
+        struct SndGlobalServerStateView *gs;
         i = 0;
         off = i;
         gs = base;
         off = i;
         do {
             i++;
-            SNDstop(((SndChannel *)(unsigned int)(off + gs[0x25]))->owner_tag);
+            SNDstop(((SndChannel *)(unsigned int)(off + gs->play_records))->owner_tag);
             off += sizeof(SndChannel);
-        } while (i < ((unsigned char *)gs)[0x11]);
+        } while (i < gs->channel_count);
     }
 }

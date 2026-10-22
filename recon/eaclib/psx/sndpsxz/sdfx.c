@@ -102,7 +102,7 @@ unsigned int iSNDpsxfxinit(int mode)
      * alongside the other prologue register spills, reused later (via +8/+0xC) for all 7 reverb-depth
      * taps. Declaring it here (matching that early C-source position) instead of inside the `if` block
      * it's actually used in reproduces that hoist. */
-    SndFxBus *sg = (SndFxBus *)&sndgs[0x27];
+    const SndFxBus *sg = (const SndFxBus *)((unsigned char *)sndgs + 0x9C);
 
     if (mode != 0) {
         if      (mode == 5)    mode = 1;

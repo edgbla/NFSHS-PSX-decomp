@@ -600,9 +600,9 @@ int iSNDfillspuwithpackets(int p, int chunk)
                     result = cursor - pp->serve_position;
                     if (pp->queue_fill_limit.u < result)
                         goto function_exit;
-                    if (pp->fill36.u > pp->frame_count)
+                    if (pp->empty_source_loop_count.u > pp->frame_count)
                         goto advance;
-                    if (pp->fill36.u < 2) {     /* mark SPU loop-back */
+                    if (pp->empty_source_loop_count.u < 2) {     /* mark SPU loop-back */
                         i = 0;
                         if (voice->channel_count != 0) {
                             ch = (unsigned char *)pp;
@@ -636,13 +636,13 @@ int iSNDfillspuwithpackets(int p, int chunk)
                         }
                     }
                     if (pp->spu_buffer_offset.u == 0)
-                        pp->fill36.s = pp->fill36.s + 1;
+                        pp->empty_source_loop_count.s = pp->empty_source_loop_count.s + 1;
                     pp->spu_bytes_remaining.s = 0;
                     goto queue_dma;
                 }
                 {
                     int chunkSize = (frameSize * 4) / 7;   /* ADPCM bytes per chunk */
-                    pp->fill36.s = 0;
+                    pp->empty_source_loop_count.s = 0;
                     pp->source_frame_offset.s = 0;
                     pp->source_frame_remaining.s = (short)chunkSize;
                     pp->channel_frame_stride.s = pp->source_frame_remaining.s;
@@ -930,7 +930,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
                                                     * count -- volatile keeps this store pinned
                                                     * right after its own load, ahead of the OTHER
                                                     * (also-volatile) field stores below. */
-    *(volatile int *)&voice->word04 = 0;          /* DAT_801479f4 -- MATCH: this whole field-store
+    *(volatile int *)&voice->loop_length_param = 0;          /* DAT_801479f4 -- MATCH: this whole field-store
                                                     * run must complete BEFORE the chunkBytes
                                                     * division below (oracle keeps them in program
                                                     * order); plain (non-volatile) stores through an
@@ -939,7 +939,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
     *(volatile unsigned short *)&voice->volume_angle = volAngle; /* DAT_80147a08 */
     *(volatile unsigned char *)&voice->level = level;      /* DAT_80147a12 */
     *(volatile unsigned char *)&voice->fx_level = fxlevel;    /* DAT_80147a13 */
-    *(volatile int *)&voice->header_word0 = ctx->spu_address;       /* DAT_801479f0 */
+    *(volatile int *)&voice->spu_start_address = ctx->spu_address;       /* DAT_801479f0 */
     *(volatile unsigned char *)&voice->voice_done = (unsigned char)p; /* DAT_80147a17 */
 
     chunkBytes = 0x1000 / (unsigned char)*(volatile unsigned char *)&voice->channel_count;
@@ -979,7 +979,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
         ctx->queue_fill_limit.s =
             *(volatile unsigned short *)&ctx->frames_per_block.u;
         ctx->active_note = (signed char)note;
-        ctx->fill36.s = 0;
+        ctx->empty_source_loop_count.s = 0;
         ctx->channel_frame_stride.s = 0;
         ctx->source_frame_remaining.s = 0;
         ctx->source_frame_offset.s = 0;

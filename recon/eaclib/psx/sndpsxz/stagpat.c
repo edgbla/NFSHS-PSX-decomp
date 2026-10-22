@@ -106,20 +106,20 @@ int iSNDfindfreekey(void)
 {
     int   i, count, probe;
     unsigned char key;
-    int *gs;
+    struct SndGlobalServerStateView *gs;
     SndChannel *slot;
 top:
     DAT_801371cc = DAT_801371cc + 1;        /* lbu/addiu/sb; the == 0 test reuses the CSE'd value */
     if (DAT_801371cc == 0)                     /* skip 0 (the "no group" sentinel) */
         DAT_801371cc = DAT_801371cc + 1;
     i = 0;
-    gs = sndgs;                                   /* one la base for the +0x11 / +0x94 displacements */
-    probe = ((unsigned char *)gs)[0x11];
+    gs = (struct SndGlobalServerStateView *)sndgs; /* one la base for the +0x11 / +0x94 displacements */
+    probe = gs->channel_count;
     if (probe == 0)
         goto done;
-    count = ((unsigned char *)gs)[0x11];
+    count = gs->channel_count;
     key   = DAT_801371cc;
-    slot  = (SndChannel *)(unsigned int)gs[0x25];
+    slot  = (SndChannel *)(unsigned int)gs->play_records;
 loop:                                             /* goto-formed: no LOOP notes -> no giv anchoring */
     if (slot->state != 0) {
         if (slot->group_id == key)
@@ -278,7 +278,7 @@ pan_low:
         playLevel = slot->volume;
         playPitch = slot->spu_pitch;
         playResult = iSNDplatformplay(timbre, chan, playLevel, playPitch, playTag,
-                                      (iSNDplatformrate[0] * slot->playback_fx.playback.playback_factor34 *
+                                      (sndgs_fx_bus0_master[0] * slot->playback_fx.playback.playback_factor34 *
                                        slot->playback_fx.playback.playback_factor35) / 16129,
                                       tmp, playOffset);
         if (playResult < 0)

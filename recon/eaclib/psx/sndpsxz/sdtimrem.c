@@ -3,7 +3,7 @@
  *   1 fn @0x801049A8.  iSNDtimeremaining -- samples left to play on a voice = (loopEnd - servedPos) / pitch.
  *   Ghidra nfs4-f.exe.c (sdtimrem) + IDA sig.  Voice table @0x801479F0 (0x2c byte / 0xb int stride per voice).
  */
-/* W85-S8 VOLATILE AUDIT (2026-09-02): the `volatile` qualifiers on 19 (`voice+8` sample-rate word; line 22 is load-bearing and stays)
+/* W85-S8 VOLATILE AUDIT (2026-09-02): the `volatile` qualifiers on 19 (`voice+8` position-step word; line 22 is load-bearing and stays)
  * were REMOVED -- plain main-RAM driver state, not MMIO and not IRQ-mutated; removal is
  * gate-neutral (whole-TU verify_asm/tugate PASS before and after).  Every REMAINING
  * `volatile` in this file was measured individually or as a group and is load-bearing
@@ -19,8 +19,8 @@
 unsigned int iSNDtimeremaining(int chan)
 {
     unsigned char *voice = D_801479F0 + chan * 0x2c;
-    if (((SndPacketVoiceState *)voice)->word08 == 0)
+    if (((SndPacketVoiceState *)voice)->position_step == 0)
         return 0x7fffffff;
     return (((SndPacketVoiceState *)voice)->loop_length - ((SndPacketVoiceState *)voice)->byte_position) /
-           *(volatile unsigned int *)&((SndPacketVoiceState *)voice)->word08;
+           *(volatile unsigned int *)&((SndPacketVoiceState *)voice)->position_step;
 }

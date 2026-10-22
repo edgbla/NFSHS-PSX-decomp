@@ -74,11 +74,11 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
             ((volatile SndPacketVoiceState *)slot)->route = (unsigned char)val;
     }
 
-    ((volatile SndPacketVoiceState *)slot)->word04 = loopVal;
+    ((volatile SndPacketVoiceState *)slot)->loop_length_param = loopVal;
     ((volatile SndPacketVoiceState *)slot)->level = (char)level;
     ((volatile SndPacketVoiceState *)slot)->volume_angle = (unsigned short)volAngle;
     ((volatile SndPacketVoiceState *)slot)->fx_level = (unsigned char)fx;
-    ((volatile SndPacketVoiceState *)slot)->header_word0 = *sampleData;
+    ((volatile SndPacketVoiceState *)slot)->spu_start_address = *sampleData;
     ((volatile SndPacketVoiceState *)slot)->byte_position = 0;
     ((volatile SndPacketVoiceState *)slot)->served_position = 0;
     ((volatile SndPacketVoiceState *)slot)->loop_length = loopVal << 0xc;

@@ -43,8 +43,8 @@
  * undefined at link time and both previously "defined" by a private 4-byte
  * tentative def at a VA retail does not have (the gRepeatCount class):
  *      gSndState        = sndgs + 0      (snd.h's `SND` base view; 3 TUs)
- *      iSNDplatformrate = sndgs + 0xA0   (= D_80147900, the platform sample
- *                                         rate SNDPKTPLAY_start/stagpat load;
+ *      sndgs_fx_bus0_master = sndgs + 0xA0 (= D_80147900, SndFxBus[0].master
+ *                                         read by SNDPKTPLAY_start/stagpat;
  *                                         inside the DAT_801478f4 sub-run) */
 /* (2026-09-20) the run itself is defined by sdata.obj (sdata.c), its retail link-order owner */
 
@@ -138,10 +138,12 @@ int SNDSYS_restore(void)
     if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10])();
     if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11])();
     if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8])();
-    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[9] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[9])();
+    if (((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook != 0)
+        ((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook();
     if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7])();
     SNDstopall();
-    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[6] != 0) (*(void (*)(unsigned int))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[6])(0xffffffff);
+    if (((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook != 0)
+        ((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook(-1);
     iSNDrestore();
     ((struct SndGlobalServerStateView *)sndgs)->initialized = 0;                                     /* audio down */
     SNDI_mutexfree();

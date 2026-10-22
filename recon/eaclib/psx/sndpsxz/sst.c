@@ -250,7 +250,7 @@ int iSNDstreamparsenumchunks(int S, int data)
     int req;
     STREAM_release(((SndStream *)S)->stream_handle, (void *)(unsigned int)data);
     req = (((int)(((volatile SndStream *)S)->parse_index) << 24) >> 24) * (int)sizeof(SndStreamReq) + (int)(unsigned int)((SndStream *)S)->requests;
-    ((SndStreamReq *)req)->num_chunks = ((SndStreamChunkHeaderPrefix *)(unsigned int)data)->word_0C;
+    ((SndStreamReq *)req)->num_chunks = ((SndStreamChunkHeaderPrefix *)(unsigned int)data)->value.chunk_count;
     return 1;
 }
 
@@ -279,7 +279,7 @@ int iSNDstreamparsedata(int S, int chunk)
     int i;
     int flatPtr;
 
-    desc.fields.data_size = ((SndStreamChunkHeaderPrefix *)(unsigned int)chunk)->word_0C;                     /* stash datalen in an unused desc slot --
+    desc.fields.data_size = ((SndStreamChunkHeaderPrefix *)(unsigned int)chunk)->value.data_size;                     /* stash datalen in an unused desc slot --
                                                            * gcc doesn't naturally spill a plain local
                                                            * across the loops (register free the whole
                                                            * time); the oracle's stack round-trip through

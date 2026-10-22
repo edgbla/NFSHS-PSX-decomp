@@ -333,7 +333,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
        channel volume/pitch plus params[0xe] missing. a0..a3 + sp+16/20/24/28/32. */
     r = iSNDplatformpacketplay(p, note, gp, ch->volume, ch->spu_pitch,
                                params->timemult,
-                               iSNDplatformrate[0] * ch->playback_fx.playback.playback_factor34 * ch->playback_fx.playback.playback_factor35 / 0x3f01,
+                               sndgs_fx_bus0_master[0] * ch->playback_fx.playback.playback_factor34 * ch->playback_fx.playback.playback_factor35 / 0x3f01,
                                rate, (int)hdr + 0xc);
     if (r < 0) {
         iSNDfreechan(note);
@@ -683,10 +683,8 @@ void iSNDpacketfreeframes(int p, int idx, int bytes)
     } while (0);
 }
 
-/* W66-A3 (link): the "owning-TU def" that used to sit here (`int
- * iSNDplatformrate[1];`) was a LATENT DEFECT, not a link harness -- at 4 bytes
- * it routes to a LOCAL symbol (nm `b`), so it never resolved anything, and it
- * placed a private word at an address retail does not have.  The real storage is
- * `sndgs + 0xA0` (= D_80147900, this file's own header note), and ssysinit.c now
- * emits `iSNDplatformrate` as an interior LABEL of the sndgs .bss run.  Do not
- * re-add a definition here.  (Same class as w65-a6's gRepeatCount fix.) */
+/* W66-A3 (link): the owning-TU definition once proposed for this interior field
+ * was a latent defect, not a link harness: it would route to a local symbol and
+ * place a private word where retail has none. The shared scalar alias
+ * `sndgs_fx_bus0_master` is emitted at `sndgs + 0xA0` in sdata.c. Keep storage
+ * owned by that shared block; do not add a second definition here. */

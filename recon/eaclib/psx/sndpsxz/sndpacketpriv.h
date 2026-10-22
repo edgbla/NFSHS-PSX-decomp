@@ -32,9 +32,9 @@ typedef union SndPacketSubmitFrameView {
 typedef char SndPacketSubmitFrameView_size_check[(sizeof(SndPacketSubmitFrameView) == 0x20) ? 1 : -1];
 
 struct SndPacketVoiceState {
-    int header_word0;                 /* +0x00 */
-    int word04;                       /* +0x04 */
-    unsigned int word08;              /* +0x08: used as pitch/rate input */
+    int spu_start_address;          /* +0x00: resolved SPU sample start address */
+    int loop_length_param;         /* +0x04: tag 0x85 loop-length value */
+    unsigned int position_step;          /* +0x08: per-tick playback-position step set by iSNDplatformpitch */
     int byte_position;                /* +0x0C: SPU play position, 12 fractional bits */
     int served_position;              /* +0x10 */
     int loop_length;                  /* +0x14: 12-bit-shifted loop length */
@@ -48,7 +48,8 @@ struct SndPacketVoiceState {
     unsigned char link_flag;          /* +0x21 */
     unsigned char level;              /* +0x22 */
     unsigned char fx_level;           /* +0x23 */
-    unsigned char pad24_25[2];
+    unsigned char pan_left_cache;  /* +0x24: signed pan output cached for delta-pan calls */
+    unsigned char pan_right_cache; /* +0x25: signed pan output cached for delta-pan calls */
     unsigned char stop_pending;       /* +0x26 */
     unsigned char voice_done;         /* +0x27: high-bit/status tag also tested by iSNDserve */
     unsigned char pitch_dirty;        /* +0x28 */
@@ -80,7 +81,7 @@ struct SndPacketPlayerContextPrefix {
     SndPacketContextHalfword channel_frame_stride;   /* +0x30 */
     SndPacketContextHalfword source_frame_offset;    /* +0x32 */
     SndPacketContextHalfword source_frame_remaining; /* +0x34 */
-    SndPacketContextHalfword fill36;                 /* +0x36: role unresolved */
+    SndPacketContextHalfword empty_source_loop_count; /* +0x36: zeroed on a new frame; counts empty-source loop-back/end passes */
     unsigned short frame_count;                      /* +0x38 */
     SndPacketContextHalfword frame_index;             /* +0x3A */
     SndPacketContextHalfword spu_bytes_remaining;     /* +0x3C */

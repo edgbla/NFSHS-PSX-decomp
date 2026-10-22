@@ -8,7 +8,7 @@
  *     dropped to 1 visible arg + `in_a2`; IDA sig (a1,a2,a3) confirms 3 (a1=bus is unused/overwritten).
  *
  *   Packet-voice table @0x801479F0 (0x2c stride, indexed [chan*0x2c] for bytes / [chan*0xb] for ints):
- *     int  +0x08 (DAT_801479f8) hw pitch/rate    u16 +0x18 (DAT_80147a08) volume angle/pan
+ *     int  +0x08 (DAT_801479f8) position step    u16 +0x18 (DAT_80147a08) volume angle/pan
  *     u16  +0x1a (DAT_80147a0a) base pitch        b  +0x1c (DAT_80147a0c) playstate (2 == playing)
  *     b    +0x1d (DAT_80147a0d) substate          b  +0x1e (DAT_80147a0e) volume routing mode
  *     b    +0x1f (DAT_80147a0f) channel count     b  +0x20 (DAT_80147a10) linked voice index
@@ -34,24 +34,24 @@ extern char          DAT_801479f0;     /* +0x00 voice-table base (byte, for hook
  *   key-off for the combined voice mask. */
 int iSNDstop(unsigned int chan)
 {
-    int vt = (int)chan * 0x2c;
+    int vt = (int)chan * (int)sizeof(SndPacketVoiceState);
     volatile unsigned char *base = sndpd + 0xd8;
-    volatile unsigned char *slot = base + vt;
+    volatile SndPacketVoiceState *slot = (volatile SndPacketVoiceState *)(base + vt);
     unsigned int mask;
 
-    if (0 <= (int)((unsigned int)((volatile SndPacketVoiceState *)slot)->voice_done << 24))            /* voice-done bit clear -> notify */
+    if (0 <= (int)((unsigned int)slot->voice_done << 24))            /* voice-done bit clear -> notify */
         (*(void (**)(void *))(base + 0x64c))((void *)slot);
     iSNDfreechan(chan);
-    ((volatile SndPacketVoiceState *)slot)->voice_status = 3;
-    ((volatile SndPacketVoiceState *)slot)->play_state = 0;
+    slot->voice_status = 3;
+    slot->play_state = 0;
     mask = 1u << chan;
-    if (1 < ((volatile SndPacketVoiceState *)slot)->channel_count) {                                     /* linked pair -> stop the partner too */
-        chan = (signed char)((volatile SndPacketVoiceState *)slot)->link_index.vu;
+    if (1 < slot->channel_count) {                                     /* linked pair -> stop the partner too */
+        chan = (signed char)slot->link_index.vu;
         iSNDfreechan(chan);
-        slot = base + (int)chan * 0x2c;
+        slot = (volatile SndPacketVoiceState *)(base + (int)chan * (int)sizeof(SndPacketVoiceState));
         mask |= 1u << chan;
-        ((volatile SndPacketVoiceState *)slot)->voice_status = 3;
-        ((volatile SndPacketVoiceState *)slot)->play_state = 0;
+        slot->voice_status = 3;
+        slot->play_state = 0;
     }
     iSNDpsxkeyoff(mask);
     return 0;
@@ -63,20 +63,20 @@ int iSNDstop(unsigned int chan)
 int iSNDplatformpitch(int chan, int pitch)
 {
     int vt = chan * 0xb;
-    unsigned char *slot;
+    SndPacketVoiceState *slot;
 
     vt <<= 2;
     chan = (int)(sndpd + 0xd8);
-    slot = (unsigned char *)(chan + vt);
+    slot = (SndPacketVoiceState *)(chan + vt);
 
-    ((volatile SndPacketVoiceState *)slot)->word08 =
-        ((int)((unsigned)((SndPacketVoiceState *)slot)->initial_pitch.u * pitch) >> 0xc) * 0x1b9;
+    ((volatile SndPacketVoiceState *)slot)->position_step =
+        ((int)((unsigned)slot->initial_pitch.u * pitch) >> 0xc) * 0x1b9;
     ((volatile SndPacketVoiceState *)slot)->pitch_dirty = 1;
     if (((volatile SndPacketVoiceState *)slot)->channel_count == 2) {      /* linked pair shares the pitch */
         chan -= 0xd8;
-        ((SndPacketVoiceState *)(unsigned int)(chan + (int)((volatile SndPacketVoiceState *)slot)->link_index.vs * 0x2c + 0xd8))->word08 =
-            ((SndPacketVoiceState *)slot)->word08;
-        ((SndPacketVoiceState *)(unsigned int)(chan + (int)((volatile SndPacketVoiceState *)slot)->link_index.vs * 0x2c + 0xd8))->pitch_dirty = 1;
+        ((SndPacketVoiceState *)(unsigned int)(chan + (int)((volatile SndPacketVoiceState *)slot)->link_index.vs * (int)sizeof(SndPacketVoiceState) + 0xd8))->position_step =
+            slot->position_step;
+        ((SndPacketVoiceState *)(unsigned int)(chan + (int)((volatile SndPacketVoiceState *)slot)->link_index.vs * (int)sizeof(SndPacketVoiceState) + 0xd8))->pitch_dirty = 1;
     }
     return 0;
 }
@@ -89,18 +89,18 @@ int iSNDplatformpitch(int chan, int pitch)
  *   oracle's lbu+nop+andi sequence, and `if (fxon)` preserves its effect-on/effect-off block order. */
 int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
 {
-    int          vt = (int)chan * 0x2c;
-    volatile signed char *slot = (volatile signed char *)&DAT_801479f0 + vt;
+    int          vt = (int)chan * (int)sizeof(SndPacketVoiceState);
+    volatile SndPacketVoiceState *slot = (volatile SndPacketVoiceState *)((volatile unsigned char *)&DAT_801479f0 + vt);
     unsigned int mask;
-    bus = (unsigned char)((volatile SndPacketVoiceState *)slot)->play_state; /* 3-arg per IDA/disasm: a1 is overwritten by the playstate */
+    bus = (unsigned char)slot->play_state; /* 3-arg per IDA/disasm: a1 is overwritten by the playstate */
 
     if (bus != 2) {                                          /* not playing -> cache for next key-on */
-        ((volatile SndPacketVoiceState *)slot)->fx_level = (char)fxon;
+        slot->fx_level = (char)fxon;
         return 0;
     }
     mask = 1u << (chan);                               /* (computed even when the branch below skips) */
-    if (((volatile SndPacketVoiceState *)slot)->channel_count == bus)
-        mask |= 1u << ((volatile SndPacketVoiceState *)slot)->link_index.u;
+    if (slot->channel_count == bus)
+        mask |= 1u << slot->link_index.u;
     if (fxon)
         iSNDpsxeffecton(mask);
     else
@@ -114,21 +114,21 @@ int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
  *   dropped the inner-call args -- all restored from disasm-v3.) */
 int iSNDvol(int chan, int level)
 {
-    int vt = chan * 0x2c;
-    volatile unsigned char *slot = sndpd + 0xd8 + vt;
+    int vt = chan * (int)sizeof(SndPacketVoiceState);
+    volatile SndPacketVoiceState *slot = (volatile SndPacketVoiceState *)(sndpd + 0xd8 + vt);
     int outL, outR;
 
-    if (((volatile SndPacketVoiceState *)slot)->play_state != 2) {                                   /* not playing -> cache the level */
-        ((volatile SndPacketVoiceState *)slot)->level = (char)level;
+    if (slot->play_state != 2) {                                   /* not playing -> cache the level */
+        slot->level = (char)level;
         return 0;
     }
-    if (((volatile SndPacketVoiceState *)slot)->route == 0)                                     /* absolute L/R from level */
-        iSNDatolrv((unsigned)((volatile SndPacketVoiceState *)slot)->volume_angle, level, &outL, &outR);
-    else if (((volatile SndPacketVoiceState *)slot)->route == 1)                                /* delta from current L/R cache */
-        iSNDatodlrv((unsigned)((volatile SndPacketVoiceState *)slot)->volume_angle, level, &outL, &outR,
-                    (signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[0], (signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[1]);
-    ((volatile SndPacketVoiceState *)slot)->pad24_25[0] = (unsigned char)outL;
-    ((volatile SndPacketVoiceState *)slot)->pad24_25[1] = (unsigned char)outR;
+    if (slot->route == 0)                                     /* absolute L/R from level */
+        iSNDatolrv((unsigned)slot->volume_angle, level, &outL, &outR);
+    else if (slot->route == 1)                                /* delta from current L/R cache */
+        iSNDatodlrv((unsigned)slot->volume_angle, level, &outL, &outR,
+                    (signed char)slot->pan_left_cache, (signed char)slot->pan_right_cache);
+    slot->pan_left_cache = (unsigned char)outL;
+    slot->pan_right_cache = (unsigned char)outR;
     iSNDsetvol(chan, outL, outR);
     return 0;
 }

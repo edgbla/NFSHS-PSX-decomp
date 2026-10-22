@@ -17,21 +17,21 @@
  *   the explicit non-playing return supplies the oracle's zero-valued branch delay slot. */
 int iSNDplatform3dpos(int chan, int x, int y)
 {
-    int vt = chan * 0x2c;
-    volatile unsigned char *slot = sndpd + 0xd8 + vt;
+    int vt = chan * (int)sizeof(SndPacketVoiceState);
+    volatile SndPacketVoiceState *slot = (volatile SndPacketVoiceState *)(sndpd + 0xd8 + vt);
     int outL, outR;
 
-    ((volatile SndPacketVoiceState *)slot)->volume_angle = (short)x;
-    if (((volatile SndPacketVoiceState *)slot)->play_state != 2)
+    slot->volume_angle = (short)x;
+    if (slot->play_state != 2)
         return 0;
-    if (((volatile SndPacketVoiceState *)slot)->route == 1)
+    if (slot->route == 1)
         iSNDatodlrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
-                    &outL, &outR, (signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[0], (signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[1]);
-    else if (((volatile SndPacketVoiceState *)slot)->route == 0)
+                    &outL, &outR, (signed char)slot->pan_left_cache, (signed char)slot->pan_right_cache);
+    else if (slot->route == 0)
         iSNDatolrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
                    &outL, &outR);
-    ((volatile SndPacketVoiceState *)slot)->pad24_25[0] = (unsigned char)outL;
-    ((volatile SndPacketVoiceState *)slot)->pad24_25[1] = (unsigned char)outR;
+    slot->pan_left_cache = (unsigned char)outL;
+    slot->pan_right_cache = (unsigned char)outR;
     iSNDsetvol(chan, outL, outR);
     return 0;
 }

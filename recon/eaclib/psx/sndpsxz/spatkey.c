@@ -34,14 +34,14 @@ int iSNDpatchkey(int chan, int tag)
     if (grp != 0) {
         int i = *(int *)tag;
         *(int *)tag = i + 1;
-        if (i + 1 < ((unsigned char *)sndgs)[0x11]) {
-            int *gs = sndgs;
+        if (i + 1 < ((struct SndGlobalServerStateView *)sndgs)->channel_count) {
+            struct SndGlobalServerStateView *gs = (struct SndGlobalServerStateView *)sndgs;
             do {
-                SndChannel *p = &((SndChannel *)(unsigned int)gs[0x25])[*(int *)tag];
+                SndChannel *p = &((SndChannel *)(unsigned int)gs->play_records)[*(int *)tag];
                 if (p->group_id == grp && p->state == 1 && -1 < (int)p->owner_tag)
                     return 1;
                 *(int *)tag = *(int *)tag + 1;
-            } while (*(int *)tag < ((unsigned char *)gs)[0x11]);
+            } while (*(int *)tag < gs->channel_count);
         }
         goto no_key;
     }
