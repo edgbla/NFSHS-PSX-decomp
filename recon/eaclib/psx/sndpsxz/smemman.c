@@ -51,10 +51,7 @@ SNDMemState sndmm;                  /* @0x80148780 [BSS] definition */
  * `lui %hi(sndmm)`. */
 extern unsigned char sndmm_b[] __asm__("sndmm");
 
-#define DAT_80148784 (sndmm.count)
 #define DAT_80148786 (sndmm.poolWords)
-#define DAT_80148788 (sndmm.highWater)
-#define DAT_8014878c (sndmm.entries[0].blk)
 
 /* iSNDmemconstrain @0x801061A8 : clamp a candidate [block, size] so block+size stays within the pool top.
  *   Its true contract is void; the subtraction left in v0 on the clamp path is incidental. */

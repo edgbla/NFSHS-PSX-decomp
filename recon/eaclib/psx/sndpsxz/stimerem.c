@@ -5,6 +5,7 @@
  */
 #include "salloc.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
 #include "sdtimrem.h"
 #include "spatkey.h"
 #include "sserver.h"
@@ -18,7 +19,7 @@ int SNDtimeremaining(unsigned int tag)
                                        * matching the oracle's `li s0,-1024` in the prologue */
     int          chan;
     int          voice[2];
-    if ((signed char)sndgs[0xf] == '\0')
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == '\0')
         return -10;
     iSNDenteraudio();
     chan = iSNDgetchan(tag);

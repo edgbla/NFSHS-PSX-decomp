@@ -10,21 +10,20 @@
 #include "spktplay.h"
 #include "ssysserv.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
 #include "spvoices.h"
 #include "sst.h"
+#include "sstpriv.h"
 
 extern void *memset(void *d, int c, int n);
 
                       /* @0x8013EA80 stream slot ptr array */
                       /* (signed char)sndgs[0xf] = init flag, sndgs[0x22] = destroyall hook */
 
-#define MI(p,o) (*(int*)((p)+(o)))
-#define MB(p,o) (*(unsigned char*)((p)+(o)))
-
 
 /* SNDSTRM_create @0x800E9B44 : create a streaming voice with its OWN ring (extHandle/extFlag forced 0).
  *   Returns the stream slot or a negative error. */
-int SNDSTRM_create(int *priority, int numReq, int pktArg, int objbuf, int memsize)
+int SNDSTRM_create(struct SNDPLAYOPTS *priority, int numReq, int pktArg, int objbuf, int memsize)
 {
     return iSNDstreamcreate(priority, numReq, pktArg, objbuf, memsize, 0, 0);
 }
@@ -33,21 +32,21 @@ int SNDSTRM_create(int *priority, int numReq, int pktArg, int objbuf, int memsiz
  *   audio-server service callback.  Frees the packet player and (if owned) the ring. */
 int SNDSTRM_destroy(int s)
 {
-    int S;
-    if ((signed char)sndgs[0xf] == 0)
+    SndStream *S;
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
-    S = iSNDstreamgetstreamptr(s);
+    S = (SndStream *)iSNDstreamgetstreamptr(s);
     if (S == 0)
         return -8;
 
     SNDSTRM_purge(s);
     if (iSNDstreamnumcreated() == 1) {                  /* this is the last live stream */
-        iSNDserverremoveclient((int)iSNDstreamservice);
-        sndgs[0x22] = 0;
+        iSNDserverremoveclient(iSNDstreamservice);
+        ((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook = 0;
     }
-    SNDPKTPLAY_destroy(MI(S, 0xc));
-    if (MB(S, 0x18) == 0)                                /* owns its ring */
-        STREAM_destroy(MI(S, 4));
+    SNDPKTPLAY_destroy(S->packet_player);
+    if (S->external_stream == 0)                         /* owns its ring */
+        STREAM_destroy(S->stream_handle);
     sndss[s] = 0;
     return 0;
 }
@@ -64,28 +63,28 @@ int SNDSTRM_queuefile(unsigned int s, int name, char *filename, int off)
  *   prepare memset's size before them, leaving the call delay slot as the oracle's nop. */
 int SNDSTRM_purge(int s)
 {
-    int S;
+    SndStream *S;
     int stopped;
-    if ((signed char)sndgs[0xf] == 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
-    S = iSNDstreamgetstreamptr(s);
+    S = (SndStream *)iSNDstreamgetstreamptr(s);
     if (S == 0)
         return -8;
-    if (MI(S, 8) < 0) {
+    if (S->start_result < 0) {
         stopped = -1;
     } else {
-        SNDPKTPLAY_stop(MI(S, 0xc));                     /* a play handle is active */
+        SNDPKTPLAY_stop(S->packet_player);               /* a play handle is active */
         stopped = -1;
     }
-    *(volatile int *)(S + 8) = stopped;
-    if (*(volatile unsigned char *)(S + 0x18) == 0)
-        STREAM_kill(MI(S, 4));
-    *(volatile unsigned char *)(S + 0x16) = 0;           /* curReqCount */
-    *(volatile unsigned char *)(S + 0x17) = 0;           /* parseIdx */
-    *(volatile unsigned char *)(S + 0x14) = 0;           /* state */
-    memset((void *)(S + 0x1c), 0, 4);                   /* locked rate */
-    memset((void *)(S + 0x20), 0, 4);                   /* current rate */
-    memset((void *)(S + 0x24), 0, 0x14);                /* locked header */
-    memset((void *)(S + 0x38), 0, 0x14);                /* current header */
+    ((volatile SndStream *)S)->start_result = stopped;
+    if (((volatile SndStream *)S)->external_stream == 0)
+        STREAM_kill(S->stream_handle);
+    ((volatile SndStream *)S)->current_count = 0;        /* curReqCount */
+    ((volatile SndStream *)S)->parse_index = 0;          /* parseIdx */
+    ((volatile SndStream *)S)->state = 0;
+    memset(&S->locked_rate, 0, (int)sizeof(SNDSAMPLEFORMAT)); /* locked rate */
+    memset(&S->current_rate, 0, (int)sizeof(SNDSAMPLEFORMAT)); /* current rate */
+    memset(&S->locked_header, 0, (int)sizeof(SndPatchAttributes)); /* locked header */
+    memset(&S->current_header, 0, (int)sizeof(SndPatchAttributes)); /* current header */
     return 0;
 }

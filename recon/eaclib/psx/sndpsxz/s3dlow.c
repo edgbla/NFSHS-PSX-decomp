@@ -2,6 +2,7 @@
 #include "s3dlow.h"
 #include "salloc.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
 #include "spatkey.h"
 #include "sserver.h"
 #include "s3dpos.h"
@@ -10,7 +11,7 @@
 int SND3dpos(unsigned int tag, unsigned int pos, int y)
 {
     int ch, cur[2];
-    if ((signed char)sndgs[0xf] == 0) return -10;
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
     pos &= 0xffff;
     if (y >= 0x4000)
         y = 0x3fff;

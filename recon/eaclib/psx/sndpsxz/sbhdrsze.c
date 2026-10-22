@@ -4,11 +4,14 @@
  */
 #include "sbhdrsze.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndbankpriv.h"
+#include "sndbankhdrpriv.h"
 
 /* SNDbankheadersize @0x800E7B64 : bank @ sndgs[0x26]+bankId*0xc, +0 = data ptr, [data+8] = header size. */
 int SNDbankheadersize(int bankId)
 {
-    if ((signed char)sndgs[0xf] == 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
-    return *(int *)(*(int *)(bankId * 0xc + sndgs[0x26]) + 8);
+    return ((struct SndBankDataHeaderPrefix *)(unsigned int)((struct SndBankTableEntry *)(bankId * (int)sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block)->header_size;
 }

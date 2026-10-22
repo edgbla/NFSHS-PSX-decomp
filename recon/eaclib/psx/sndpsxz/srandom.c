@@ -18,8 +18,6 @@ unsigned int sndseed[6] = {
     0xf22d0e56u, 0x883126e9u, 0xc624dd2fu,
     0x0702c49cu, 0x9e353f7du, 0x6fdf3b64u
 };
-#define SNDSEED(i) state[(i)]
-#define NSNDSEED(i) (((unsigned int *)state)[(i)])
 
 /* iSNDrandom @0x8010BE80 : step the additive generator (with carry propagation) and return the new seed. */
 int iSNDrandom(void)
@@ -36,40 +34,40 @@ int iSNDrandom(void)
         carry = 1;
 
     state = sndseed;
-    old3 = SNDSEED(3);
-    old2 = SNDSEED(2);
-    old1 = SNDSEED(1);
-    SNDSEED(4) = sum;
+    old3 = state[3];
+    old2 = state[2];
+    old1 = state[1];
+    state[4] = sum;
 
     sum = sum + old3 + carry;
     carry = (unsigned int)(sum < old3);
-    SNDSEED(3) = sum;
+    state[3] = sum;
 
     sum = sum + old2 + carry;
     carry = (unsigned int)(sum < old2);
-    SNDSEED(2) = sum;
+    state[2] = sum;
 
     sum = sum + old1 + carry;
     carry = (unsigned int)(sum < old1);
-    NSNDSEED(1) = sum;
+    state[1] = sum;
 
     {
     unsigned int seed;
-    seed = SNDSEED(0);
+    seed = state[0];
     sum = sum + seed + carry;
-    NSNDSEED(0) = sum;
+    state[0] = sum;
 
-    if ((NSNDSEED(5) = SNDSEED(5) + 1) != 0)
+    if ((state[5] = state[5] + 1) != 0)
         goto done;
-    if ((NSNDSEED(4) = SNDSEED(4) + 1) != 0)
+    if ((state[4] = state[4] + 1) != 0)
         goto done;
-    if ((NSNDSEED(3) = SNDSEED(3) + 1) != 0)
+    if ((state[3] = state[3] + 1) != 0)
         goto done;
-    if ((NSNDSEED(2) = SNDSEED(2) + 1) != 0)
+    if ((state[2] = state[2] + 1) != 0)
         goto done;
-    if ((NSNDSEED(1) = SNDSEED(1) + 1) == 0) {
+    if ((state[1] = state[1] + 1) == 0) {
         unsigned int final = sum + 1;
-        NSNDSEED(0) = final;
+        state[0] = final;
         sum = final;
     }
     }

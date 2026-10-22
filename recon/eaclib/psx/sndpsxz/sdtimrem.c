@@ -12,18 +12,15 @@
 #include "sdtimrem.h"
 #include "slib.h"
 #include "snd_state.h"
-
-extern int           DAT_801479f8;   /* +0x08 hw pitch/rate (int view: [chan*0xb])    */
-extern unsigned char DAT_801479fc;   /* +0x0c served byte position (int via &+chan*0x2c) */
-extern unsigned char DAT_80147a04;   /* +0x14 loop-end byte position                  */
+#include "sndpacketpriv.h"
 
 /* iSNDtimeremaining @0x801049A8 : remaining samples for voice `chan`; 0x7fffffff if the voice has no pitch
  *   (stopped/infinite).  The pitch==0 retest is the compiler's divide-by-zero guard. */
 unsigned int iSNDtimeremaining(int chan)
 {
     unsigned char *voice = D_801479F0 + chan * 0x2c;
-    if (*(unsigned int *)(voice + 8) == 0)
+    if (((SndPacketVoiceState *)voice)->word08 == 0)
         return 0x7fffffff;
-    return (unsigned int)(*(int *)(voice + 0x14) - *(int *)(voice + 0xc)) /
-           *(volatile unsigned int *)(voice + 8);
+    return (unsigned int)(((SndPacketVoiceState *)voice)->loop_length - ((SndPacketVoiceState *)voice)->byte_position) /
+           *(volatile unsigned int *)&((SndPacketVoiceState *)voice)->word08;
 }

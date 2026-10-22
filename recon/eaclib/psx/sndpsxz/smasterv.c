@@ -4,38 +4,32 @@
  *   Ghidra nfs4-f.exe.c (smasterv).
  */
 #include "sdata.h"
+#include "sndchpriv.h"
+#include "sndserverpriv.h"
 #include "sdriver.h"
 #include "slib.h"
 #include "snd_state.h"
 #include "smasterv.h"
 #include "sserver.h"
 
-struct SNDMasterState {
-    unsigned char pad0[0x11];
-    unsigned char channel_count;
-    unsigned char pad1[0x82];
-    int play_records;
-};
-#define SNDMASTER_STATE (*(struct SNDMasterState *)sndgs)
-
 /* SNDmastervol @0x800E7FF0 : store the master volume (sndgs[0xf]._1_1_) and refresh all held voices. */
 int SNDmastervol(int vol)
 {
     int chan;
-    if ((signed char)sndgs[0xf] == 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
-    ((char *)sndgs)[0x3d] = (char)vol;             /* sndgs[0xf]._1_1_ : master volume */
+    ((struct SndGlobalServerStateView *)sndgs)->master_volume = (signed char)vol;             /* sndgs[0xf]._1_1_ : master volume */
     chan = 0;
-    if (((unsigned char *)sndgs)[0x11] != 0) {
+    if (((struct SndGlobalServerStateView *)sndgs)->channel_count != 0) {
         do {
-            int *slot = (int *)(SNDMASTER_STATE.play_records + chan * 100);
-            if (*(signed char *)((int)slot + 0xb) == 1 && -1 < *slot) {
+            SndChannel *slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
+            if (slot->state == 1 && -1 < (int)slot->owner_tag) {
                 iSNDcalcvol(chan);
-                iSNDvol(chan, (int)*(signed char *)((int)slot + 0x2d));
+                iSNDvol(chan, (int)slot->volume);
             }
             chan++;
-        } while (chan < (int)(unsigned)SNDMASTER_STATE.channel_count);
+        } while (chan < (int)(unsigned)((struct SndGlobalServerStateView *)sndgs)->channel_count);
     }
     iSNDleaveaudio();
     return 0;

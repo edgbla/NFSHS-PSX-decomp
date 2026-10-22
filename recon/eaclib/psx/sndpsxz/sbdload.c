@@ -8,6 +8,7 @@
  */
 #include "sbdload.h"
 #include "stagpat.h"
+#include "sndbankhdrpriv.h"
 
 /* iSNDdownloadbank @0x8010266C : rebase + resolve all patches of the bank at `bankData`.  Returns 7 (all
  *   ok) or 8 (a patch failed).
@@ -41,7 +42,7 @@ int iSNDdownloadbank(int bankData, int patchData)
      *   v11 $v0=off  v12 $v0=abs.
      * Two facts this pinned down, both worth generalizing:
      *  - the two cursors are INT variables dereferenced at a CONSTANT byte displacement
-     *    (`*(int *)(cur4 + 0x14)`), not `int *` walkers indexed `[5]`;
+     *    (`((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset`), not `int *` walkers indexed `[5]`;
      *  - the 255-down-counter and the scan counter are ONE variable.  Splitting them into two
      *    locals drops that pseudo's ref count below the cursors' and re-colors the whole frame
      *    (i lands in $s2, cur2 in $s0); sharing it restores the oracle's $s0.
@@ -90,24 +91,24 @@ int iSNDdownloadbank(int bankData, int patchData)
      * (4, copy still sinks), anchor copy wrapped instead (44, its ref weight re-colors s3..fp),
      * guard read through `anchor` (2), anchor copy before the clear loop (4). */
     do { i = 0; } while (0);
-    if (*(unsigned short *)(bankData + 6) != 0) {
+    if (((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->patch_count != 0) {
         type4 = 4;
         off2 = 0xc;
         cur2 = bankData;
         off4 = 0x14;
         cur4 = bankData;
         do {
-            if (*(unsigned char *)(bankData + 4) == type4)
-                off = *(int *)(cur4 + 0x14);
+            if (((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->type == type4)
+                off = ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset;
             else
-                off = *(int *)(cur2 + 0xc);
+                off = ((struct SndBankPatchOffset12CursorView *)(unsigned int)cur2)->relative_offset;
             if (off != 0) {
-                if (*(unsigned char *)(bankData + 4) == type4) {
-                    *(int *)(cur4 + 0x14) = bankData + off4 + *(int *)(cur4 + 0x14);
-                    abs = *(int *)(cur4 + 0x14);   /* read-back: cse forwards -> retail's addu copy */
+                if (((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->type == type4) {
+                    ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset = bankData + off4 + ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset;
+                    abs = ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset;   /* read-back: cse forwards -> retail's addu copy */
                 } else {
-                    *(int *)(cur2 + 0xc) = anchor + off2 + *(int *)(cur2 + 0xc);
-                    abs = *(int *)(cur2 + 0xc);
+                    ((struct SndBankPatchOffset12CursorView *)(unsigned int)cur2)->relative_offset = anchor + off2 + ((struct SndBankPatchOffset12CursorView *)(unsigned int)cur2)->relative_offset;
+                    abs = ((struct SndBankPatchOffset12CursorView *)(unsigned int)cur2)->relative_offset;
                 }
                 if (iSNDresolvetaggedpatch(abs, patchData, (int)scratch) != 7)
                     ret = 8;
@@ -123,7 +124,7 @@ int iSNDdownloadbank(int bankData, int patchData)
              * void fence before the increment, and a void fence after it all measure 3. */
             cur4 += 4;
             i++;
-        } while (i < (int)(unsigned)*(unsigned short *)(bankData + 6));
+        } while (i < (int)(unsigned)((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->patch_count);
     }
     /* RESIDUAL 42 diffs, 84/84 insns.  All nine callee-saved assignments now match the oracle;
      * what is left is ONE loop.c decision plus its fallout:

@@ -1,5 +1,6 @@
 /* eaclib/psx/sndpsxz/sstgetrp.c -- RECONSTRUCTED. NOT original.  *** 1/1 ***  obj sstgetrp.obj @0x80103508 */
 #include "sst.h"
+#include "sstpriv.h"
 #include "sstgetrp.h"
 
 /* iSNDstreamgetrequestptr @0x80103508 : resolve a stream-request tag to its request struct -- find the
@@ -13,22 +14,22 @@
  * (11->0; same lever as iSNDstreamparsenumchunks/sst.cpp). */
 int iSNDstreamgetrequestptr(unsigned int idx)
 {
-    int *sp;
+    SndStream *sp;
     int  rq, i;
     if (-1 >= (int)idx)
         return 0;
-    sp = (int *)iSNDstreamgetstreamptr((int)(idx & 0xff));
+    sp = (SndStream *)iSNDstreamgetstreamptr((int)(idx & 0xff));
     if (sp == 0)
         return 0;
-    if (!(0 < (int)((unsigned)*(unsigned char *)((int)sp + 0x16) << 0x18)))   /* (signed char) count > 0 */
+    if (!(0 < (int)((unsigned)sp->current_count << 0x18)))   /* (signed char) count > 0 */
         return 0;
-    rq = *sp;
+    rq = (int)(unsigned int)sp->requests;
     i = 0;
     do {
-        if (*(unsigned int *)(rq + 4) == idx)
+        if (((SndStreamReq *)(unsigned int)rq)->request_id == idx)
             return rq;
-        rq += 0x2c;
+        rq += (int)sizeof(SndStreamReq);
         i++;
-    } while (i < (((int)(*(volatile unsigned char *)((int)sp + 0x16)) << 24) >> 24));
+    } while (i < (((int)((volatile SndStream *)sp)->current_count << 24) >> 24));
     return 0;
 }

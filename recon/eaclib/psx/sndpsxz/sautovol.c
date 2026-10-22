@@ -2,6 +2,8 @@
 #include "salloc.h"
 #include "sautovol.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndchpriv.h"
 #include "spatkey.h"
 #include "sserver.h"
 
@@ -9,17 +11,17 @@
 int SNDautovol(unsigned int tag, unsigned int rate, int target)
 {
     int ch, cur[2];
-    if ((signed char)sndgs[0xf] == 0) return -10;  /* signed -> lb (ccpsx char is unsigned) */
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;  /* signed -> lb (ccpsx char is unsigned) */
     iSNDenteraudio();
     ch = iSNDgetchan(tag);
     if (-1 < ch) {
         if ((int)rate < 1) rate = 1;
         cur[0] = -1;
         while (iSNDpatchkey(ch, (int)cur) != 0) {
-            int v = sndgs[0x25] + cur[0] * 100;
-            int delta = target * 0x10000 - *(int *)(v + 0x1c);
-            *(int *)(v + 0x18) = target * 0x10000;
-            *(int *)(v + 0x14) = delta / (int)rate;
+            SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[cur[0]];
+            int delta = target * 0x10000 - v->autovol_position.word;
+            v->autovol_limit = target * 0x10000;
+            v->autovol_step = delta / (int)rate;
         }
     }
     iSNDleaveaudio();

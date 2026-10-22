@@ -1,6 +1,8 @@
 /* eaclib/psx/sndpsxz/sgetvol.c -- RECONSTRUCTED. NOT original.  *** 1/1 ***  obj sgetvol.obj @0x80102810 */
 #include "salloc.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndchpriv.h"
 #include "sgetvol.h"
 #include "sserver.h"
 
@@ -8,7 +10,7 @@
 int SNDgetvol(unsigned int tag)
 {
     int ch;
-    if ((signed char)sndgs[0xf] == 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
     ch = iSNDgetchan(tag);
@@ -17,5 +19,5 @@ int SNDgetvol(unsigned int tag)
         return -8;
     }
     iSNDleaveaudio();                               /* oracle: leaveaudio BEFORE reading the +0x2d vol */
-    return (int)*(signed char *)(ch * 100 + sndgs[0x25] + 0x2d);   /* +0x2d cached vol read signed (lb) */
+    return (int)((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[ch].volume; /* signed cached-volume load */
 }

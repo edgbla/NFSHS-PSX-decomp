@@ -1,30 +1,33 @@
 /* eaclib/psx/sndpsxz/sststat.c -- RECONSTRUCTED. NOT original.  *** 1/1 PASS ***  obj sststat.obj @0x800E86D8 */
 #include "sdata.h"
+#include "../../../shared/SNDSTREAMSTATUS.h"
+#include "sndserverpriv.h"
 #include "spktplay.h"
 #include "sserver.h"
 #include "sst.h"
+#include "sstpriv.h"
 #include "sststat.h"
 
 /* SNDSTRM_status : fill the 3-int status block `s` (active, bytes, permille) for stream `tag`. */
 int SNDSTRM_status(int tag, int s)
 {
-    int *sp;
+    SndStream *sp;
     unsigned int frames, outstanding;
-    *(int *)(s + 8) = 0;
-    *(int *)(s + 4) = 0;
-    *(int *)s = 0;
-    if ((signed char)sndgs[0xf] == 0) return -10;
-    sp = (int *)iSNDstreamgetstreamptr(tag);
+    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered = 0;
+    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->currentrequest = 0;
+    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->outstandingrequests = 0;
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
+    sp = (SndStream *)iSNDstreamgetstreamptr(tag);
     if (sp == 0) return -8;
     iSNDenteraudio();
-    *(int *)s = ((int)(*(volatile unsigned char *)((int)sp + 0x16) << 24)) >> 24;
-    if (*(unsigned char *)((int)sp + 0x16) != 0) {
-        *(int *)(s + 4) = *(int *)(*sp + 4);
-        frames = (unsigned int)*(unsigned short *)(sp + 7);
+    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->outstandingrequests = ((int)((unsigned)((volatile SndStream *)sp)->current_count << 24)) >> 24;
+    if (sp->current_count != 0) {
+        ((struct SNDSTREAMSTATUS *)(unsigned int)s)->currentrequest = sp->requests->request_id;
+        frames = sp->locked_rate.samplerate;
         if (frames != 0) {
-            outstanding = (unsigned int)SNDPKTPLAY_unsafeframesoutstanding(sp[3]);
-            *(unsigned int *)(s + 8) =
-                (outstanding * 1000) / (unsigned int)*(unsigned short *)(sp + 7);
+            outstanding = (unsigned int)SNDPKTPLAY_unsafeframesoutstanding(sp->packet_player);
+            ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered =
+                (outstanding * 1000) / sp->locked_rate.samplerate;
         }
     }
     iSNDleaveaudio();

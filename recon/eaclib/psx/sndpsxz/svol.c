@@ -7,6 +7,7 @@
  *   the voice's left base volume @+0x2D.  SNDvol is the locked public wrapper (-10 when disabled).
  */
 #include "svol.h"
+#include "sndchpriv.h"
 #include "../../../lib/snd.h"
 
 int iSNDunsafevol(int handle, int vol)   /* @0x800E69D0 */
@@ -23,15 +24,15 @@ int iSNDunsafevol(int handle, int vol)   /* @0x800E69D0 */
     /* MATCH: the shared `done` return and explicit state-base local keep the early-exit delay slot,
      * voice-table base, and level calculation in the oracle's order. */
     while (iSNDpatchkey(chan, &iter)) {
-        SndVoice *v = &state->voices[iter];
-        if (v->f1C == level)
+        SndChannel *v = (SndChannel *)&state->voices[iter];
+        if (v->autovol_position.word == level)
             return 0;                       /* already this level -> done (Ghidra: explicit `return 0;`,
                                               * NOT a break-to-shared-tail -- oracle's beq delay slot sets
                                               * v0=0 here, not v0=chan) */
-        v->f1C = level;
-        v->f14 = 0;                         /* sunk into the iSNDcalcvol jal delay slot */
+        v->autovol_position.word = level;
+        v->autovol_step = 0;                /* sunk into the iSNDcalcvol jal delay slot */
         iSNDcalcvol(iter);
-        iSNDvol(iter, v->vol_l);
+        iSNDvol(iter, v->volume);
     }
 done:
     return chan;

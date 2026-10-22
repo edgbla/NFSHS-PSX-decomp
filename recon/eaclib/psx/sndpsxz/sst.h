@@ -1,6 +1,8 @@
 #ifndef _SNDPSXZ_SST_H_
 #define _SNDPSXZ_SST_H_
 
+struct SNDPLAYOPTS;
+
 extern int iSNDstreamdestroyall(void); /* @0x800E8C14 */
 extern int iSNDstreamgetstreamptr(int idx); /* @0x800E8C48 */ /* sst */
 extern void iSNDstreamremoverequest(unsigned int reqid); /* @0x800E8C64 */
@@ -15,7 +17,7 @@ extern int iSNDstreamisheld(int S); /* @0x800E9318 */
 extern void iSNDstreamhotroddatachunks(void); /* sst */ /* @0x800E9438 */
 extern void iSNDstreamservice(void); /* @0x800E9590 (serve hook) */ /* @0x800E9590 */
 extern int iSNDstreamnumcreated(void); /* @0x800E96F8 */
-extern int iSNDstreamcreate(int *priority, int numReq, int pktArg, int objbuf, int memsize, int extHandle, int extFlag); /* @0x800E9730 */
+extern int iSNDstreamcreate(struct SNDPLAYOPTS *priority, int numReq, int pktArg, int objbuf, int memsize, int extHandle, int extFlag); /* @0x800E9730 */
 extern int iSNDstreamqueue(unsigned int s, int name, char *filename, int off, int mode); /* @0x800E9970 */
 
 extern int sndss[];

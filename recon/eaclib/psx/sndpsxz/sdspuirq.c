@@ -6,23 +6,23 @@
 #include "sdspuirq.h"
 #include "slib.h"
 #include "snd_state.h"
+#include "sndspuregpriv.h"
 
-#define SNDPD_CTRLREG (*(int *)(sndpd + 0x514))
 
 /* iSNDpsxenablespuirq @0x8010BF80 : set the SPU IRQ-enable bit in SPUCNT.  Returns the new SPUCNT value
  *   (the RMW result lands in $v0 and the store fills nothing -> v0 survives as the return; oracle keeps the
  *   base ptr in $v1 and the value in $v0). */
 int iSNDpsxenablespuirq(void)
 {
-    unsigned short v = *(unsigned short *)(SNDPD_CTRLREG + 0x1aa) | 0x40;
-    *(volatile unsigned short *)(SNDPD_CTRLREG + 0x1aa) = v;
+    unsigned short v = *(unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) | 0x40;
+    *(volatile unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) = v;
     return v;
 }
 
 /* iSNDpsxdisablespuirq @0x8010BFA4 : clear the SPU IRQ-enable bit in SPUCNT. */
 int iSNDpsxdisablespuirq(void)
 {
-    unsigned short v = *(unsigned short *)(SNDPD_CTRLREG + 0x1aa) & 0xffbf;
-    *(volatile unsigned short *)(SNDPD_CTRLREG + 0x1aa) = v;
+    unsigned short v = *(unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) & 0xffbf;
+    *(volatile unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) = v;
     return v;
 }

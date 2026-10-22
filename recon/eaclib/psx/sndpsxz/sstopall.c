@@ -3,6 +3,7 @@
  *   1 fn @0x800E81A8.  SNDstopall -- stop every voice in the channel pool.  Ghidra nfs4-f.exe.c (sstopall).
  */
 #include "sdata.h"
+#include "sndchpriv.h"
 #include "sstop.h"
 #include "sstopall.h"
 
@@ -20,8 +21,8 @@ void SNDstopall(void)
         off = i;
         do {
             i++;
-            SNDstop(*(unsigned int *)(off + gs[0x25]));
-            off += 100;
+            SNDstop(((SndChannel *)(unsigned int)(off + gs[0x25]))->owner_tag);
+            off += (int)sizeof(SndChannel);
         } while (i < (int)(unsigned)((unsigned char *)gs)[0x11]);
     }
 }

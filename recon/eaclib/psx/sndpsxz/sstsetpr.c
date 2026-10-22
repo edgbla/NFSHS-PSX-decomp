@@ -8,17 +8,18 @@
  */
 #include "../eacpsxz/stream.h"
 #include "sst.h"
+#include "sstpriv.h"
 #include "sstsetpr.h"
 #include "../../../lib/snd.h"
 
 int SNDSTRM_setpriority(int streamid, int prio, int a3)   /* @0x800E6CF0 */
 {
-    char * strm;
+    SndStream *strm;
     if (SND->enabled == 0)
         return -10;
-    strm = (char *)iSNDstreamgetstreamptr(streamid);
+    strm = (SndStream *)iSNDstreamgetstreamptr(streamid);
     if (strm == 0)
         return -8;
-    STREAM_setpriority(*(int *)(strm + 4), prio, a3);
+    STREAM_setpriority(strm->stream_handle, prio, a3);
     return 0;
 }

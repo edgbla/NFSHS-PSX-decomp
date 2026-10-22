@@ -4,6 +4,8 @@
  */
 #include "sballoc.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndbankpriv.h"
 
 /* iSNDbankalloc @0x801027BC : return the index of the first empty bank table entry (sndgs[0x26], 0xc
  *   stride, +0 == 0 means free), or -9 (SND_BANKFULL) if the table is empty/full.  (Ghidra lost the
@@ -11,17 +13,17 @@
 int iSNDbankalloc(void)
 {
     int  i = 0;
-    unsigned short rawcount = (unsigned short)sndgs[3];
+    unsigned short rawcount = ((struct SndGlobalServerStateView *)sndgs)->bank_count;
     if (rawcount != 0) {
         int n = rawcount;               /* cache the bank count in a reg (oracle a1), reuse it */
-        int *e = (int *)sndgs[0x26];   /* table base -- loaded INSIDE the guard, matching the oracle's
+        struct SndBankTableEntry *e = (struct SndBankTableEntry *)((struct SndGlobalServerStateView *)sndgs)->bank_table;   /* table base -- loaded INSIDE the guard, matching the oracle's
                                         * deferred `lw a0,0x98(v0)` (ours hoisted it above the count's
                                         * `beqz` when it was a function-scope init). */
         do {
-            if (*e == 0)
+            if (e->data_block == 0)
                 return i;
             i++;
-            e = e + 3;
+            e++;
         } while (i < n);
     }
     return -9;   /* H06: SND_BANKFULL on count==0 and no-empty-slot fall-through (oracle 0x80102804 $v0=-9); was `return i` */

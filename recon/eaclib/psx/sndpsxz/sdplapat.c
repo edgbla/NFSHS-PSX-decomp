@@ -8,34 +8,26 @@
  *   iSNDgettag is 4-arg (Ghidra dropped to 2).
  */
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndchpriv.h"
+#include "sndpacketpriv.h"
 #include "sdplapat.h"
 #include "sdriver.h"
 #include "sgettag.h"
 
 extern unsigned char sndpd[];
-extern unsigned char DAT_801479f0;   /* voice base (+0x00) */
-extern unsigned char DAT_801479f4;   /* +0x04 */
-extern unsigned char DAT_801479fc;   /* +0x0c */
-extern unsigned char DAT_80147a00;   /* +0x10 */
-extern unsigned char DAT_80147a04;   /* +0x14 */
-extern unsigned char DAT_80147a08;   /* +0x18 vol angle */
-extern unsigned char DAT_80147a0a;   /* +0x1a pitch base */
-extern unsigned char DAT_80147a0c;   /* +0x1c playstate */
-extern unsigned char DAT_80147a0e;   /* +0x1e output mode */
-extern unsigned char DAT_80147a0f;   /* +0x1f channels */
-extern unsigned char DAT_80147a10;   /* +0x20 link */
-extern unsigned char DAT_80147a11;   /* +0x21 link flag */
-extern unsigned char DAT_80147a12;   /* +0x22 level */
-extern unsigned char DAT_80147a13;   /* +0x23 fx level */
+extern unsigned char DAT_801479f0;   /* voice-table byte base; retained for exact address materialization */
 
 /* iSNDplatformplay @0x8010BA48 : launch `voice` playing the patch whose tag stream starts at `chan`.
- * MATCH (W31, was 32 diffs): (1) the tag parser is a NATURAL `while` loop, not a goto chain -- real
- * loop notes weight the in-loop defs' ref counts, which is what allocates sampleData->s3 / voice->s4
- * in oracle order (goto form left them swapped); (2) plain `slot[0x1f] = 1` + in-loop re-store lets
- * gcc cross-jump the two identical sb's into the oracle's shared store; (3) the 0x1f stores are
- * volatile like the record's other stores, which keeps gcc's reorg from stealing the shared sb into
- * the 0x82 case's j delay slot (oracle has the unfilled nop); (4) `slot[0x20] = -1` needs a signed
- * char store (plain char is unsigned under ccpsx). IDA sub_8010BA48 supplied the loop/store shape. */
+ * MATCH (W31, was 32 diffs): (1) the tag parser is a natural `while` loop, not a goto chain -- loop
+ * notes weight the in-loop defs' ref counts, allocating sampleData/voice values in oracle order;
+ * (2) channel_count's initial plain store and volatile in-loop re-store let gcc cross-jump the
+ * two identical stores without moving the shared store into the tag-0x82 branch delay slot;
+ * (3) record fields are read/written through SndPacketVoiceState member views, while `slot` remains
+ * the byte cursor that preserves the original manually-scaled voice index/address expression;
+ * (4) link_index.vs preserves the signed -1 initialization; `.vu` preserves unsigned volatile
+ * reads for linked-channel indexing. The persistent typed-pointer alias was tested and rejected
+ * (95 diffs / 176 instructions); per-access typed views retain the exact 171-instruction match. */
 int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
                             int volAngle, int pitchOffset)
 {
@@ -57,10 +49,10 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     vt = vt << 2;
     slot = &DAT_801479f0 + vt;
 
-    *(volatile unsigned char *)(slot + 0x21) = 0;
-    *(volatile signed char *)(slot + 0x20) = -1;
-    slot[0x1e] = 0;
-    *(volatile unsigned char *)(slot + 0x1f) = 1;
+    ((volatile SndPacketVoiceState *)slot)->link_flag = 0;
+    ((volatile SndPacketVoiceState *)slot)->link_index.vs = -1;
+    ((SndPacketVoiceState *)slot)->route = 0;
+    ((volatile SndPacketVoiceState *)slot)->channel_count = 1;
     while (iSNDgettag(&chan, &id, &val, (int *)&ptr) != 0 && id != 0xfe) {
         if (id == 0x8a) {
             sampleData = ptr;
@@ -71,7 +63,7 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
             continue;
         }
         if (id == 0x82) {
-            *(volatile unsigned char *)(slot + 0x1f) = *(unsigned char *)&val;
+            ((volatile SndPacketVoiceState *)slot)->channel_count = *(unsigned char *)&val;
             continue;
         }
         if (id == 0x84) {
@@ -79,27 +71,27 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
             continue;
         }
         if (id == 0x92)
-            *(volatile unsigned char *)(slot + 0x1e) = (unsigned char)val;
+            ((volatile SndPacketVoiceState *)slot)->route = (unsigned char)val;
     }
 
-    *(volatile int *)(slot + 0x04) = loopVal;
-    *(volatile unsigned char *)(slot + 0x22) = (char)level;
-    *(volatile unsigned short *)(slot + 0x18) = (unsigned short)volAngle;
-    *(volatile unsigned char *)(slot + 0x23) = (unsigned char)fx;
-    *(volatile int *)(slot + 0x00) = *sampleData;
-    *(volatile int *)(slot + 0x0c) = 0;
-    *(volatile int *)(slot + 0x10) = 0;
-    *(volatile int *)(slot + 0x14) = loopVal << 0xc;
-    *(volatile short *)(slot + 0x1a) = (short)((rate * 0x17c7) >> 0x10);
-    if (1 < (unsigned char)*(volatile unsigned char *)(slot + 0x1f)) { /* arm linked voice */
+    ((volatile SndPacketVoiceState *)slot)->word04 = loopVal;
+    ((volatile SndPacketVoiceState *)slot)->level = (char)level;
+    ((volatile SndPacketVoiceState *)slot)->volume_angle = (unsigned short)volAngle;
+    ((volatile SndPacketVoiceState *)slot)->fx_level = (unsigned char)fx;
+    ((volatile SndPacketVoiceState *)slot)->header_word0 = *sampleData;
+    ((volatile SndPacketVoiceState *)slot)->byte_position = 0;
+    ((volatile SndPacketVoiceState *)slot)->served_position = 0;
+    ((volatile SndPacketVoiceState *)slot)->loop_length = loopVal << 0xc;
+    ((volatile SndPacketVoiceState *)slot)->initial_pitch.vs = (short)((rate * 0x17c7) >> 0x10);
+    if (1 < (unsigned char)((volatile SndPacketVoiceState *)slot)->channel_count) { /* arm linked voice */
         unsigned char *voiceBase = sndpd;
-        slot[0x20] = *(unsigned char *)(voice * 100 + sndgs[0x25] + 4);
-        voiceBase[(((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xf9] = 1;
-        *(int *)(voiceBase + (((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xe4) = 0;
-        *(int *)(voiceBase + (((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xe8) = 0;
-        *(int *)(voiceBase + (((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xec) = *(int *)(slot + 0x14);
+        ((SndPacketVoiceState *)slot)->link_index.u = ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[voice].linked_tag_view.linked_channels[0];
+        voiceBase[(((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xf9] = 1;
+        *(int *)(voiceBase + (((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xe4) = 0;
+        *(int *)(voiceBase + (((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xe8) = 0;
+        *(int *)(voiceBase + (((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xec) = ((SndPacketVoiceState *)slot)->loop_length;
     }
     iSNDplatformpitch(voice, pitch);
-    slot[0x1c] = 1;                                     /* playstate = playing */
+    ((SndPacketVoiceState *)slot)->play_state = 1;                                     /* playstate = playing */
     return 0;
 }

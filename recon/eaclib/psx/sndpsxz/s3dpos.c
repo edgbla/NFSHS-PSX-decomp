@@ -6,10 +6,11 @@
 #include "saetodv.h"
 #include "saetolrv.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndchpriv.h"
+#include "sndpacketpriv.h"
 #include "slib.h"
 #include "snd_state.h"
-
-extern unsigned char DAT_80147a08, DAT_80147a0c, DAT_80147a0e, DAT_80147a14, DAT_80147a15;
 
 /* iSNDplatform3dpos @0x800FEE30 : store pan angle `x` (+0x18) and, if the voice is playing, recompute its
  *   SPU L/R from the routing mode and push it. MATCH: the voice fields are one volatile sndpd+0xd8 record;
@@ -20,17 +21,17 @@ int iSNDplatform3dpos(int chan, int x, int y)
     volatile unsigned char *slot = sndpd + 0xd8 + vt;
     int outL, outR;
 
-    *(volatile short *)(slot + 0x18) = (short)x;
-    if (slot[0x1c] != 2)
+    ((volatile SndPacketVoiceState *)slot)->volume_angle = (short)x;
+    if (((volatile SndPacketVoiceState *)slot)->play_state != 2)
         return 0;
-    if (slot[0x1e] == 1)
-        iSNDatodlrv((unsigned int)x, (int)*(signed char *)(chan * 100 + sndgs[0x25] + 0x2d),
-                    &outL, &outR, (int)(signed char)slot[0x24], (int)(signed char)slot[0x25]);
-    else if (slot[0x1e] == 0)
-        iSNDatolrv((unsigned int)x, (int)*(signed char *)(chan * 100 + sndgs[0x25] + 0x2d),
+    if (((volatile SndPacketVoiceState *)slot)->route == 1)
+        iSNDatodlrv((unsigned int)x, (int)((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
+                    &outL, &outR, (int)(signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[0], (int)(signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[1]);
+    else if (((volatile SndPacketVoiceState *)slot)->route == 0)
+        iSNDatolrv((unsigned int)x, (int)((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
                    &outL, &outR);
-    slot[0x24] = (unsigned char)outL;
-    slot[0x25] = (unsigned char)outR;
+    ((volatile SndPacketVoiceState *)slot)->pad24_25[0] = (unsigned char)outL;
+    ((volatile SndPacketVoiceState *)slot)->pad24_25[1] = (unsigned char)outR;
     iSNDsetvol(chan, outL, outR);
     return 0;
 }

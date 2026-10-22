@@ -9,22 +9,22 @@
 
 /* SNDattributessetdef @0x801035B0 : reset a 0xc-byte attribute block to defaults (level -1, pan 0x40,
  *   sustain 0x7f). */
-int SNDattributessetdef(int *attr)
+int SNDattributessetdef(SndPatchAttributeBlock *attr)
 {
-    *attr = -1;
-    *((unsigned char *)attr + 7)  = 0x7f;
-    *((unsigned char *)attr + 8)  = 0x40;
-    *((unsigned char *)attr + 6)  = 0;
-    *(unsigned short *)((char *)attr + 4) = 0;
-    *((unsigned char *)attr + 9)  = 0;
-    *((unsigned char *)attr + 10) = 0;
-    *((unsigned char *)attr + 0xb) = 0;
+    attr->patch_id = -1;
+    attr->patch_volume = 0x7f;
+    attr->pan = 0x40;
+    attr->velocity = 0;
+    attr->base_detune = 0;
+    attr->playback_factor34 = 0;
+    attr->envelope_detune = 0;
+        attr->use3dpos = 0;
     return 0;
 }
 
-/* iSNDpatchtohdr @0x801035E4 : build the SPU playback header (`hdr`, magic 0x5622) + attribute block (`attr`)
+/* iSNDpatchtohdr @0x801035E4 : build the `SNDSAMPLEFORMAT` output (`format`, default word 0x5622) + attribute block (`attr`)
  *   + extra word (`extraOut`) from the sample's tag stream (after its 4- or 8-byte prefix per flags bit 1). */
-int iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut)
+int iSNDpatchtohdr(short *sampleData, SNDSAMPLEFORMAT *format, SndPatchAttributeBlock *attr, int *extraOut)
 {
     short *cursor;
     int    id, val, ptr;
@@ -36,19 +36,19 @@ int iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut)
         cursor = sampleData + 4;
     else
         cursor = sampleData + 2;
-    *(unsigned short *)hdr      = 0x5622;
-    *((unsigned char *)hdr + 2) = 1;
-    *((unsigned char *)hdr + 3) = 5;
+    format->samplerate = 0x5622;
+    format->channels = 1;
+    format->samplerep = 5;
     *extraOut = 0;
     while (iSNDgettag((int *)&cursor, &id, &val, &ptr) != 0) {
-        if (id == 0x80)      *((unsigned char *)attr + 0xb) = (unsigned char)val;
-        else if (id == 0x82) *((unsigned char *)hdr + 2)    = (unsigned char)val;
-        else if (id == 0x84) *(unsigned short *)hdr         = (unsigned short)val;
+        if (id == 0x80)      attr->use3dpos = (unsigned char)val;
+        else if (id == 0x82) format->channels    = (unsigned char)val;
+        else if (id == 0x84) format->samplerate = (unsigned short)val;
         else if (id == 0x85) *extraOut                      = val;
-        else if (id == 0x13) *((unsigned char *)attr + 9)   = (unsigned char)val;
-        else if (id == 0xa)  *((unsigned char *)attr + 0xa) = (unsigned char)val;
-        else if (id == 5)    *attr                          = val;
-        else if (id == 6)    *((unsigned char *)attr + 6)   = (unsigned char)val;
+        else if (id == 0x13) attr->playback_factor34 = (unsigned char)val;
+        else if (id == 0xa)  attr->envelope_detune = (unsigned char)val;
+        else if (id == 5)    attr->patch_id                 = val;
+        else if (id == 6)    attr->velocity                 = (unsigned char)val;
     }
     return 0;   /* oracle: `addu v0,zero,zero` before jr ra (void->int, §3.2) */
 }

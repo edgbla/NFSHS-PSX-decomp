@@ -8,13 +8,17 @@
  *   NEW leaf deps: sgettag(iSNDgettag), sdresolv(iSNDplatformresolve/remove), srrange(randrange),
  *   srandom(iSNDrandom), sdplapat(iSNDplatformplay).
  *
- *   TIMBRE struct (0x98 bytes): +0x14/0x20 note range, +0x1c base note, +0x30 detune, +0x08/0x10 vel,
- *     +0x64 envelope ptr (&snddefaultenvelope), +0x90 patch flag, +0x94 timbre-active.
- *   BANK header: +0x03 flags (bit1 = 8-byte header, bit0 = resolved), +0x04/+0x08 tag stream start.
+ *   SndTimbre (0x98 bytes): velocity/note ranges at +0x04..+0x10, allocation priority/flags at +0x14/+0x18,
+ *     base note +0x1C, detune/pan controls from +0x30, curve tables through +0x8C, pitch-offset flag +0x90,
+ *     pan scale +0x94. Root bank data headers and tagged-patch records are distinct views (sndbankhdrpriv.h).
  */
 #include "salloc.h"
 #include "sclcptch.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndbankhdrpriv.h"
+#include "sndchpriv.h"
+#include "sndtimbrepriv.h"
 #include "sdplapat.h"
 #include "sdresolv.h"
 #include "sgettag.h"
@@ -32,67 +36,67 @@ signed char snddefaultenvelope[8] = { -1, -1, -1, 0x7f, 0x7f, 0, 0, 0 };   /* @0
 unsigned char DAT_801371cc = 0;   /* @0x801371CC : rolling key-group counter (the library is built -G0: plain .data) */
 
 /* iSNDresetpatch @0x80101ABC : clear a patch-play state's flag word (+0x90). */
-void iSNDresetpatch(int patch)
+void iSNDresetpatch(struct SndTimbre *patch)
 {
-    *(int *)(patch + 0x90) = 0;
+    patch->apply_pitch_offset.word = 0;
 }
 
 /* iSNDresettimbre @0x80101AC4 : zero the 0x98-byte timbre `buf` then load the default timbre into `t`
  *   (note range 0..0x3c, full velocity, default envelope). */
-unsigned char *iSNDresettimbre(int *t, int buf)
+unsigned char *iSNDresettimbre(struct SndTimbre *t, struct SndTimbre *buf)
 {
     int i = 0x25;
-    int *p = (int *)(buf + 0x94);
+    int *p = &buf->pan_scale.word;
     do {                                              /* zero the whole timbre buffer */
         *p = 0;
         i--;
         p--;
     } while (-1 < i);
-    t[1] = 0;
-    t[2] = 0x7f;
-    t[3] = 0;
-    t[4] = 0x7f;
-    t[5] = -1;
-    t[6] = 0;
-    t[7] = 0x3c;
-    t[8] = -1;
-    t[9] = 1;
-    t[10] = 0;
-    t[11] = 1;
-    t[12] = 0x40;
-    t[13] = 0;
-    t[14] = 0x7f;
-    t[15] = 0;
-    t[16] = 0;
-    t[17] = 0;
-    t[18] = 0;
-    t[19] = 0;
-    t[21] = 0;
-    t[23] = 0;
-    t[28] = 0x7f;
-    t[29] = 0;
-    t[30] = 0;
-    t[31] = 0;
-    t[32] = 0;
-    t[33] = 0;
-    t[35] = 0;
-    t[34] = 0;
-    t[37] = 1;
-    t[25] = (int)snddefaultenvelope;
+    t->velocity_min.word = 0;
+    t->velocity_max.word = 0x7f;
+    t->note_min.word = 0;
+    t->note_max.word = 0x7f;
+    t->channel_priority.word = -1;
+    t->allocation_flags.word = 0;
+    t->base_note.word = 0x3c;
+    t->control32.word = -1;
+    t->sweep_count.word = 1;
+    t->envelope_detune.word = 0;
+    t->channel_count.word = 1;
+    t->detune.word = 0x40;
+    t->detune_range.word = 0;
+    t->pan.word = 0x7f;
+    t->pan_range.word = 0;
+    t->base_detune.word = 0;
+    t->base_detune_range.word = 0;
+    t->final_volume_curve.word = 0;
+    t->playback_factor.word = 0;
+    t->pan_curve.word = 0;
+    t->detune_curve.word = 0;
+    t->portamento_initial.word = 0x7f;
+    t->velocity_curve.word = 0;
+    t->velocity_phase_limit.word = 0;
+    t->velocity_phase_seed.word = 0;
+    t->pitch_lfo_table.word = 0;
+    t->lfo_phase_limit.word = 0;
+    t->pitch_lfo_seed.word = 0;
+    t->pitch_lfo_depth.word = 0;
+    t->pan_scale.word = 1;
+    t->envelope_sweep_table.word = (int)snddefaultenvelope;
     return (unsigned char *)snddefaultenvelope;
 }
 
 /* iSNDresolveheader @0x80101B7C : fold an override header `out` into the running timbre header `hdr`
  *   (sum the envelope / volume / pitch fields). */
-void iSNDresolveheader(int *hdr, int *out)
+void iSNDresolveheader(struct SndTimbre *hdr, struct SndTimbre *out)
 {
-    *(int *)((int)hdr + 0x48) = *(int *)((int)out + 0x48) + *(int *)((int)hdr + 0x48);
-    *(int *)((int)hdr + 0x54) = *(int *)((int)out + 0x54) + *(int *)((int)hdr + 0x54);
-    *(int *)((int)hdr + 0x5c) = *(int *)((int)out + 0x5c) + *(int *)((int)hdr + 0x5c);
-    *(int *)((int)hdr + 0x74) = *(int *)((int)out + 0x74) + *(int *)((int)hdr + 0x74);
-    *(int *)((int)hdr + 0x80) = *(int *)((int)out + 0x80) + *(int *)((int)hdr + 0x80);
-    if (*(int *)((int)hdr + 100) != 0)
-        *(int *)((int)hdr + 100) = *(int *)((int)out + 100) + *(int *)((int)hdr + 100);
+    hdr->final_volume_curve.word = out->final_volume_curve.word + hdr->final_volume_curve.word;
+    hdr->pan_curve.word = out->pan_curve.word + hdr->pan_curve.word;
+    hdr->detune_curve.word = out->detune_curve.word + hdr->detune_curve.word;
+    hdr->velocity_curve.word = out->velocity_curve.word + hdr->velocity_curve.word;
+    hdr->pitch_lfo_table.word = out->pitch_lfo_table.word + hdr->pitch_lfo_table.word;
+    if (hdr->envelope_sweep_table.word != 0)
+        hdr->envelope_sweep_table.word = out->envelope_sweep_table.word + hdr->envelope_sweep_table.word;
 }
 
 /* iSNDfindfreekey @0x80101BFC : advance the rolling key-group counter (DAT_801371cc) to a value not
@@ -103,7 +107,7 @@ int iSNDfindfreekey(void)
     int   i, count, probe;
     unsigned char key;
     int *gs;
-    char *slot;
+    SndChannel *slot;
 top:
     DAT_801371cc = DAT_801371cc + 1;        /* lbu/addiu/sb; the == 0 test reuses the CSE'd value */
     if (DAT_801371cc == 0)                     /* skip 0 (the "no group" sentinel) */
@@ -115,14 +119,14 @@ top:
         goto done;
     count = ((unsigned char *)gs)[0x11];
     key   = DAT_801371cc;
-    slot  = (char *)gs[0x25];
+    slot  = (SndChannel *)(unsigned int)gs[0x25];
 loop:                                             /* goto-formed: no LOOP notes -> no giv anchoring */
-    if (*(signed char *)(slot + 0xb) != 0) {
-        if (*(unsigned char *)(slot + 0x37) == key)
+    if (slot->state != 0) {
+        if (slot->group_id == key)
             goto top;                             /* key owned by a held channel -> try the next one */
     }
     i++;
-    slot += 0x64;
+    slot++;
     if (i < count)
         goto loop;
 done:
@@ -144,25 +148,26 @@ done:
  *   restores the detune table/scaling path, both PRNG return uses, all four stack arguments, and the
  *   success/failure return contract. MATCH (320/320): modeling the one-word platform-rate storage as
  *   an array element makes gcc split its address materialization around the independent byte load. */
-int iSNDplaytaggedtimbre(int timbre, int tag, int vol, int header,
+int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *vol, struct SndTimbre *header,
                                     int baseNote, int velScale, int pitchOff)
 {
-    int b7  = *(signed char *)(tag + 7);
-    int b8  = *(signed char *)(tag + 8);
-    int b9  = *(signed char *)(tag + 9);
-    int b10 = *(signed char *)(tag + 10);
+    int b7  = (signed char)tag->pan;
+    int b8  = (signed char)tag->vol;
+    int b9  = (signed char)tag->bend;
+    int b10 = (signed char)tag->fxlevel0;
     unsigned int  out;
-    int           chan, slot, detune, pan, sw, s28, num, active, tmp;
+    int           chan, detune, pan, sw, s28, num, active, tmp;
+    SndChannel   *slot;
     int           field28, field4c, field54, field5c;
     int           playOffset, playResult;
     int           playLevel, playPitch, playTag;
     unsigned int  sv;
 
-    iSNDresolveheader((int *)vol, (int *)header);
+    iSNDresolveheader(vol, header);
 
-    detune = *(int *)(vol + 0x30);
-    if (*(int *)(vol + 0x34) != 0)
-        detune += randrange(*(int *)(vol + 0x34));
+    detune = vol->detune.word;
+    if (vol->detune_range.word != 0)
+        detune += randrange(vol->detune_range.word);
     if (detune < 0x80)
         goto detune_low;
     detune = 0x7f;
@@ -172,29 +177,29 @@ detune_low:
         detune = 0;
 detune_done:
 
-    chan = iSNDallocchan(*(unsigned int *)(vol + 0x14), *(int *)(vol + 0x2c), *(int *)(vol + 0x18), &out);
+    chan = iSNDallocchan(vol->channel_priority.uword, vol->channel_count.word, vol->allocation_flags.word, &out);
     if (chan < 0)
         return chan;
     {
-        slot = sndgs[0x25] + chan * 100;
-        *(unsigned char *)(slot + 0x33) = *(unsigned char *)(vol + 0x94);
-        sv = *(unsigned short *)(vol + 0x40);
-        *(short *)(slot + 0x5c) = sv;
-        sv = sv - (*(int *)(vol + 0x1c) - baseNote) * 100;
-        *(short *)(slot + 0x5c) = sv;
-        if (*(int *)(vol + 0x90) != 0)
-            *(short *)(slot + 0x5c) = sv + pitchOff;
-        if (*(int *)(vol + 0x44) != 0)
-            *(short *)(slot + 0x5c) = *(unsigned short *)(slot + 0x5c) + randrange(*(int *)(vol + 0x44));
-        *(volatile int *)(slot + 0x44) = *(int *)(vol + 0x48);
-        field54 = *(int *)(vol + 0x54);
-        *(volatile int *)(slot + 0x48) = field54;
-        field5c = *(int *)(vol + 0x5c);
-        *(volatile int *)(slot + 0x1c) = (int)b8 << 0x10;
-        *(volatile int *)(slot + 0x4c) = field5c;
-        active = *(signed char *)(slot + 0x33);
-        *(int *)(slot + 0x14) = 0;
-        *(unsigned char *)(slot + 0x3d) = b7;
+        slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
+        slot->pan_scale = vol->pan_scale.ubyte;
+        sv = vol->base_detune.uhalf;
+        slot->base_detune = sv;
+        sv = sv - (vol->base_note.word - baseNote) * 100;
+        slot->base_detune = sv;
+        if (vol->apply_pitch_offset.word != 0)
+            slot->base_detune = sv + pitchOff;
+        if (vol->base_detune_range.word != 0)
+            slot->base_detune = (unsigned short)slot->base_detune + randrange(vol->base_detune_range.word);
+        *(volatile int *)&slot->final_volume_curve = vol->final_volume_curve.word;
+        field54 = vol->pan_curve.word;
+        *(volatile int *)&slot->pan_curve = field54;
+        field5c = vol->detune_curve.word;
+        *(volatile int *)&slot->autovol_position.word = (int)b8 << 0x10;
+        *(volatile int *)&slot->detune_curve = field5c;
+        active = slot->pan_scale;
+        slot->autovol_step = 0;
+        slot->current_pan = b7;
         if (active != 1)
             b7 = (b7 - 0x40) * active + 0x40;
         b7 = detune + b7 - 0x40;
@@ -202,66 +207,66 @@ detune_done:
             b7 = 0;
         else if (0x7f < b7)
             b7 = 0x7f;
-        if (*(int *)(slot + 0x48) != 0)
-            b7 = *(signed char *)(*(int *)(slot + 0x48) + b7);
-        pan = *(int *)(vol + 0x38);
-        if (*(int *)(vol + 0x3c) != 0)
-            pan += randrange(*(int *)(vol + 0x3c));
+        if (slot->pan_curve != 0)
+            b7 = *(signed char *)(slot->pan_curve + b7);
+        pan = vol->pan.word;
+        if (vol->pan_range.word != 0)
+            pan += randrange(vol->pan_range.word);
         if (pan < 0x80)
             goto pan_low;
         pan = 0x7f;
 pan_low:
         if (pan < -0x80)
             pan = -0x80;
-        *(char *)(slot + 0x2e) = (char)detune;
-        *(char *)(slot + 0x2c) = (char)((pan * velScale) / 0x7f);
-        field28 = *(int *)(vol + 0x28);
-        *(unsigned char *)(slot + 0x2f) = b9;
-        *(short *)(slot + 0x5a) = (short)(field28 * 100);
-        *(int *)(slot + 0x40) = *(int *)(vol + 100);
-        *(int *)(slot + 0x24) = *(int *)(vol + 0x70) << 0x10;
-        *(unsigned char *)(slot + 0x31) = 0;
-        *(unsigned char *)(slot + 0x30) = *(unsigned char *)(vol + 0x24);
-        *(unsigned char *)(slot + 0x32) = *(unsigned char *)(vol + 0x20);
-        sw = **(int **)(slot + 0x40);
-        *(int *)(slot + 0x28) = sw;
+        slot->pan = (char)detune;
+        slot->patch_volume = (char)((pan * velScale) / 0x7f);
+        field28 = vol->envelope_detune.word;
+        slot->bend = b9;
+        slot->envelope_detune_depth = (short)(field28 * 100);
+        slot->sweep_table = (SndSweepSegment *)(unsigned int)vol->envelope_sweep_table.word;
+        slot->portamento_position.word = vol->portamento_initial.word << 0x10;
+        slot->sweep_index = 0;
+        slot->sweep_count = vol->sweep_count.ubyte;
+        slot->control32 = vol->control32.ubyte;
+        sw = ((SndSweepSegment *)(unsigned int)slot->sweep_table)->duration;
+        slot->sweep_countdown = sw;
         if (sw < 0)
-            *(int *)(slot + 0x28) = 0x7fffffff;
-        s28 = *(int *)(slot + 0x28);
-        num = *(int *)(*(int *)(slot + 0x40) + 4) * 0x10000 - *(int *)(slot + 0x24);
-        *(int *)(slot + 0x20) = num / s28;
-        *(int *)(slot + 0x50) = *(int *)(vol + 0x74);
-        *(int *)(slot + 0x54) = *(int *)(vol + 0x80);
-        *(unsigned char *)(slot + 0x38) = *(unsigned char *)(vol + 0x78);
-        *(unsigned char *)(slot + 0x39) = *(unsigned char *)(vol + 0x84);
-        *(unsigned short *)(slot + 0x58) = (unsigned short)*(unsigned char *)(vol + 0x88);
+            slot->sweep_countdown = 0x7fffffff;
+        s28 = slot->sweep_countdown;
+        num = ((SndSweepSegment *)(unsigned int)slot->sweep_table)->target_pitch * 0x10000 - slot->portamento_position.word;
+        slot->portamento_step = num / s28;
+        slot->velocity_curve = vol->velocity_curve.word;
+        slot->pitch_lfo_table = vol->pitch_lfo_table.word;
+        slot->velocity_phase_limit = vol->velocity_phase_limit.ubyte;
+        slot->lfo_phase_limit = vol->lfo_phase_limit.ubyte;
+        slot->pitch_lfo_depth = (unsigned short)vol->pitch_lfo_depth.ubyte;
         {
-            unsigned int rv = *(unsigned int *)(vol + 0x7c);
+            unsigned int rv = vol->velocity_phase_seed.uword;
             if (rv != 0) {
                 rv = (unsigned int)iSNDrandom();
-                *(char *)(slot + 0x3a) = (char)(rv % *(unsigned int *)(vol + 0x78));
+                slot->velocity_phase = (char)(rv % vol->velocity_phase_limit.uword);
             } else
-                *(unsigned char *)(slot + 0x3a) = 0;
-            rv = *(unsigned int *)(vol + 0x8c);
+                slot->velocity_phase = 0;
+            rv = vol->pitch_lfo_seed.uword;
             if (rv != 0) {
                 rv = (unsigned int)iSNDrandom();
-                *(char *)(slot + 0x3b) = (char)(rv % *(unsigned int *)(vol + 0x84));
+                slot->pitch_lfo_phase = (char)(rv % vol->lfo_phase_limit.uword);
             } else
-                *(unsigned char *)(slot + 0x3b) = 0;
+                slot->pitch_lfo_phase = 0;
         }
-        *(short *)(slot + 0x3e) = *(short *)(tag + 0xe);
-        *(short *)(slot + 0x60) = *(short *)(tag + 0xc);
-        *(short *)(slot + 0x5e) = 0;
+        slot->tag_word_e = (short)tag->timemult;
+        slot->base_pitch = (short)tag->pitchmult;
+        slot->linear_pitch_cache = 0;
         iSNDcalcpitch(chan);
-        field4c = *(unsigned char *)(vol + 0x4c);
-        *(unsigned char *)(slot + 0x35) = b10;
-        *(unsigned char *)(slot + 0x34) = field4c;
-        *(unsigned char *)(slot + 10)   = *(unsigned char *)(tag + 4);
-        *(short *)(slot + 8) = *(short *)tag;
+        field4c = vol->playback_factor.ubyte;
+        slot->playback_fx.playback.playback_factor35 = b10;
+        slot->playback_fx.playback.playback_factor34 = field4c;
+        slot->start_marker   = (unsigned char)tag->bhandle;
+        slot->linked_tag_view.tagged_patch.tagged_patch_word = *(short *)tag;
         iSNDcalcvol(chan);
-        if (*(signed char *)(tag + 0xb) != 0) {
-            tmp = *(unsigned short *)(tag + 0x10);
-            playOffset = *(short *)(tag + 0x12);
+        if ((signed char)tag->use3dpos != 0) {
+            tmp = tag->azimuth;
+            playOffset = tag->elevation;
         } else {
             tmp = b7;
             tmp = tmp - 0x40;
@@ -269,12 +274,12 @@ pan_low:
             tmp = (unsigned short)tmp;
             playOffset = 0;
         }
-        playTag = *(unsigned short *)(tag + 0xe);
-        playLevel = *(signed char *)(slot + 0x2d);
-        playPitch = *(unsigned short *)(slot + 0x62);
+        playTag = tag->timemult;
+        playLevel = slot->volume;
+        playPitch = slot->spu_pitch;
         playResult = iSNDplatformplay(timbre, chan, playLevel, playPitch, playTag,
-                                      (iSNDplatformrate[0] * *(signed char *)(slot + 0x34) *
-                                       *(signed char *)(slot + 0x35)) / 16129,
+                                      (iSNDplatformrate[0] * slot->playback_fx.playback.playback_factor34 *
+                                       slot->playback_fx.playback.playback_factor35) / 16129,
                                       tmp, playOffset);
         if (playResult < 0)
             iSNDfreechan(chan);
@@ -295,10 +300,10 @@ pan_low:
  *     7-arg call: (timbreData, tag, &builtTimbre, &header, note, vel, pitchOff). pitchOff ($s6) is the
  *     CAPTURED randrange() result of the last 0x24 field tag (0 until one is seen); the group key ($fp)
  *     is the CAPTURED iSNDfindfreekey() return.  BYTE-MATCHES the oracle (verify_asm PASS, 216 insns). */
-int iSNDplaytaggedpatch(int bank, int tag)
+int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
 {
-    int           bt[0x26];                /* built timbre    @sp+0x20  */
-    int           hdr[0x26];               /* override header @sp+0xB8  */
+    union SndTimbreBufferView bt;                /* built timbre    @sp+0x20  */
+    union SndTimbreBufferView hdr;               /* override header @sp+0xB8  */
     int           started[12];             /* started voices  @sp+0x150 */
     int           cursor;                  /* tag-stream cursor @sp+0x180 (&cursor -> gettag) */
     unsigned int  g0;                      /* gettag out: tag id  @sp+0x184 (3 SCALARS, not an array */
@@ -307,7 +312,7 @@ int iSNDplaytaggedpatch(int bank, int tag)
     int           timbreData = 0;          /* s5: last 0xfd sample-data ptr */
     int           ret        = -9;         /* s4: launch result / return value */
     int           nStarted   = 0;          /* s2 */
-    int           slot       = 0;          /* s3: last written voice slot (shared single/multi) */
+    SndChannel   *slot       = 0;          /* s3: last written voice slot (shared single/multi) */
     int           pitchOff   = 0;          /* s6: the CAPTURED randrange() of the last 0x24 tag */
     int           vel, note;               /* s0 / s1 (lb: signed; vel FIRST -> vel=s0/note=s1) */
     int           key;                     /* fp: the CAPTURED iSNDfindfreekey() return */
@@ -316,13 +321,13 @@ int iSNDplaytaggedpatch(int bank, int tag)
 
     if (bank == 0)
         return -8;
-    note = *(signed char *)(tag + 5);
-    vel  = *(signed char *)(tag + 6);
+    note = (signed char)tag->keynum;
+    vel  = (signed char)tag->velocity;
     cursor = bank;                         /* stored (addressable) then overwritten -- both sw in oracle */
-    cursor = (*(unsigned char *)(bank + 3) & 2) ? bank + 8 : bank + 4;
+    cursor = (((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) ? (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte : (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
 
-    iSNDresetpatch((int)bt);
-    iSNDresettimbre(bt, (int)hdr);
+    iSNDresetpatch(&bt.fields);
+    iSNDresettimbre(&bt.fields, &hdr.fields);
     iSNDenteraudio();
     key = iSNDfindfreekey();
 
@@ -335,27 +340,27 @@ int iSNDplaytaggedpatch(int bank, int tag)
             continue;
         }
         if (id == 0xfe) {                  /* note-region complete -> launch if in range */
-            if (bt[1] <= vel && vel <= bt[2] && bt[3] <= note && note <= bt[4]) {
-                ret = iSNDplaytaggedtimbre(timbreData, tag, (int)bt, (int)hdr, note, vel, pitchOff);
+            if (bt.fields.velocity_min.word <= vel && vel <= bt.fields.velocity_max.word && bt.fields.note_min.word <= note && note <= bt.fields.note_max.word) {
+                ret = iSNDplaytaggedtimbre(timbreData, tag, &bt.fields, &hdr.fields, note, vel, pitchOff);
                 if (ret < 0)
                     goto fail;
                 started[nStarted] = ret;
                 nStarted++;
             }
-            iSNDresettimbre(bt, (int)hdr);
+            iSNDresettimbre(&bt.fields, &hdr.fields);
             continue;
         }
         if (id < 0x26) {                   /* field tag -> set timbre[idx] + parallel header[idx] */
             val = g1;
-            bt[id]  = val;
-            hdr[id] = g2;
+            bt.tag_words[id]  = val;
+            hdr.tag_words[id] = g2;
             if (id == 0x24)
                 pitchOff = randrange(val); /* s6: fed to every later launch as arg 7 */
         }
     }
     /* the final note-region (no trailing 0xfe) */
-    if (bt[1] <= vel && vel <= bt[2] && bt[3] <= note && note <= bt[4]) {
-        ret = iSNDplaytaggedtimbre(timbreData, tag, (int)bt, (int)hdr, note, vel, pitchOff);
+    if (bt.fields.velocity_min.word <= vel && vel <= bt.fields.velocity_max.word && bt.fields.note_min.word <= note && note <= bt.fields.note_max.word) {
+        ret = iSNDplaytaggedtimbre(timbreData, tag, &bt.fields, &hdr.fields, note, vel, pitchOff);
         if (ret < 0)
             goto fail;
         started[nStarted] = ret;
@@ -367,9 +372,9 @@ int iSNDplaytaggedpatch(int bank, int tag)
     if (nStarted == 1) {                   /* single voice: no key group */
         ch = iSNDgetchan(started[0]);
         if (-1 < ch) {
-            slot = sndgs[0x25] + ch * 100;
-            *(unsigned char *)(slot + 0x37) = 0;
-            *(unsigned char *)(slot + 0x36) = 0;
+            slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[ch];
+            slot->group_id = 0;
+            slot->playback_fx.playback.group_flag = 0;
         }
     } else {                               /* join the started voices into the key group */
         for (i = 0; i < nStarted; i++) {
@@ -377,12 +382,12 @@ int iSNDplaytaggedpatch(int bank, int tag)
                                             * into a callee-saved reg (held ACROSS the getchan calls) */
             ch = iSNDgetchan(started[i]);
             if (-1 < ch) {
-                slot = *(int *)(gs + 0x94) + ch * 100;
-                *(unsigned char *)(slot + 0x37) = (unsigned char)key;
-                *(unsigned char *)(slot + 0x36) = 0;
+                slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)gs)->play_records)[ch];
+                slot->group_id = (unsigned char)key;
+                slot->playback_fx.playback.group_flag = 0;
             }
         }
-        *(unsigned char *)(slot + 0x36) = 1;   /* mark the last voice as the group end */
+        slot->playback_fx.playback.group_flag = 1; /* mark the last voice as the group end */
     }
     iSNDleaveaudio();
     return ret;
@@ -401,16 +406,16 @@ int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
     unsigned int state[4];
     int r = -1;
     state[0] = (unsigned int)bank;
-    if ((*(unsigned char *)(bank + 3) & 2) != 0)
-        state[0] = (unsigned int)(bank + 8);
+    if ((((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) != 0)
+        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte);
     else
-        state[0] = (unsigned int)(bank + 4);
+        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte);
     while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
         if (state[1] == 0xfd)
             r = iSNDplatformresolve((int)state[0], patch_idx, scratch);
     }
     if (-1 < r)
-        *(unsigned char *)(bank + 3) = *(unsigned char *)(bank + 3) | 1;
+        ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags = ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags | 1;
     return r;
 }
 
@@ -420,15 +425,15 @@ int iSNDremovetaggedpatch(int bank, int *patch_idx)
 {
     unsigned int state[4];
     state[0] = (unsigned int)bank;
-    if ((*(unsigned char *)(bank + 3) & 2) != 0)
-        state[0] = (unsigned int)(bank + 8);
+    if ((((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) != 0)
+        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte);
     else
-        state[0] = (unsigned int)(bank + 4);
+        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte);
     while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
         if (state[1] == 0xfd)
             iSNDplatformremove((int)state[0], patch_idx);
     }
-    *(unsigned char *)(bank + 3) = *(unsigned char *)(bank + 3) & 0xfe;
+    ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags = ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 0xfe;
     return 0;
 }
 

@@ -4,20 +4,22 @@
  *   (`this` is the stream tag).
  */
 #include "sdata.h"
+#include "sndserverpriv.h"
 #include "sst.h"
+#include "sstpriv.h"
 #include "sstautov.h"
 #include "sautovol.h"
 
 /* SNDSTRM_autovol @0x800E9DE8 : store the target vol (+0x54) and start an auto-volume ramp over steps/10. */
 int SNDSTRM_autovol(int tag, int steps, int vol)
 {
-    int s;
-    if ((signed char)sndgs[0xf] == '\0')
+    SndStream *s;
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == '\0')
         return -10;
-    s = iSNDstreamgetstreamptr(tag);
+    s = (SndStream *)iSNDstreamgetstreamptr(tag);
     if (s == 0)
         return -8;
-    *(char *)(s + 0x54) = (char)vol;
-    SNDautovol(*(int *)(s + 8), steps / 10, vol);
+    s->start_params.vol = (char)vol;
+    SNDautovol(s->start_result, steps / 10, vol);
     return 0;
 }

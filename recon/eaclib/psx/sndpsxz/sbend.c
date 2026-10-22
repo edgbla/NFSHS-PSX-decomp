@@ -7,6 +7,8 @@
 #include "sbend.h"
 #include "sclcptch.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndchpriv.h"
 #include "sdriver.h"
 #include "spatkey.h"
 #include "sserver.h"
@@ -19,20 +21,20 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
     if (-1 < chanIdx) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
-            int v = sndgs[0x25] + cur[0] * 100;
-            if ((int)*(signed char *)(v + 0x2f) == (int)chan)   /* +0x2f detune read signed (lb); this build's char is unsigned */
+            SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[cur[0]];
+            if ((int)v->bend == (int)chan)   /* signed +0x2f detune read (lb) */
                 return 0;
-            if (*(short *)(v + 0x5a) == 0)
+            if (v->envelope_detune_depth == 0)
                 return 0;
-            *(char *)(v + 0x2f) = (char)chan;
+            v->bend = (char)chan;
             {
                 /* MATCH: naming the already-loaded channel before the store lets gcc sink the store
                  * into iSNDcalcpitch's jal delay slot; either statement alone leaves a nop there. */
                 int c = cur[0];
-                *(short *)(v + 0x5e) = 0;
+                v->linear_pitch_cache = 0;
                 iSNDcalcpitch(c);
             }
-            iSNDplatformpitch(cur[0], (int)(unsigned)*(unsigned short *)(v + 0x62));
+            iSNDplatformpitch(cur[0], (int)(unsigned)v->spu_pitch);
         }
     }
     return chanIdx;
@@ -42,7 +44,7 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
 int SNDpitchbend(unsigned int tag, int bend)
 {
     int r;
-    if ((signed char)sndgs[0xf] == 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
     r = iSNDunsafebend(tag, (unsigned int)bend);

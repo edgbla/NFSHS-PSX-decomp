@@ -6,7 +6,7 @@
 struct SNDPLAYOPTS {
     int patnum;
     char bhandle, keynum, velocity, pan, vol, bend, fxlevel0, use3dpos;
-    u_short pitchmult, timemult, azimuth;
+    unsigned short pitchmult, timemult, azimuth;
     short elevation;
 };
 #endif

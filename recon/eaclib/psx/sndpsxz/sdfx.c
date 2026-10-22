@@ -8,25 +8,24 @@
  *   is the work-area size, block[1..0x20] the 0x20 SPU reverb coefficient registers (SPUctrl+0x1c0..).
  */
 #include "sdata.h"
+#include "sndfxpriv.h"
+#include "sndserverpriv.h"
 #include "sdfx.h"
 #include "../eacpsxz/blkfill.h"
 #include "../eacpsxz/blkmov.h"
 #include "sdma.h"
 #include "slib.h"
 #include "snd_state.h"
+#include "sndspuregpriv.h"
+#include "sndmempriv.h"
 
 #define DAT_8014791c (*(int *)(sndpd + 4))         /* current fx mode */
-/* SPLIT-STORAGE FIX (wave-22 a1): snd_spu_reverb_mode was a standalone extern "own storage" global
- * (sdmemlu.c's old comment credited it to "sdmemman", but it's really the same sndpd+0x51E field
- * sdmemlu.c/sdmemman.c now read via SNDPD_REVERBMODE). Converted to the same sndpd-relative macro so
- * this write is actually observed by SNDmemlargestunused/iSNDpsxmemconstrain/iSNDpsxmalloc's reads
- * instead of landing in disconnected storage -- see sdmemlu.c's banner for the full cross-file proof. */
-#define snd_spu_reverb_mode (*(unsigned short *)(sndpd + 0x51E))
-/* Same class, same fix: DAT_80147e2c ("SPU control reg base") was ALSO a standalone `extern "C" int`
- * here even though slib.c's iSNDinit (the actual writer, `#define DAT_80147e2c (*(int*)(sndpd+0x514))`)
- * already models it sndpd-relative -- this file's reads were the disconnected half of that same pair.
- * (Other consumers -- spatkey.c/sdspuirq.c/sdpacket.c/sdcdvol.c -- were left untouched; out of scope.) */
-#define DAT_80147e2c (*(int *)(sndpd + 0x514))
+/* SPLIT-STORAGE FIX (wave-22 a1): the former standalone `snd_spu_reverb_mode` name did not own
+ * separate storage; the field is part of sndpd+0x518's allocator header. The typed view below
+ * aliases the same `SndSpuMemoryState` bytes read by sdmemlu.c and sdmemman.c. */
+/* The SPU control-base word at sndpd+0x514 is a member of the private
+ * SndSpuRegisterBasesStateView. This TU uses that typed view for the reverb MMIO accesses below;
+ * sdma.c, sdspuirq.c, sdpacket.c, sdcdvol.c and slib.c use the same record view where codegen permits. */
     /* reverb preset coefficient table */
 /* @0x80136E00 byte-exact from image: 10 blocks (modes 0..9) x 0x42 bytes = 660.
  * block[+0] u16 = SPU reverb work-area size, [+2..0x41] = the 0x20 reverb coefficient regs.
@@ -103,7 +102,7 @@ unsigned int iSNDpsxfxinit(int mode)
      * alongside the other prologue register spills, reused later (via +8/+0xC) for all 7 reverb-depth
      * taps. Declaring it here (matching that early C-source position) instead of inside the `if` block
      * it's actually used in reproduces that hoist. */
-    int *sg = &sndgs[0x27];
+    SndFxBus *sg = (SndFxBus *)&sndgs[0x27];
 
     if (mode != 0) {
         if      (mode == 5)    mode = 1;
@@ -121,19 +120,19 @@ unsigned int iSNDpsxfxinit(int mode)
      * further down -- same early-hoist lever as `sg` above. */
     pd = sndpd;
     { unsigned char *tb = sndpe; src = tb + mode * 0x42; }
-    *(unsigned short *)(pd + 0x51E) = (short)((int)(0x10000 - (unsigned int)*(unsigned short *)src) >> 3);
+    ((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode = (short)((int)(0x10000 - (unsigned int)*(unsigned short *)src) >> 3);
     iSNDpsxeffectoff(0xffffff);
     iSNDpsxeffectvol(0, 0);
     blockmove((int *)src, (int *)rv, 0x42);
 
     if ((unsigned int)(mode - 7U) < 2) {                  /* presets 7/8: scale taps by reverb depth */
-        rv[0xb] = (short)((sg[2] * 0x2000) / 0x7f) - rv[1];
-        rv[0xc] = (short)((sg[2] * 0x1000) / 0x7f) - rv[2];
-        rv[0xd] = rv[0xe] + (short)((sg[2] * 0x1000) / 0x7f);
-        rv[0x11] = rv[0x12] + (short)((sg[2] * 0x1000) / 0x7f);
-        rv[0x1b] = rv[0x1d] + (short)((sg[2] * 0x1000) / 0x7f);
-        rv[0x1c] = rv[0x1e] + (short)((sg[2] * 0x1000) / 0x7f);
-        rv[8] = (short)((sg[3] * 0x8100) / 0x7f);
+        rv[0xb] = (short)((sg->depth * 0x2000) / 0x7f) - rv[1];
+        rv[0xc] = (short)((sg->depth * 0x1000) / 0x7f) - rv[2];
+        rv[0xd] = rv[0xe] + (short)((sg->depth * 0x1000) / 0x7f);
+        rv[0x11] = rv[0x12] + (short)((sg->depth * 0x1000) / 0x7f);
+        rv[0x1b] = rv[0x1d] + (short)((sg->depth * 0x1000) / 0x7f);
+        rv[0x1c] = rv[0x1e] + (short)((sg->depth * 0x1000) / 0x7f);
+        rv[8] = (short)((sg->delay * 0x8100) / 0x7f);
     }
 
     /* MATCH (w32, 49->6): four shape facts, all read off the oracle's loop at .L8010049C.
@@ -145,24 +144,23 @@ unsigned int iSNDpsxfxinit(int mode)
      *  3. The rv source is a WALKING short pointer read at +2 (`lhu $a0,0x2($a1)`; `$a1 += 2`),
      *     while the SPU destination is indexed by the counter -- mixed walk/index, exactly as
      *     retail wrote it; indexing both sides costs 3 extra insns.
-     *  4. The per-iteration control-register reload goes through a volatile int* base indexed by
-     *     a constant word (`lw $v1,0x514($a3)`); the plain DAT_80147e2c macro folds &sndpd+0x514
-     *     into one absolute %lo load and hoists it out as a lui. */
+     *  4. The per-iteration control-register reload uses the typed control_base field through a
+     *     volatile int view (`lw $v1,0x514($a3)`); the state displacement remains +0x514 on each iteration. */
     n = 0;
-    *(unsigned short *)(DAT_80147e2c + 0x1aa) = *(unsigned short *)(DAT_80147e2c + 0x1aa) & 0xff7f;  /* reverb off while loading */
+    *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) & 0xff7f;  /* reverb off while loading */
     {
         volatile int *ctl = (volatile int *)pd;
         short *rp = rv;
         for (; n < 0x20; n++) {                           /* 0x20 reverb coefficient regs */
             short v = rp[1];
             rp++;
-            *(unsigned short *)(n * 2 + ctl[0x514/4] + 0x1c0) = (unsigned short)v;
+            *(unsigned short *)(n * 2 + *(volatile int *)&((struct SndSpuRegisterBasesStateView *)ctl)->registers.control_base + 0x1c0) = (unsigned short)v;
         }
     }
     work = 0x10000 - (unsigned short)rv[0];
     /* volatile: the oracle does NOT fill the following jal's delay slot with this store (it emits
      * `sh; jal; nop`), which is reorg refusing to move a volatile MEM -- §3.25-3c inverted. */
-    *(volatile short *)(DAT_80147e2c + 0x1a2) = (short)work;        /* reverb work-area start address */
+    *(volatile short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1a2) = (short)work;        /* reverb work-area start address */
 
     blockclear((int)scratch, 0x100);                      /* zero the 256-byte DMA scratch */
     /* 🔴 CORRECTNESS FIX (w32, oracle-proven): the clear loop starts at the reverb WORK-AREA base,
@@ -205,8 +203,8 @@ unsigned int iSNDpsxfxinit(int mode)
      * LESSON for the catalog: "expand-order identity" was a WEAK floor (single mechanism asserted,
      * levers never combined).  Compiler-snapshot invariance across psq43/44/45 proves only that the
      * COMPILER is not the variable -- it says nothing about whether the SOURCE shape is reachable. */
-    ctl = *(unsigned short *)(DAT_80147e2c + 0x1aa) | 0x80;   /* reverb enable */
-    *(short *)(DAT_80147e2c + 0x1aa) = (short)ctl;
+    ctl = *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) | 0x80;   /* reverb enable */
+    *(short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = (short)ctl;
     return ctl;
 }
 
@@ -219,7 +217,7 @@ int iSNDplatformfxinit(int reserved, int mode, int depthL, int depthR)
     (void)depthL;
     (void)depthR;
     DAT_8014791c = mode;
-    if ((signed char)sndgs[0xf] != 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized != 0)
         iSNDpsxfxinit(mode);
     return 0;
 }

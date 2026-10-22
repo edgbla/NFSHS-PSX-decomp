@@ -50,6 +50,8 @@
  *     +0x0C age   +0x10 alloc timestamp   +0x3C link-back   +0x3D..  voice fields
  */
 #include "salloc.h"
+#include "sndchpriv.h"
+#include "sndserverpriv.h"
 #include "sstop.h"
 #include "sover.h"
 
@@ -70,7 +72,6 @@ extern int  DAT_801478f4;
  * "ARRAY DECAY != &scalar".) */
 extern int  DAT_801478f4_v[] __asm__("DAT_801478f4");                                      /* channel-pool pointer (sndgs + 0x94) */
 
-#define SNDNUMCHAN (((unsigned char *)sndgs)[0x11])  /* sndgs[4]._1_1_ : channels in the pool */
 
 /* iSNDischanreserved @0x800FE724 : is channel `chan` already in the chosen list (first `count` entries)? */
 int iSNDischanreserved(int chan, int count)
@@ -263,21 +264,21 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                  * `beqz` slot (retail's exact slot) instead of `bestval = best`, which stays at the
                  * loop head where retail has it. */
                 c = 0;
-                if (gs[0x11] != 0) {
+                if (((struct SndGlobalServerStateView *)gs)->channel_count != 0) {
                     off = c;
                     do {
                         one = 1;
                         if ((priority & (one << c)) != 0) {
-                            ch = *(int *)(gs + 0x94) + off;
-                            if (*(signed char *)(ch + 0xb) == 0 &&
+                            ch = ((struct SndGlobalServerStateView *)gs)->play_records + off;
+                            if (((SndChannel *)(unsigned int)ch)->state == 0 &&
                                 iSNDischanreserved(c, reserved) == 0) {
-                                v = *(unsigned int *)(ch + 0x10);
+                                v = ((SndChannel *)(unsigned int)ch)->allocation_tick;
                                 if (v < bestval) { bestval = v; best = c; }
                             }
                         }
                         one = 0;
-                        limit = gs[0x11];
-                        c++; off += 100;
+                        limit = ((struct SndGlobalServerStateView *)gs)->channel_count;
+                        c++; off += (int)sizeof(SndChannel);
                     } while ((int)c < limit);
                 }
                 if (-1 < (int)best) {
@@ -296,30 +297,30 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                 best = 0xffffffff;
                 bestv = best;
                 c = 0;                 /* MATCH (w47-a3): same delay-slot lever as pass 1 */
-                if (gs[0x11] != 0) {
+                if (((struct SndGlobalServerStateView *)gs)->channel_count != 0) {
                     off = c;
                     do {
                         if ((priority & (1 << c)) != 0 &&
                             iSNDischanreserved(c, reserved) == 0) {
-                            ch = *(int *)(gs + 0x94) + off;
-                            if (*(unsigned char *)(ch + 0xc) < 0x65) {
+                            ch = ((struct SndGlobalServerStateView *)gs)->play_records + off;
+                            if (((SndChannel *)(unsigned int)ch)->age < 0x65) {
                                 /* MATCH: `age` is an int -- the oracle re-loads the byte with a
                                  * bare `lbu` and compares with no `andi ..,255` re-mask; a u_char
                                  * local re-masks on every use (methodology 3.12 #9). */
-                                int age = *(unsigned char *)(ch + 0xc);
+                                int age = ((SndChannel *)(unsigned int)ch)->age;
                                 if (age < bestage) {
-                                    bestv = *(unsigned int *)(ch + 0x10);
+                                    bestv = ((SndChannel *)(unsigned int)ch)->allocation_tick;
                                     bestage = age;
                                     best = c;
                                 } else if (age == bestage &&
-                                           *(unsigned int *)(ch + 0x10) < bestv) {
-                                    bestv = *(unsigned int *)(ch + 0x10);
+                                           ((SndChannel *)(unsigned int)ch)->allocation_tick < bestv) {
+                                    bestv = ((SndChannel *)(unsigned int)ch)->allocation_tick;
                                     best = c;
                                 }
                             }
                         }
-                        limit = gs[0x11];
-                        c++; off += 100;
+                        limit = ((struct SndGlobalServerStateView *)gs)->channel_count;
+                        c++; off += (int)sizeof(SndChannel);
                     } while ((int)c < limit);
                 }
                 if (-1 < (int)best) {
@@ -338,35 +339,35 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
         if (0 < reserved) {
             do {
                 unsigned int owner;
-                ch = sndgs[0x25] + (signed char)sndchanreserved[i] * 100;
-                owner = *(unsigned int *)ch;
-                if (*(signed char *)(ch + 0xb) == 1) {      /* currently held -> stop it */
+                ch = ((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[i] * (int)sizeof(SndChannel);
+                owner = ((SndChannel *)(unsigned int)ch)->owner_tag;
+                if (((SndChannel *)(unsigned int)ch)->state == 1) {      /* currently held -> stop it */
                     if ((int)owner < 0)
-                        owner = *(unsigned int *)((signed char)((int *)ch)[0xf] * 100 + sndgs[0x25]);
+                        owner = ((SndChannel *)(unsigned int)(((SndChannel *)(unsigned int)ch)->linked_primary * (int)sizeof(SndChannel) + ((struct SndGlobalServerStateView *)sndgs)->play_records))->owner_tag;
                     SNDstop(owner);
                     if (SNDover(owner) != 1) {              /* refused -> roll back */
                         while (i = i - 1, -1 < i) {
-                            ch = sndgs[0x25] + (signed char)sndchanreserved[i] * 100;
-                            *(char *)(ch + 0xb) = 0;
+                            ch = ((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[i] * (int)sizeof(SndChannel);
+                            ((SndChannel *)(unsigned int)ch)->state = 0;
                         }
                         result = -9;
                         goto done;
                     }
                 }
-                *(char *)(ch + 0xb) = 1;
-                *(int *)(ch + 0x10) = sndgs[0x11];          /* timestamp */
-                *(char *)(ch + 0xc) = (char)a2;             /* voice flag byte */
+                ((SndChannel *)(unsigned int)ch)->state = 1;
+                ((SndChannel *)(unsigned int)ch)->allocation_tick = ((struct SndGlobalServerStateView *)sndgs)->tick_count;          /* timestamp */
+                ((SndChannel *)(unsigned int)ch)->age = (char)a2;             /* voice flag byte */
                 i++;
             } while (i < reserved);
         }
         /* link the secondary channels to the primary */
-        *(unsigned int *)(sndgs[0x25] + (signed char)sndchanreserved[0] * 100) = *out;
+        ((SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[0] * (int)sizeof(SndChannel)))->owner_tag = *out;
         for (i = 1; i < reserved; i++) {
-            *(unsigned char *)(i + ((signed char)sndchanreserved[0] * 100 + sndgs[0x25]) + 3) =
+            ((SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[0] * (int)sizeof(SndChannel)))->linked_tag_view.linked_channels[i - 1] =
                 sndchanreserved[i];
-            *(unsigned int *)((signed char)sndchanreserved[i] * 100 + sndgs[0x25]) = 0xffffffff;
-            *(unsigned char *)((signed char)sndchanreserved[i] * 100 + sndgs[0x25] + 0x3c) =
-                sndchanreserved[0];
+            ((SndChannel *)(unsigned int)((signed char)sndchanreserved[i] * (int)sizeof(SndChannel) + ((struct SndGlobalServerStateView *)sndgs)->play_records))->owner_tag = 0xffffffff;
+            ((SndChannel *)(unsigned int)((signed char)sndchanreserved[i] * (int)sizeof(SndChannel) + ((struct SndGlobalServerStateView *)sndgs)->play_records))->linked_primary =
+                (signed char)sndchanreserved[0];
         }
     }
 done:
@@ -514,17 +515,20 @@ done:
    shift by two. This is retail's exact 110-instruction order and introduces no extra code. */
 void iSNDfreechan(int chan)
 {
+    /* `state`, owner/group keys, and scan predicates use SndChannel members. Keep the +0x10
+     * timestamp stores as raw word views: expressing all of them as `allocation_tick` changed
+     * the liveness/register schedule by 6 diffs (108 vs oracle 110 instructions); this raw spelling is exact. */
     unsigned int group;
     int count = 0;
     unsigned char *base = (unsigned char *)sndgs;
-    int pool = *(int *)(base + 0x94);
+    int pool = ((struct SndGlobalServerStateView *)base)->play_records;
     int partner = -1;
     /* MATCH: ONE slot variable, exactly as IDA reads retail's $a1 -- it holds the
      * initial channel slot, then the scan index, then the recomputed slot.  Split
      * into three C locals gcc gives them three pseudos and the whole caller-saved
      * assignment rotates (base/initialSlot and count/group swap places). */
-    int slot = pool + chan * 100;
-    group = *(unsigned char *)(slot + 0x37);
+    int slot = pool + chan * (int)sizeof(SndChannel);
+    group = ((SndChannel *)(unsigned int)slot)->group_id;
 
     if (group != 0) {
         int limit;
@@ -533,13 +537,13 @@ void iSNDfreechan(int chan)
         int poolv;
         int chan25;
 
-        if (count < (int)base[0x11]) {
+        if (count < (int)((struct SndGlobalServerStateView *)base)->channel_count) {
             slot = count;
             /* MATCH (cse.c double evaluation): retail's `addu $t2,$v1,$zero` is a COPY of
-             * the guard's own load -- the guard holds the FIRST evaluation of base[0x11]
+             * the guard's own load -- the guard holds the FIRST evaluation of ((struct SndGlobalServerStateView *)base)->channel_count
              * and the loop bound is a SECOND textual evaluation.  One hoisted `limit`
              * folds them together and loses the copy. */
-            limit = base[0x11];
+            limit = ((struct SndGlobalServerStateView *)base)->channel_count;
             scan = (unsigned char *)pool;
             do {
                 /* MATCH (w50-a7): OPACITY FENCE REPLACES THE volatile SCAN READS.  The four reads
@@ -562,39 +566,39 @@ void iSNDfreechan(int chan)
                  * folds the whole identity away at ZERO instructions (110/110, 4/4 PASS).
                  * Do NOT "simplify" it; removing it costs 81 diffs.  Receipt: scratchpad/w86/. */
                 scan = (unsigned char *)((unsigned int)scan | ((unsigned int)scan & 3u));
-                if (*(unsigned char *)(scan + 0x37) == group &&
-                    0 <= *(int *)scan &&
-                    *(signed char *)(scan + 0xb) != 0 &&
-                    (count++, *(unsigned char *)(scan + 0x36) != 0))
+                if (((SndChannel *)scan)->group_id == group &&
+                    0 <= (int)((SndChannel *)scan)->owner_tag &&
+                    ((SndChannel *)scan)->state != 0 &&
+                    (count++, ((SndChannel *)scan)->playback_fx.playback.group_flag != 0))
                     partner = slot;
                 slot++;
-                scan += 100;
+                scan += (int)sizeof(SndChannel);
             } while (slot < limit);
         }
 
         gs = (unsigned char *)sndgs;
         /* Retail schedules this *25 prefix before the independent pool load, then finishes *4. */
         chan25 = chan * 25;
-        poolv = *(int *)(gs + 0x94);
+        poolv = ((struct SndGlobalServerStateView *)gs)->play_records;
         slot = poolv + chan25 * 4;
 
         if (count == 1) {
-            *(unsigned char *)(slot + 0xb) = 0;
-            *(int *)(slot + 0x10) = *(int *)(gs + 0x44);
+            ((SndChannel *)(unsigned int)slot)->state = 0;
+            *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)gs)->tick_count;
             return;
         }
 
         {
-            int partnerOffset = partner * 100;
+            int partnerOffset = partner * (int)sizeof(SndChannel);
 
             /* MATCH: the scaled partner offset is the FIRST addu operand -- the oracle
              * emits `addu $v0,$a3,$v1` / `addu $a3,$v0,$v1`. */
-            if (*(signed char *)(partnerOffset + poolv + 0xb) == 2 &&
+            if (((SndChannel *)(unsigned int)(partnerOffset + poolv))->state == 2 &&
                 chan != partner && count == 2) {
-                *(unsigned char *)(slot + 0xb) = 0;
-                *(int *)(slot + 0x10) = *(int *)(gs + 0x44);
-                *(unsigned char *)(partnerOffset + *(int *)(gs + 0x94) + 0xb) = 0;
-                *(int *)(partnerOffset + *(int *)(gs + 0x94) + 0x10) = *(int *)(gs + 0x44);
+                ((SndChannel *)(unsigned int)slot)->state = 0;
+                *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)gs)->tick_count;
+                ((SndChannel *)(unsigned int)(partnerOffset + ((struct SndGlobalServerStateView *)gs)->play_records))->state = 0;
+                *(int *)(partnerOffset + ((struct SndGlobalServerStateView *)gs)->play_records + 0x10) = ((struct SndGlobalServerStateView *)gs)->tick_count;
                 return;
             }
 
@@ -613,44 +617,44 @@ void iSNDfreechan(int chan)
                 int *dp = DAT_801478f4_v;
                 int partnerSlot;
                 unsigned char *gv;
-                partnerSlot = partner * 100 + *dp;
-                if (*(signed char *)(partnerSlot + 0xb) == 1) {
+                partnerSlot = partner * (int)sizeof(SndChannel) + *dp;
+                if (((SndChannel *)(unsigned int)partnerSlot)->state == 1) {
                     gv = sndgs_v;
                     if (chan == partner) {
-                        *(unsigned char *)(partnerSlot + 0xb) = 2;
+                        ((SndChannel *)(unsigned int)partnerSlot)->state = 2;
                         return;
                     }
                 } else
                     gv = sndgs_v;
-                *(unsigned char *)(slot + 0xb) = 0;
-                *(int *)(slot + 0x10) = *(int *)(gv + 0x44);
+                ((SndChannel *)(unsigned int)slot)->state = 0;
+                *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)gv)->tick_count;
             }
             return;
         }
     }
 
-    *(unsigned char *)(slot + 0xb) = 0;
-    *(int *)(slot + 0x10) = *(int *)(base + 0x44);
+    ((SndChannel *)(unsigned int)slot)->state = 0;
+    *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)base)->tick_count;
 }
 
 /* iSNDgetchan @0x800FEDC4 : resolve a sound tag back to its channel index, validating that the channel is
  *   still held by that exact tag.  Returns the channel, or a negative error. */
 int iSNDgetchan(unsigned int tag)
 {
-    unsigned char *base;
+    struct SndGlobalServerStateView *base;
     int ch;   /* signed -- oracle compares via slt (both operands non-negative so behavior is unchanged) */
     if ((int)tag < 0)
         goto invalid;
-    base = (unsigned char *)sndgs;   /* materialize bare &sndgs first (no offset folded into %lo) */
+    base = (struct SndGlobalServerStateView *)sndgs;   /* materialize bare &sndgs first (no offset folded into %lo) */
     ch = tag & 0x1f;
-    if (ch < base[0x11])
+    if (ch < base->channel_count)
         goto valid_range;
 invalid:
     return -8;
 valid_range:
     {
-        int *slot = (int *)(*(int *)(base + 0x94) + ch * 100);
-        if (*(signed char *)((int)slot + 0xb) == 0 || *(unsigned int *)slot != tag)
+        int *slot = (int *)(base->play_records + ch * (int)sizeof(SndChannel));
+        if (((SndChannel *)slot)->state == 0 || ((SndChannel *)slot)->owner_tag != tag)
             ch = 0xfffffff8;
         return ch;
     }

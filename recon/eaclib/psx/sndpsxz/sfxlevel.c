@@ -10,6 +10,8 @@
  */
 #include "salloc.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndchpriv.h"
 #include "sdfx.h"
 #include "sfxlevel.h"
 #include "sdriver.h"
@@ -18,7 +20,9 @@
 #include "spatkey.h"
 #include "sserver.h"
 
-struct SNDfxBusView {
+/* Codegen-preserving global-state displacement view. The actual records are SndFxBus (0x10 bytes,
+ * at sndgs+0x9C); from the state base plus bus*0x10, the master is at displacement +0xA0. */
+struct SndFxBusMasterDisplacementView {
     unsigned char pad[0xa0];
     int master;
 };
@@ -34,20 +38,20 @@ int SNDfxlevel(int tag, int bus, int level)
 {
     int chanIdx;
     int cur[2];
-    if ((signed char)sndgs[0xf] == 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
     chanIdx = iSNDgetchan((unsigned int)tag);
     if (-1 < chanIdx) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
-            int slot   = sndgs[0x25] + cur[0] * 100 + bus;
-            int scaled = level * (int)(signed char)*(char *)(slot + 0x34);
+            int slot   = ((struct SndGlobalServerStateView *)sndgs)->play_records + cur[0] * (int)sizeof(SndChannel) + bus;
+            int scaled = level * ((SndChannelFxLevelStepView *)(unsigned int)(slot + 0x34))->previous_level;
             int fxArg;
-            *(char *)(slot + 0x35) = (char)level;
-            /* The padded bus view makes GCC fold the master offset into lw 0xa0(s4),
-             * matching the original code without an extra address addiu. */
-            fxArg = (scaled * ((struct SNDfxBusView *)((unsigned char *)sndgs + bus * 0x10))->master) / 16129; /* /(127*127): normalises BOTH the send byte
+            ((SndChannelFxLevelStepView *)(unsigned int)(slot + 0x34))->next_level = (signed char)level;
+            /* The displacement view keeps GCC's exact retail lw 0xA0(s4) form; direct SndFxBus
+             * indexing adds an address instruction and changes this function's exact match. */
+            fxArg = (scaled * ((struct SndFxBusMasterDisplacementView *)((unsigned char *)sndgs + bus * 0x10))->master) / 16129; /* /(127*127): normalises BOTH the send byte
                                                                  * and the bus-master 0..127 fractions (oracle
                                                                  * magic 0x82061029 sra 13 == signed /16129) */
             iSNDplatformfxlevel(cur[0], bus, fxArg);

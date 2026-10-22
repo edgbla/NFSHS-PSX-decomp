@@ -29,7 +29,7 @@
 /* eaclib/psx/sndpsxz/sdmemman.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.  *** 1/3 PASS ***
  *   Source obj : nfs4\eaclib\psx\sdmemman.obj ; archive C:\nfs4\EACLIB\PSX\SNDPSXZ.LIB (xlsx col11)
  *   3 fns @[0x8010A550 .. 0x8010A7C8].  SPU local-RAM block allocator -- a sorted free-list of up to 128
- *   {block,size} entries (DAT_80147e38, 4-byte stride) carving the SPU's 512 KB sample area into 64-byte
+ *   `SndSpuFreeBlock` entries at sndpd+0x520 (4-byte stride, in `SndSpuMemoryStateView`) carving the SPU's 512 KB sample area into 64-byte
  *   blocks.  Ghidra nfs4-f.exe.c (sdmemman) + disasm-v3 L<8010A700+> for the unaligned shift loop.
  *
  *   🔴 The shift loop's `entry[dst]=entry[src]` is a lwl/lwr+swl/swr UNALIGNED 4-byte copy (the table sits
@@ -170,10 +170,10 @@
 
 /* MATCH: engine_ver/block_total/reverb_mode/alloc_count are NOT separate linked globals -- the oracle
  * (iSNDpsxmemconstrain, byte-exact) materializes ONE `sndpd` base (lui/addiu) and reads them all as
- * fixed displacements off it (0x518/0x51A/0x51C/0x51E). Modeled as sndpd+offset macros, same lever as
- * sdma.c. The alloc table lives right after reverb_mode @ sndpd+0x520 (4-byte {block:u16,size:u16}
- * stride); iSNDpsxmalloc's oracle addresses it via its OWN independently-relocated symbol at the
- * array-indexed sites, but that symbol's VA == sndpd+0x520 -- same storage, different materialization.
+ * fixed displacements off it (0x518/0x51A/0x51C/0x51E). `sndmempriv.h` models these fields and the
+ * following 128 `SndSpuFreeBlock` entries at sndpd+0x520 (4-byte stride). iSNDpsxmalloc's oracle still
+ * addresses indexed entries via its independently-relocated symbol; its VA is sndpd+0x520, so this is
+ * the same storage with a different materialization.
  *
  * SPLIT-STORAGE FIX (wave-22 a1): this file previously `extern`-declared snd_spu_block_total/
  * snd_spu_reverb_mode/snd_spu_alloc_count/DAT_80147e38 as their OWN standalone globals, owned by
@@ -181,25 +181,12 @@
  * extern_audit_report.txt: DAT_80147e38 as `unsigned short` here vs `int` there, no owner def either
  * place). That is a genuine aliasing/link bug: sdmemlu.c has been converted to the sndpd-relative
  * model (see its banner) and no longer provides that storage, so these externs would now be
- * UNDEFINED REFERENCES. Converted to the same SNDPD_* macro-view convention used by
- * iSNDpsxmemconstrain above, so this file's own reads/writes of the free-list genuinely alias with
- * slib.c's iSNDinit (writer) and sdmemlu.c's SNDmemlargestunused (reader) -- all three now compute
- * addresses off the same `sndpd` base instead of three disconnected storage locations. */
+ * UNDEFINED REFERENCES. This file now uses the shared `SndSpuMemoryState`/`SndSpuFreeBlock` views,
+ * so reads and writes alias with slib.c's `iSNDinit`, sdfx.c's reverb writer, and sdmemlu.c's scanner. */
 #include "sdmemman.h"
 #include "slib.h"
 #include "snd_state.h"
-
-#define SNDPD_ENGINEVER   (*(unsigned short *)(sndpd + 0x51A))  /* min SPU block (reserved low area) */
-#define SNDPD_BLOCKTOTAL  (*(unsigned short *)(sndpd + 0x51C))  /* top of the SPU sample area */
-#define SNDPD_REVERBMODE  (*(unsigned short *)(sndpd + 0x51E))  /* reverb-work-area boundary */
-#define SNDPD_ALLOCCOUNT  (*(unsigned short *)(sndpd + 0x518))  /* # of live SPU allocations */
-/* legacy names kept as macro aliases so the function bodies below need no rewrite beyond dropping
- * their `extern` decls -- lvalue macro-view recipe: NAME, &NAME, and (&NAME)[i] all keep working. */
-#define snd_spu_block_total  SNDPD_BLOCKTOTAL
-#define snd_spu_reverb_mode  SNDPD_REVERBMODE
-#define snd_spu_alloc_count  SNDPD_ALLOCCOUNT
-#define DAT_80147e38          (*(int *)(sndpd + 0x520))          /* {block:u16, size:u16}[] alloc table */
-
+#include "sndmempriv.h"
 
 /* iSNDpsxmemconstrain @0x8010A550 : clamp a candidate [block, avail] window to the SPU sample area limits
  *   (floor at engine_ver, ceil at block_total, and at reverb_mode).  Returns the reverb-bounded
@@ -329,7 +316,7 @@ void iSNDpsxmemconstrain(unsigned int *size, int *avail)
     unsigned char *pd = sndpd;
     unsigned int lo;
     unsigned int s, diff;
-    lo = *(unsigned short *)(pd + 0x51a);
+    lo = ((struct SndSpuMemoryStateView *)pd)->memory.engine_ver;
     /* MATCH: enter the branch-local-diff basin, then keep `lo` as the equivalent
      * `s + diff`.  That dependency puts the subtraction at the block head.  The
      * zero-trip wrapper is a zero-insn ref-step dial: s refs 7->8, which restores
@@ -344,10 +331,10 @@ void iSNDpsxmemconstrain(unsigned int *size, int *avail)
         *avail = *avail - diff;
         s = *size;
     }
-    if ((int)(unsigned int)*(unsigned short *)(pd + 0x51c) < (int)(s + *avail))
-        *avail = (int)*(unsigned short *)(pd + 0x51c) - s;
-    if ((int)(unsigned int)*(unsigned short *)(pd + 0x51e) < (int)(*size + *avail))
-        *avail = (int)*(unsigned short *)(pd + 0x51e) - (int)*size;
+    if ((int)(unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.block_total < (int)(s + *avail))
+        *avail = (int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.block_total - s;
+    if ((int)(unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode < (int)(*size + *avail))
+        *avail = (int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode - (int)*size;
 }
 
 /* iSNDpsxmalloc @0x8010A5CC : allocate `size` bytes (rounded to 64-byte blocks) of SPU local RAM, first-fit
@@ -707,7 +694,7 @@ int iSNDpsxmalloc(int size)
      * availableBlocks is the constrained gap at that candidate position. */
     unsigned int candidateBlock;
     int          availableBlocks;
-    unsigned short count = *(unsigned short *)(base + 0x518);
+    unsigned short count = ((struct SndSpuMemoryStateView *)base)->memory.alloc_count;
     unsigned char *entry;   /* ONE entry pointer for the scan loop AND the commit ($a1 in both) */
 
     if (count >= 0x80)
@@ -715,9 +702,9 @@ int iSNDpsxmalloc(int size)
     size += 0x3f;
     size >>= 6;
     if (count == 0) {
-        candidateBlock = (unsigned int)*(unsigned short *)(base + 0x51A);
-        availableBlocks = (int)*(unsigned short *)(base + 0x51C) -
-                      (int)*(unsigned short *)(base + 0x51A);
+        candidateBlock = (unsigned int)((struct SndSpuMemoryStateView *)base)->memory.engine_ver;
+        availableBlocks = (int)((struct SndSpuMemoryStateView *)base)->memory.boundary.view.limits.block_total -
+                      (int)((struct SndSpuMemoryStateView *)base)->memory.engine_ver;
         iSNDpsxmemconstrain(&candidateBlock, &availableBlocks);
         if (size <= availableBlocks)
             goto commit;
@@ -727,9 +714,9 @@ nonempty:
     {
         unsigned char *table;
         unsigned char *previous;
-        table = base + 0x520;
+        table = (unsigned char *)((struct SndSpuMemoryStateView *)base)->entries;
         if (idx >= (int)(unsigned int)
-                       *(unsigned short *)(base + 0x518))
+                       ((struct SndSpuMemoryStateView *)base)->memory.alloc_count)
             goto scan_done;
         pd = base;
         previous = pd + 0x51c;
@@ -740,22 +727,23 @@ scan:
                                       (unsigned int)table);
             if (idx == 0) {
                 unsigned int block =
-                    (unsigned int)*(unsigned short *)(pd + 0x51A);
-                int avail = *(unsigned short *)entry - (int)block;
+                    (unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.engine_ver;
+                int avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
                 candidateBlock = block;
                 availableBlocks = avail;
             } else {
                 unsigned int block;
                 int avail;
                 prev = (unsigned short *)(scan_off + (int)previous);
-                block = (unsigned int)prev[0] + (unsigned int)prev[1];
-                avail = *(unsigned short *)entry - (int)block;
+                block = (unsigned int)((struct SndSpuFreeBlock *)prev)->block +
+                        (unsigned int)((struct SndSpuFreeBlock *)prev)->size;
+                avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
                 candidateBlock = block;
                 availableBlocks = avail;
             }
             iSNDpsxmemconstrain(&candidateBlock, &availableBlocks);
             if (size <= availableBlocks) {
-                blk = (unsigned int)*(unsigned short *)(pd + 0x518);
+                blk = (unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.alloc_count;
                 if (idx < (int)blk) {
                     do {                                   /* shift entries up to open slot `idx` */
                         struct PackedAllocSlot {
@@ -779,7 +767,7 @@ scan:
             }
         }
         idx++;
-        if (idx < (int)(unsigned int)*(unsigned short *)(pd + 0x518))
+        if (idx < (int)(unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.alloc_count)
             goto scan;
 scan_done:
         {
@@ -803,9 +791,10 @@ scan_done:
             } while (0);
             prev = (unsigned short *)((unsigned int)adjusted_off +
                                       (unsigned int)pv);
-            candidateBlock = (unsigned int)prev[0] + (unsigned int)prev[1];
+            candidateBlock = (unsigned int)((struct SndSpuFreeBlock *)prev)->block +
+                             (unsigned int)((struct SndSpuFreeBlock *)prev)->size;
             availableBlocks =
-                (int)pv[0] - (int)candidateBlock - off + off -
+                (int)((struct SndSpuFreeBlock *)pv)->block - (int)candidateBlock - off + off -
                 off + off - off + off;
         }
     }
@@ -816,7 +805,7 @@ scan_done:
 commit:
     {
         unsigned int entry_off = idx * 4;
-        unsigned char *table = sndpd + 0x520;
+        unsigned char *table = (unsigned char *)((struct SndSpuMemoryStateView *)sndpd)->entries;
         unsigned short commit_block;
         unsigned char *commit_base;
         /* MATCH (EAC 2026-10-04, replaces the w71-a15 identity launder + depth-3 read
@@ -847,8 +836,8 @@ commit:
              * Naming the result BEFORE the RMW puts the load on retail's side of the store and the
              * `sll` becomes the count-load's delay filler. */
             int result = (int)(candidateBlock << 6);
-            *(unsigned short *)(commit_base + 0x518) =
-                *(unsigned short *)(commit_base + 0x518) + 1;
+            ((struct SndSpuMemoryStateView *)commit_base)->memory.alloc_count =
+                ((struct SndSpuMemoryStateView *)commit_base)->memory.alloc_count + 1;
             return result;
         }
     }
@@ -871,14 +860,14 @@ int iSNDpsxfree(int ptr)
     int idx = 0;
     unsigned char *pd = sndpd;
     ptr >>= 6;
-    if (*(unsigned short *)(pd + 0x518) != 0) {
-        unsigned char *table = pd + 0x520;
+    if (((struct SndSpuMemoryStateView *)pd)->memory.alloc_count != 0) {
+        unsigned char *table = (unsigned char *)((struct SndSpuMemoryStateView *)pd)->entries;
         unsigned char *base = pd;
         do {
-            if ((unsigned int)*(unsigned short *)(table + idx * 4) == (unsigned int)ptr) {
+            if ((unsigned int)((struct SndSpuFreeBlock *)(table + idx * 4))->block == (unsigned int)ptr) {
                 unsigned short remaining =
-                    *(unsigned short *)(base + 0x518) - 1;
-                *(unsigned short *)(base + 0x518) = remaining;
+                    ((struct SndSpuMemoryStateView *)base)->memory.alloc_count - 1;
+                ((struct SndSpuMemoryStateView *)base)->memory.alloc_count = remaining;
                 if (idx < (int)(unsigned int)remaining) {
                   do {
                     struct PackedAllocSlot {
@@ -894,12 +883,12 @@ int iSNDpsxfree(int ptr)
                                                    (base + next * 4))->word,
                                      4);
                     idx = next;
-                  } while (idx < (int)(unsigned int)*(unsigned short *)(base + 0x518));
+                  } while (idx < (int)(unsigned int)((struct SndSpuMemoryStateView *)base)->memory.alloc_count);
                 }
                 return 0;
             }
             idx++;
-        } while (idx < (int)(unsigned int)*(unsigned short *)(base + 0x518));
+        } while (idx < (int)(unsigned int)((struct SndSpuMemoryStateView *)base)->memory.alloc_count);
     }
     return -8;
 }

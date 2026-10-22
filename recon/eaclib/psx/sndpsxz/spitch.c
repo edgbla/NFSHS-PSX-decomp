@@ -6,6 +6,8 @@
 #include "salloc.h"
 #include "sclcptch.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndchpriv.h"
 #include "sdriver.h"
 #include "spatkey.h"
 #include "spitch.h"
@@ -16,7 +18,7 @@ int SNDpitchmult(unsigned int tag, unsigned int mult)
 {
     int chanIdx;
     int cur[2];
-    if ((signed char)sndgs[0xf] == 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
     chanIdx = iSNDgetchan(tag);
@@ -26,12 +28,12 @@ int SNDpitchmult(unsigned int tag, unsigned int mult)
             /* MATCH: keeping this value live only through iSNDcalcpitch selects a0 for the
              * multiply and lets the pitch-multiplier store fill that call's delay slot. */
             int note = cur[0];
-            int v = sndgs[0x25] + note * 100;
-            if (*(unsigned short *)(v + 0x60) == mult)
+            SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[note];
+            if (v->base_pitch == mult)
                 break;
-            *(short *)(v + 0x60) = (short)mult;
+            v->base_pitch = (short)mult;
             iSNDcalcpitch(note);
-            iSNDplatformpitch(cur[0], (int)(unsigned)*(unsigned short *)(v + 0x62));
+            iSNDplatformpitch(cur[0], (int)(unsigned)v->spu_pitch);
         }
     }
     iSNDleaveaudio();

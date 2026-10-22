@@ -8,6 +8,10 @@
  */
 
 #include "sdfx.h"
+#include "sndchpriv.h"
+#include "sndserverpriv.h"
+#include "sndbankpriv.h"
+#include "ssysinit.h"
 #include "slib.h"
 #include "smemman.h"
 #include "sserver.h"
@@ -42,45 +46,9 @@ extern int  sndgs[];
  *                                         rate SNDPKTPLAY_start/stagpat load;
  *                                         inside the DAT_801478f4 sub-run) */
 /* (2026-09-20) the run itself is defined by sdata.obj (sdata.c), its retail link-order owner */
-extern int  DAT_80134a68[];                /* output-caps flag; owned by snddata.c (array view forces
-                                             * the oracle's retained absolute address, not GP-relative) */
 
 extern void *memset(void *dst, int c, int n);        /* C43 (BIOS thunk) */
 
-typedef struct SNDSYSCAP {
-    unsigned short outputratemin;
-    unsigned short outputratemax;
-    unsigned char outputchannelsmin;
-    unsigned char outputchannelsmax;
-    unsigned char inputvoicesmax;
-    unsigned char input3dvoicesmax;
-    unsigned char eax;
-    unsigned char voicemanager;
-    char pad[2];
-} SNDSYSCAP;
-
-typedef struct SNDSYSSET {
-    unsigned short maxbanks;
-    unsigned short outputrate;
-    unsigned char outputchannels;
-    unsigned char inputvoices;
-    unsigned char useeax;
-    unsigned char use3dacceleration;
-    unsigned char use3dmixing;
-    char pad;
-    unsigned short emulationsubtype;
-    unsigned short spkrcfg3d[4][4];
-} SNDSYSSET;
-
-typedef struct SNDSYSVEC {
-    int (*issurfacelocked)(void);
-} SNDSYSVEC;
-
-typedef struct SNDSYSOPTS {
-    SNDSYSCAP cap;
-    SNDSYSSET set;
-    SNDSYSVEC vec;
-} SNDSYSOPTS;
 
 /* SNDSYS_getopts @0x800F1D58 : copy the live option block sndgs[0..0xe] into the caller's struct (lazily
  *   publishing the platform output caps first, defaulting maxbanks to 0x10).
@@ -130,9 +98,9 @@ int SNDSYS_init(int membase, int memsize)
 {
     unsigned int nchan;
     int          rv;
-    unsigned char *base = (unsigned char *)sndgs;
+    struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
 
-    if (*(signed char *)(base + 0x3c) != 0)
+    if (base->initialized != 0)
         return 0;
 
     iSNDmeminit(membase, memsize);
@@ -142,25 +110,25 @@ int SNDSYS_init(int membase, int memsize)
         SNDSYS_setopts((SNDSYSOPTS *)base);
         nchan = (unsigned int)((SNDSYSOPTS *)base)->set.inputvoices;
     }
-    ((int *)base)[0x25] = iSNDmalloc(nchan * 100);                 /* channel pool */
-    memset((unsigned char *)((int *)base)[0x25], 0,
-           (int)((unsigned)((SNDSYSOPTS *)base)->set.inputvoices * 100));
-    ((int *)base)[0x26] = iSNDmalloc(
-        (unsigned int)((SNDSYSOPTS *)base)->set.maxbanks * 0xc); /* bank table */
-    memset((unsigned char *)((int *)base)[0x26], 0,
-           (int)((unsigned)((SNDSYSOPTS *)base)->set.maxbanks * 0xc));
-    if (((int *)base)[0x12] == 0)
-        ((int *)base)[0x12] = (int)iSND100hzserver;
+    base->play_records = iSNDmalloc(nchan * sizeof(SndChannel));   /* channel pool */
+    memset((unsigned char *)(unsigned int)base->play_records, 0,
+           (int)((unsigned)((SNDSYSOPTS *)base)->set.inputvoices * sizeof(SndChannel)));
+    base->bank_table = iSNDmalloc(
+        (unsigned int)((SNDSYSOPTS *)base)->set.maxbanks * (unsigned int)sizeof(struct SndBankTableEntry)); /* bank table */
+    memset((unsigned char *)(unsigned int)base->bank_table, 0,
+           (int)((unsigned)((SNDSYSOPTS *)base)->set.maxbanks * (unsigned)sizeof(struct SndBankTableEntry)));
+    if (base->server_callback == 0)
+        base->server_callback = (int)iSND100hzserver;
     SNDI_mutexalloc();
-    ((int *)base)[0x11] = 0;
-    ((int *)base)[0x2b] = 0;
-    base[0x3d] = 0x7f;                                             /* master vol */
+    base->tick_count = 0;
+    base->real_ticks = 0;
+    base->master_volume = 0x7f;                                             /* master vol */
     rv = iSNDinit();
     if (rv < 0) {
         iSNDrestore();
         return rv;
     }
-    base[0x3c] = 1;                                                /* audio up */
+    base->initialized = 1;                                                /* audio up */
     return 0;
 }
 
@@ -168,17 +136,17 @@ int SNDSYS_init(int membase, int memsize)
  *   voices, restore the SPU, free the mutex + memory.  No-op if not up. */
 int SNDSYS_restore(void)
 {
-    if ((signed char)sndgs[0xf] == 0)                             /* audio not up */
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)                             /* audio not up */
         return -10;
-    if (sndgs[0x23] != 0) (*(void (*)(void))sndgs[0x23])();
-    if (sndgs[0x24] != 0) (*(void (*)(void))sndgs[0x24])();
-    if (sndgs[0x21] != 0) (*(void (*)(void))sndgs[0x21])();
-    if (sndgs[0x22] != 0) (*(void (*)(void))sndgs[0x22])();
-    if (sndgs[0x20] != 0) (*(void (*)(void))sndgs[0x20])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[9] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[9])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7])();
     SNDstopall();
-    if (sndgs[0x1f] != 0) (*(void (*)(unsigned int))sndgs[0x1f])(0xffffffff);
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[6] != 0) (*(void (*)(unsigned int))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[6])(0xffffffff);
     iSNDrestore();
-    ((char *)sndgs)[0x3c] = 0;                                     /* audio down */
+    ((struct SndGlobalServerStateView *)sndgs)->initialized = 0;                                     /* audio down */
     SNDI_mutexfree();
     return iSNDmemrestore();   /* $v0 holds iSNDmemrestore's return on this path (incidental);
                                 * the -10 sentinel lives only in the not-up beqz delay slot */

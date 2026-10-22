@@ -23,6 +23,8 @@
 #include "sbhdrcpy.h"
 #include "sbhdrsze.h"
 #include "snd_globals.h"
+#include "sndbankpriv.h"
+#include "sndbankhdrpriv.h"
 
 extern void *memcpy(void *dst, const void *src, int n);   /* C42 (BIOS thunk) */
 
@@ -153,7 +155,7 @@ initialized:
         size = SNDbankheadersize(id);
         if (size < 0)
             return size;
-    memcpy(dest, *(unsigned char **)(id * 0xc + base->bank_table), size);
+    memcpy(dest, (unsigned char *)((struct SndBankTableEntry *)(id * (int)sizeof(struct SndBankTableEntry) + base->bank_table))->data_block, size);
     {
         int i;
         unsigned char *bankData;
@@ -167,34 +169,34 @@ initialized:
          * define `origin` before `i`.  sched1 then places i=0 in the bankData
          * pointer-load delay slot, and reorg steals origin into the count branch
          * slot, reproducing retail exactly. */
-        bankData = *(unsigned char **)(id * 0xc + base->bank_table);
+        bankData = (unsigned char *)((struct SndBankTableEntry *)(id * (int)sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
         origin = bankData;
         i = 0;
-        if ((unsigned int)i < *(unsigned short *)(bankData + 6)) {
+        if ((unsigned int)i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count) {
             type4 = 4;
             dst12 = dest;
             src12 = bankData;
             dst20 = dest;
             src20 = bankData;
         do {
-            if (*(unsigned char *)(bankData + 4) == type4) {
-                int sp = *(int *)(src20 + 0x14);
+            if (((struct SndBankDataHeaderPrefix *)bankData)->type == type4) {
+                int sp = ((struct SndBankPatchOffset20CursorView *)(unsigned int)src20)->relative_offset;
                 if (sp != 0)
-                    *(int *)(dst20 + 0x14) = (int)dest + (sp - (int)origin);
+                    ((struct SndBankPatchOffset20CursorView *)(unsigned int)dst20)->relative_offset = (int)dest + (sp - (int)origin);
             } else {
-                int sp = *(int *)(src12 + 0xc);
+                int sp = ((struct SndBankPatchOffset12CursorView *)(unsigned int)src12)->relative_offset;
                 if (sp != 0)
-                    *(int *)(dst12 + 0xc) = (int)dest + (sp - (int)bankData);
+                    ((struct SndBankPatchOffset12CursorView *)(unsigned int)dst12)->relative_offset = (int)dest + (sp - (int)bankData);
             }
             dst12 += 4;
             src12 += 4;
             dst20 += 4;
             src20 += 4;
             i++;
-        } while (i < (int)(unsigned)*(unsigned short *)(bankData + 6));
+        } while (i < (int)(unsigned)((struct SndBankDataHeaderPrefix *)bankData)->patch_count);
         }
     }
-        *(int *)(id * 0xc + sndgs.bank_table) = (int)dest;
+        ((struct SndBankTableEntry *)(id * (int)sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = dest;
         return 0;
     }
 }

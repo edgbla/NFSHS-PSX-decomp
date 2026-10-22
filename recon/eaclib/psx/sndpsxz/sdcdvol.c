@@ -13,6 +13,7 @@
 #include "sdcdvol.h"
 #include "slib.h"
 #include "snd_state.h"
+#include "sndspuregpriv.h"
 #include "spvtolrv.h"
 
 /* iSNDplatformcdpanvol @0x801094EC : derive CD L/R from (pan, vol) and write SPU_CD_VOL_L/R (base+0x1b0/2),
@@ -35,9 +36,9 @@ int iSNDplatformcdpanvol(int pan, int vol)
      *     store on its own (it would have to prove no alias) -- retail's source read it early.
      *     Reading it any earlier (before the ctlL load) mis-orders the pair; hence this exact spot. */
     base = (int *)sndpd;
-    ctlL = base[0x514/4];
+    ctlL = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
     r = outR;
-    *(unsigned short *)(ctlL + 0x1b0) = (unsigned short)(outL * 0x102 & 0x7fff);
-    *(unsigned short *)(base[0x514/4] + 0x1b2) = (unsigned short)(r * 0x102 & 0x7fff);
+    ((struct SndSpuCdVolumeRegisterView *)(unsigned int)ctlL)->cd_volume_left = (unsigned short)(outL * 0x102 & 0x7fff);
+    ((struct SndSpuCdVolumeRegisterView *)(unsigned int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base)->cd_volume_right = (unsigned short)(r * 0x102 & 0x7fff);
     return 0;
 }

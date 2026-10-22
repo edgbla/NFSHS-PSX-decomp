@@ -10,20 +10,22 @@
 #include "sbremove.h"
 #include "sbdload.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
+#include "sndbankpriv.h"
 
 /* SNDbankadd @0x800E7DEC : add the bank at `bankData`, writing its slot id to *bank_out.  Returns the
  *   download result, or -10 if audio is down. */
 int SNDbankadd(int *bank_out, int bankData)
 {
     int  slot;
-    int *e;
-    if ((signed char)sndgs[0xf] == 0)
+    struct SndBankTableEntry *e;
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     slot = iSNDbankalloc();
     *bank_out = slot;
-    e = (int *)(sndgs[0x26] + slot * 0xc);
-    e[0] = bankData;
-    e[1] = bankData;
-    sndgs[0x1f] = (int)SNDbankremove;
+    e = (struct SndBankTableEntry *)(((struct SndGlobalServerStateView *)sndgs)->bank_table + slot * (int)sizeof(struct SndBankTableEntry));
+    e->data_block = (void *)(unsigned int)bankData;
+    e->platform_block = (void *)(unsigned int)bankData;
+    ((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook = SNDbankremove;
     return iSNDdownloadbank(bankData, bankData);
 }

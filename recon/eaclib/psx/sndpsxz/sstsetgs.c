@@ -5,18 +5,20 @@
  */
 #include "../eacpsxz/stream.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
 #include "sst.h"
+#include "sstpriv.h"
 #include "sstsetgs.h"
 
 /* SNDSTRM_setgreedystate @0x800E9D8C : -10 if uninit, -8 if no such stream, else set its greedy state. */
 int SNDSTRM_setgreedystate(int tag, int s)
 {
-    int p;
-    if ((signed char)sndgs[0xf] == '\0')
+    SndStream *p;
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized == '\0')
         return -10;
-    p = iSNDstreamgetstreamptr(tag);
+    p = (SndStream *)iSNDstreamgetstreamptr(tag);
     if (p == 0)
         return -8;
-    STREAM_setgreedystate(*(int *)(p + 4), s);
+    STREAM_setgreedystate(p->stream_handle, s);
     return 0;
 }

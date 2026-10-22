@@ -5,6 +5,7 @@
  */
 #include "salloc.h"
 #include "sdata.h"
+#include "sndserverpriv.h"
 #include "sover.h"
 #include "sserver.h"
 
@@ -14,7 +15,7 @@
 unsigned int SNDover(unsigned int tag)
 {
     unsigned int r;
-    if (*(signed char *)((int)sndgs + 0x3c) != 0) {   /* init flag = low byte of sndgs[0xf]; direct-addr read */
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized != 0) {   /* init flag = low byte of sndgs[0xf]; direct-addr read */
         iSNDenteraudio();
         r = (unsigned int)iSNDgetchan(tag) >> 0x1f;   /* 1 == finished, 0 == still playing */
         iSNDleaveaudio();

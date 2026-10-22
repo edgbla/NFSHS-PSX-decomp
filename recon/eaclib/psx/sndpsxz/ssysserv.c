@@ -3,36 +3,35 @@
  *   3 fns @[0x8010479C .. 0x80104878].  The (per-frame) "service-client" list -- callbacks the game
  *   registers to run on each SNDSYS_service tick.  Ghidra nfs4-f.exe.c (ssysserv) + IDA sigs.
  *
- *   Client list lives at sndgs[0x19..] (int fn-ptrs); the count is sndgs[0x10]._1_1_ = ((char*)sndgs)[0x41].
+ *   The shared `SndGlobalServerStateView` names the service-client count at +0x41 and its 12 callback
+ *   slots at +0x64..+0x93; the table ends where `SNDGlobals.play_records` begins at +0x94.
  */
 #include "sdata.h"
+#include "sndserverpriv.h"
 #include "ssysserv.h"
 
-#define NCLIENT (((char *)sndgs)[0x41])   /* sndgs[0x10]._1_1_ : service-client count */
 
 /* iSNDserveraddclient @0x8010479C : append callback `cb` to the service-client list; returns sndgs.
- *   The count is read SIGNED (lb) for the array index but UNSIGNED (lbu) for the increment-store. */
-short *iSNDserveraddclient(int cb)
+ *   The count uses a signed view for the array index and an unsigned view for the increment-store.
+ * MATCH: `service_callbacks[count]` in the full state view emits the retail sll(count*4), addu base,
+ *   then `sw a0,0x64(base)` displacement sequence. */
+short *iSNDserveraddclient(void (*cb)(void))
 {
-    /* MATCH: index sndgs by the raw client count ONLY (base = sndgs + count*4) and fold the 0x19-slot
-     * (0x64-byte) client-array offset into the store DISPLACEMENT via a single explicit char* base --
-     * oracle emits sll(count*4); addu base; sw a0,0x64(base). (Same lever as the sibling
-     * iSNDserveradd100hzclient in sserver.cpp: sndgs[count+0x19] adds 0x19 to the INDEX before the *4
-     * scale, and a second independent `sndgs`-typed expression makes gcc rematerialize the base twice;
-     * routing EVERYTHING through one already-materialized char* base fixes both.) */
+    /* Keep the raw count as the scaled index; folding the 0x19-slot prefix into it adds an instruction. */
     char *base = (char *)sndgs;
-    *(int *)(base + (signed char)NCLIENT * 4 + 0x64) = cb;
-    NCLIENT = NCLIENT + 1;
+    ((struct SndGlobalServerStateView *)base)->service_callbacks[
+        (signed char)((struct SndGlobalServerStateView *)base)->service_client_count.u] = cb;
+    ((struct SndGlobalServerStateView *)base)->service_client_count.u = ((struct SndGlobalServerStateView *)base)->service_client_count.u + 1;
     return (short *)sndgs;
 }
 
 /* iSNDserverremoveclient @0x801047CC : unregister `cb`, compacting the list.  void -- $v0 at every
  *   exit is incidental (numclients / slt scratch / i<<2). */
-void iSNDserverremoveclient(int cb)
+void iSNDserverremoveclient(void (*cb)(void))
 {
     int i;
     int j;
-    int target;
+    void (*target)(void);
     char *base;
     char *p;
     __asm__("" : "=r"(target) : "0"(cb));
@@ -66,26 +65,26 @@ void iSNDserverremoveclient(int cb)
      * (`sw a0,0(sp) ... lw a2,0(sp)`); the fence buys the identical allocation at zero instructions.
      * Twin-transcribed verbatim to sserver.c iSNDserverremove100hzclient (also PASS).
      */
-    if (*(signed char *)(p + 0x41) <= 0)                      /* lb count (signed-char view of the byte) */
+    if (((struct SndGlobalServerStateView *)p)->service_client_count.s <= 0)                      /* lb count (signed-char view of the byte) */
         return;
     i = 0;
     base = p;
 findloop:
-    if (*(int *)(base + i * 4 + 0x64) == target) {            /* client slots @+0x64 */
-        *(char *)(base + 0x41) = *(char *)(base + 0x41) - 1;  /* lbu/addiu/sb (plain char is unsigned) */
-        if (i < *(signed char *)(base + 0x41)) {
+    if (((struct SndServerServiceClientCursorView *)(base + i * 4))->callback == target) {            /* client slots @+0x64 */
+        ((struct SndGlobalServerStateView *)base)->service_client_count.u = ((struct SndGlobalServerStateView *)base)->service_client_count.u - 1;  /* lbu/addiu/sb (plain char is unsigned) */
+        if (i < ((struct SndGlobalServerStateView *)base)->service_client_count.s) {
 shiftloop:                                                    /* compact the tail down one slot */
             j = i * 4;                                        /* scale BEFORE the increment (sll in the entry/back-edge delay slot) */
             i++;
-            *(int *)((unsigned int)j + (unsigned int)base + 0x64) =
-                *(int *)(base + i * 4 + 0x64);
-            if (i < *(signed char *)(base + 0x41))
+            ((struct SndServerServiceClientCursorView *)((unsigned int)j + (unsigned int)base))->callback =
+                ((struct SndServerServiceClientCursorView *)(base + i * 4))->callback;
+            if (i < ((struct SndGlobalServerStateView *)base)->service_client_count.s)
                 goto shiftloop;
         }
         return;
     }
     i++;
-    if (i < *(signed char *)(base + 0x41))
+    if (i < ((struct SndGlobalServerStateView *)base)->service_client_count.s)
         goto findloop;
 }
 
@@ -110,15 +109,15 @@ void SNDSYS_service(void)
     int   i;
     guard = (char *)sndgs;
     i = 0;
-    if (i < *(signed char *)(guard + 0x41)) {
+    if (i < ((struct SndGlobalServerStateView *)guard)->service_client_count.s) {
         base = guard;
         p = base;
         i = 0;
         do {
-            void (*cb)(void) = *(void (**)(void))(p + 0x64);
+            void (*cb)(void) = ((struct SndServerServiceClientCursorView *)p)->callback;
             p = p + 4;
             (*cb)();
             i++;
-        } while (i < *(signed char *)(base + 0x41));
+        } while (i < ((struct SndGlobalServerStateView *)base)->service_client_count.s);
     }
 }
