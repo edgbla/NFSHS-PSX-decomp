@@ -112,11 +112,11 @@ void iSNDcalcvol(int chan)
      * curve block colors itself. */
     n = n / 0x1f417f;
     v->volume = (char)n;
-    if (v->velocity_curve != 0) {                  /* velocity curve */
+    if (v->velocity_curve) {                  /* velocity curve */
         v->volume = (char)(((n * 0x1000000 >> 0x18) *
                (int)*(signed char *)(v->velocity_curve + (unsigned)v->velocity_phase)) / 0x7f);
     }
-    if (v->final_volume_curve != 0) { /* final volume curve */
+    if (v->final_volume_curve) { /* final volume curve */
         *(unsigned char *)&v->volume =
             *(unsigned char *)(v->final_volume_curve + v->volume);
     }
@@ -193,7 +193,10 @@ int iSNDpsxeffectvol(int left, int right)
  *   carry the a0/a3 webs through the shared tail. */
 void iSNDsetvol(int chan, int left, int right)
 {
-    int            vt = chan * 0x2c;
+    /* MATCH: keep the byte-shaped base and explicit byte offset. A typed record base plus
+     * typed `voiceBase[chan]` indexing shifts two address-materialization instructions (4 diffs,
+     * still 87 insns). Linked register offsets use the signed volatile link_index.vs view. */
+    int            vt = chan * (int)sizeof(SndPacketVoiceState);
     unsigned char *voiceBase = sndpd + 0xd8;
     SndPacketVoiceState *slot = (SndPacketVoiceState *)(voiceBase + vt);
     unsigned char  *pd = (unsigned char *)voiceBase - 0xd8;
@@ -224,7 +227,7 @@ void iSNDsetvol(int chan, int left, int right)
             *vreg   = left * 0x81 & 0x7fff;
             vreg[1] = 0;
             vreg = (unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base +
-                    ((int)((unsigned)((volatile SndPacketVoiceState *)slot)->link_index.u << 0x18) >> 0x14));
+                    ((volatile SndPacketVoiceState *)slot)->link_index.vs * 0x10);
             *vreg   = 0;
             vreg[1] = right * 0x81 & 0x7fff;
             return;
@@ -234,7 +237,7 @@ void iSNDsetvol(int chan, int left, int right)
         vreg[1] = vol;
         vol = (right * 0x81 >> 1) & 0x7fff;
         vreg = (unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base +
-                ((int)((unsigned)((volatile SndPacketVoiceState *)slot)->link_index.u << 0x18) >> 0x14));
+                ((volatile SndPacketVoiceState *)slot)->link_index.vs * 0x10);
     }
     *vreg   = vol;
     vreg[1] = vol;
@@ -261,9 +264,9 @@ int iSNDsetslot(int chan, int addr, int pitch)
  *   ADSR slot, set the initial volume + fx level, and return the SPU key-on mask. */
 unsigned int iSNDstartvoice(unsigned int chan)
 {
-    int          vt  = chan * 0x2c;
-    volatile unsigned char *vte = sndpd + 0xd8 + vt; /* &voicetable[chan] */
-    volatile SndPacketVoiceState *voice = (volatile SndPacketVoiceState *)vte;
+    int          vt  = chan * sizeof(SndPacketVoiceState);
+    volatile SndPacketVoiceState *voice =
+        (volatile SndPacketVoiceState *)(sndpd + 0xd8 + vt); /* &voicetable[chan] */
     volatile unsigned char *voiceBase = sndpd + 0xd8;
     /* 441 Hz units; cc1psx lowers the unsigned divide to multu 0x4A4DC96F + mfhi >> 7. */
     int          pitch;
@@ -278,13 +281,12 @@ unsigned int iSNDstartvoice(unsigned int chan)
     voice->voice_status = 2;
     voice->stop_pending = 0;
     if (voice->channel_count == 2) {                            /* linked pair -> arm the partner too */
-        signed char link = (signed char)voice->link_index.vu;
-        signed char maskLink;
-        int         vt2  = link * 0x2c;
-        volatile unsigned char *vte2 = voiceBase + vt2;
+        signed char maskLink; /* MATCH: retain the pre-store linked index; inlining it in the final mask shifts lbu/li (4 diffs). */
+        int         vt2  = voice->link_index.vs * (int)sizeof(SndPacketVoiceState);
+        volatile SndPacketVoiceState *vte2 = (volatile SndPacketVoiceState *)(voiceBase + vt2);
         int         a3;                              /* linked-partner start-addr offset (oracle 0x800FF468-50C) */
-        if (0 <= (int)((unsigned int)voice->voice_done << 24)) { /* bit7 clear: ptr table at base+0x420 indexed by f27 */
-            int f27x4 = ((int)((unsigned int)voice->voice_done << 24)) >> 22;
+        if ((signed char)voice->voice_done >= 0) { /* bit7 clear: ptr table at base+0x420 indexed by f27 */
+            int f27x4 = (int)(signed char)voice->voice_done * 4;
             volatile unsigned char *table = voiceBase + 0x420;
             int *pt = *(int **)(table + f27x4);
             a3 = *(int *)((char *)pt + 8);
@@ -296,12 +298,12 @@ unsigned int iSNDstartvoice(unsigned int chan)
                 a3 = a3 + 1;
             a3 = a3 << 4;
         }
-        iSNDsetslot(((int)((unsigned int)voice->link_index.vu << 24)) >> 24,
+        iSNDsetslot(voice->link_index.vs,
                     voice->spu_start_address + a3, pitch);
-        maskLink = (signed char)voice->link_index.vu;
-        ((volatile SndPacketVoiceState *)vte2)->play_state = 2;
-        ((volatile SndPacketVoiceState *)vte2)->voice_status = 2;
-        ((volatile SndPacketVoiceState *)vte2)->stop_pending = 0;
+        maskLink = voice->link_index.vs;
+        vte2->play_state = 2;
+        vte2->voice_status = 2;
+        vte2->stop_pending = 0;
         mask = mask | (1u << maskLink);
     }
     iSNDvol(chan, (signed char)voice->level);
@@ -431,7 +433,7 @@ int iSNDplatformoutputset(void)
              * persistent sndgs base) and reproduces the oracle's per-iteration
              * `addiu v0,zero,2` remat in the lbu's load-delay slot. */
             if (vp->play_state == 2) {
-                if (vp->link_flag == 0) {
+                if (!vp->link_flag) {
                     iSNDsetvol(chan,
                         (vp->pan_left_cache << 24) >> 24,
                         (vp->pan_right_cache << 24) >> 24);
@@ -558,7 +560,7 @@ int iSNDinit(void)
     iSNDpsxfxinit(*(int *)(post + 4));
     *(volatile unsigned char *)(post + 1) = 0;
     addtimer(iSNDserver);
-    if (sndpd[0] == 0) {
+    if (!sndpd[0]) {
         addexit((void (*)(void))SNDSYS_restore);
         sndpd[0] = 1;
     }
@@ -624,7 +626,7 @@ int iSNDrestore(void)
                     }
                     quiet = 0;
                 }
-                vp += 0x2c;
+                vp += sizeof(SndPacketVoiceState);
             } while (((struct SndGlobalServerStateView *)gp)->channel_count > ++chan);
         }
         SNDSYS_service();
@@ -869,7 +871,7 @@ void iSNDserve(void)
             vp   = D_801479F0 + vt;
             vreg = (unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)fpbase)->registers.voice_base + chan * 0x10);
             if (*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->voice_status == 2) {       /* voice stopping */
-                if (vreg[6] != 0) {
+                if (vreg[6]) {
                     *(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->stop_pending = 1;
                 } else {                                             /* SPU ADSR reached 0 */
                     if (((struct SndPacketVoiceState *)vp)->stop_pending != 0 && ((struct SndPacketVoiceState *)vp)->link_flag == 0 &&
@@ -883,7 +885,7 @@ void iSNDserve(void)
                                 do { vbase++; vbase--; } while (0);
                                 c = (int)((unsigned int)*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->link_index << 24) >> 24;
                                 vp = D_801479F0 +
-                                     ((int)((unsigned int)*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->link_index << 24) >> 24) * 0x2c;
+                                     ((int)((unsigned int)*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->link_index << 24) >> 24) * (int)sizeof(SndPacketVoiceState);
                             } else {
                                 vbase = D_801479F0;
                                 /* MATCH: using the real +0x1c field symbol and subtracting its field
@@ -931,7 +933,7 @@ void iSNDserve(void)
                     }
                 }
             } else if (*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->voice_status == 3) { /* voice fully stopped */
-                if (vreg[6] == 0) {
+                if (!vreg[6]) {
                     one = 1;
                     kon = kon | (one << chan);              /* (Ghidra `mask`) */
                     ((struct SndPacketVoiceState *)vp)->voice_status = 0;
@@ -957,7 +959,7 @@ void iSNDserve(void)
                  ].voice_status == 0)) {
                 kon = kon | iSNDstartvoice(chan);                    /* arm newly-triggered voice */
             }
-            vt += 0x2c;
+            vt += (int)sizeof(SndPacketVoiceState);
             /* MATCH (w47-a3): the counter increment lives INSIDE the condition, evaluated AFTER the
              * bound load, so the loop-latch block STARTS with `lui %hi(sndgs+17)`.  A duplicable
              * `lui` at the join is what lets gcc's reorg EAGER-STEAL it into the three forward
@@ -968,10 +970,10 @@ void iSNDserve(void)
              * `slt chan,bound`. */
         } while (((struct SndGlobalServerStateView *)sndgs)->channel_count > ++chan);
     }
-    if (koff != 0)
+    if (koff)
         iSNDpsxkeyoff(koff);
     do {
-        if (kon != 0)
+        if (kon)
             iSNDpsxkeyon(kon);
     } while (0);
 }

@@ -39,14 +39,14 @@ int iSNDstop(unsigned int chan)
     volatile SndPacketVoiceState *slot = (volatile SndPacketVoiceState *)(base + vt);
     unsigned int mask;
 
-    if (0 <= (int)((unsigned int)slot->voice_done << 24))            /* voice-done bit clear -> notify */
+    if ((signed char)slot->voice_done >= 0)            /* voice-done bit clear -> notify */
         (*(void (**)(void *))(base + 0x64c))((void *)slot);
     iSNDfreechan(chan);
     slot->voice_status = 3;
     slot->play_state = 0;
     mask = 1u << chan;
     if (1 < slot->channel_count) {                                     /* linked pair -> stop the partner too */
-        chan = (signed char)slot->link_index.vu;
+        chan = slot->link_index.vs;
         iSNDfreechan(chan);
         slot = (volatile SndPacketVoiceState *)(base + (int)chan * (int)sizeof(SndPacketVoiceState));
         mask |= 1u << chan;
@@ -86,7 +86,8 @@ int iSNDplatformpitch(int chan, int pitch)
  *   `fxon` == 0 disables reverb, non-zero enables.  3-arg (chan,bus,fxon): `bus` is unused (the binary
  *   overwrites $a1 with the playstate), `fxon` is $a2 -- matches SNDfxlevel's iSNDplatformfxlevel(voice,bus,fxArg).
  *   MATCH: the slot is async/volatile signed-byte storage; casting playstate to unsigned char produces the
- *   oracle's lbu+nop+andi sequence, and `if (fxon)` preserves its effect-on/effect-off block order. */
+ *   oracle's lbu+nop+andi sequence, `link_index.vu` is the unsigned volatile partner index, and `if (fxon)`
+ *   preserves its effect-on/effect-off block order. */
 int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
 {
     int          vt = (int)chan * (int)sizeof(SndPacketVoiceState);
@@ -100,7 +101,7 @@ int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
     }
     mask = 1u << (chan);                               /* (computed even when the branch below skips) */
     if (slot->channel_count == bus)
-        mask |= 1u << slot->link_index.u;
+        mask |= 1u << slot->link_index.vu;
     if (fxon)
         iSNDpsxeffecton(mask);
     else
@@ -122,7 +123,7 @@ int iSNDvol(int chan, int level)
         slot->level = (char)level;
         return 0;
     }
-    if (slot->route == 0)                                     /* absolute L/R from level */
+    if (!slot->route)                                     /* absolute L/R from level */
         iSNDatolrv((unsigned)slot->volume_angle, level, &outL, &outR);
     else if (slot->route == 1)                                /* delta from current L/R cache */
         iSNDatodlrv((unsigned)slot->volume_angle, level, &outL, &outR,

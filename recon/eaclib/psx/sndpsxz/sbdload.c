@@ -102,7 +102,7 @@ int iSNDdownloadbank(int bankData, int patchData)
                 off = ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset;
             else
                 off = ((struct SndBankPatchOffset12CursorView *)(unsigned int)cur2)->relative_offset;
-            if (off != 0) {
+            if (off) {
                 if (((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->type == type4) {
                     ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset = bankData + off4 + ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset;
                     abs = ((struct SndBankPatchOffset20CursorView *)(unsigned int)cur4)->relative_offset;   /* read-back: cse forwards -> retail's addu copy */

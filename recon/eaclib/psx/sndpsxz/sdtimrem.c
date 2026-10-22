@@ -18,9 +18,9 @@
  *   (stopped/infinite).  The pitch==0 retest is the compiler's divide-by-zero guard. */
 unsigned int iSNDtimeremaining(int chan)
 {
-    unsigned char *voice = D_801479F0 + chan * 0x2c;
-    if (((SndPacketVoiceState *)voice)->position_step == 0)
+    SndPacketVoiceState *voice = (SndPacketVoiceState *)(D_801479F0 + chan * (int)sizeof(SndPacketVoiceState));
+    if (!voice->position_step)
         return 0x7fffffff;
-    return (((SndPacketVoiceState *)voice)->loop_length - ((SndPacketVoiceState *)voice)->byte_position) /
-           *(volatile unsigned int *)&((SndPacketVoiceState *)voice)->position_step;
+    return (voice->loop_length - voice->byte_position) /
+           *(volatile unsigned int *)&voice->position_step;
 }

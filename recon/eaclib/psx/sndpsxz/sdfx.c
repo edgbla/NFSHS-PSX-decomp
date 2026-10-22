@@ -104,7 +104,7 @@ unsigned int iSNDpsxfxinit(int mode)
      * it's actually used in reproduces that hoist. */
     const SndFxBus *sg = (const SndFxBus *)((unsigned char *)sndgs + 0x9C);
 
-    if (mode != 0) {
+    if (mode) {
         if      (mode == 5)    mode = 1;
         else if (mode == 10)   mode = 2;
         else if (mode == 0x14) mode = 3;

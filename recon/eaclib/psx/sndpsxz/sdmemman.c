@@ -701,7 +701,7 @@ int iSNDpsxmalloc(int size)
         return 0;
     size += 0x3f;
     size >>= 6;
-    if (count == 0) {
+    if (!count) {
         candidateBlock = ((struct SndSpuMemoryStateView *)base)->memory.engine_ver;
         availableBlocks = (int)((struct SndSpuMemoryStateView *)base)->memory.boundary.view.limits.block_total -
                       (int)((struct SndSpuMemoryStateView *)base)->memory.engine_ver;
@@ -724,7 +724,7 @@ scan:
             int scan_off = idx * 4;
             entry = (unsigned char *)((unsigned int)scan_off +
                                       (unsigned int)table);
-            if (idx == 0) {
+            if (!idx) {
                 unsigned int block =
                     ((struct SndSpuMemoryStateView *)pd)->memory.engine_ver;
                 int avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;

@@ -18,13 +18,13 @@ int SNDSTRM_status(int tag, int s)
     ((struct SNDSTREAMSTATUS *)(unsigned int)s)->outstandingrequests = 0;
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
     sp = (SndStream *)iSNDstreamgetstreamptr(tag);
-    if (sp == 0) return -8;
+    if (!sp) return -8;
     iSNDenteraudio();
     ((struct SNDSTREAMSTATUS *)(unsigned int)s)->outstandingrequests = ((int)((unsigned)((volatile SndStream *)sp)->current_count << 24)) >> 24;
-    if (sp->current_count != 0) {
+    if (sp->current_count) {
         ((struct SNDSTREAMSTATUS *)(unsigned int)s)->currentrequest = sp->requests->request_id;
         frames = sp->locked_rate.samplerate;
-        if (frames != 0) {
+        if (frames) {
             outstanding = SNDPKTPLAY_unsafeframesoutstanding(sp->packet_player);
             ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered =
                 (outstanding * 1000) / sp->locked_rate.samplerate;

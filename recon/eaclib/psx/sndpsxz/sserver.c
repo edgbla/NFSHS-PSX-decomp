@@ -113,7 +113,7 @@ void iSND100hzserver(void)
         do {
             p = (SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)globalBase)->play_records + chanIdx);
             if (p->state == 1 && -1 < (int)p->owner_tag) { /* held, valid tag */
-                if (p->pitch_lfo_table != 0) {                                 /* pitch LFO active */
+                if (p->pitch_lfo_table) {                                 /* pitch LFO active */
                     unsigned char phase = p->pitch_lfo_phase + 1;
                     p->pitch_lfo_phase = phase;
                     if (p->lfo_phase_limit <= phase)
@@ -123,7 +123,7 @@ void iSND100hzserver(void)
                     iSNDplatformpitch(i, p->spu_pitch);
                 }
                 dirty = 0;
-                if (p->velocity_curve != 0) {                                 /* velocity envelope active */
+                if (p->velocity_curve) {                                 /* velocity envelope active */
                     unsigned char phase;
                     dirty = 1;
                     phase = p->velocity_phase + 1;
@@ -134,7 +134,7 @@ void iSND100hzserver(void)
                 {
                     /* MATCH (184/184): keep the step as direct field reads. GCC CSEs them into the
                      * oracle's step/sign register pair while retaining `position` as the add result. */
-                    if (p->autovol_step != 0) {                                   /* autovol ramp step */
+                    if (p->autovol_step) {                                   /* autovol ramp step */
                         int position;
                         dirty = 1;
                         position = p->autovol_position.word + p->autovol_step;
@@ -159,8 +159,8 @@ void iSND100hzserver(void)
                     }
                 }
                 /* portamento done -> pitch sweep */
-                if (p->portamento_step != 0) { dirty = 1; p->portamento_position.word = p->portamento_position.word + p->portamento_step; }
-                if (p->sweep_countdown == 0) {                                   /* advance to next sweep segment */
+                if (p->portamento_step) { dirty = 1; p->portamento_position.word = p->portamento_position.word + p->portamento_step; }
+                if (!p->sweep_countdown) {                                   /* advance to next sweep segment */
                     signed char index = p->sweep_index + 1;
                     p->sweep_index = index;
                     if (!(index < p->sweep_count)) {

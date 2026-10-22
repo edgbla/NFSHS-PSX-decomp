@@ -151,7 +151,7 @@ int SNDPKTPLAY_create(void *mem, int memsize, void (*relcb)(int),
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     for (slot = 0; slot < 1; slot++) {
-        if (sndpps[slot] == 0)
+        if (!sndpps[slot])
             goto found;
     }
     return -9;
@@ -628,7 +628,7 @@ int iSNDpacketget(int p, int idx, int *out)
              * arithmetic, and forms the final entry base in the branch delay slot. */
             fr = ((PacketFrame *)(ppp + sizeof(PacketPlayerHeader))) + m;
             cb = ((PacketPlayerHeader *)(unsigned int)ppp)->release_cb;
-            if (cb != 0)
+            if (cb)
                 cb(fr->channel[0]);
         }
     }

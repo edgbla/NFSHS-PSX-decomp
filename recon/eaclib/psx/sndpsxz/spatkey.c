@@ -31,7 +31,7 @@ int iSNDpatchkey(int chan, int tag)
     SndChannel *pbase = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
     char grp;
     grp = pbase->group_id;
-    if (grp != 0) {
+    if (grp) {
         int i = *(int *)tag;
         *(int *)tag = i + 1;
         if (i + 1 < ((struct SndGlobalServerStateView *)sndgs)->channel_count) {

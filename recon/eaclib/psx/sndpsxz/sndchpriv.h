@@ -28,13 +28,6 @@ typedef union SndChannelPlaybackFxView {
     signed char fx_level_window[3];
 } SndChannelPlaybackFxView;
 
-/* SNDfxlevel's per-bus sliding view: read at +0x34+bus, then write the next
- * byte (+0x35+bus). With two buses, the two steps overlap at +0x35. */
-typedef struct SndChannelFxLevelStepView {
-    signed char previous_level;
-    signed char next_level;
-} SndChannelFxLevelStepView;
-
 typedef union SndChannelLinkedTagView {
     unsigned char linked_channels[6];
     struct {

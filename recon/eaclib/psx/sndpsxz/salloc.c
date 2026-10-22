@@ -530,7 +530,7 @@ void iSNDfreechan(int chan)
     int slot = pool + chan * (int)sizeof(SndChannel);
     group = ((SndChannel *)(unsigned int)slot)->group_id;
 
-    if (group != 0) {
+    if (group) {
         int limit;
         unsigned char *scan;
         unsigned char *gs;

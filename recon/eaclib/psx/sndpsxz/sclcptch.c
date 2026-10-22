@@ -64,16 +64,16 @@ int iSNDcalcpitch(int note)
     int          c;                               /* envelope byte; the per-load (signed char) casts emit `lb`
                                                    * (sign-extend once), and `int c` avoids re-extending on use */
 
-    if (v->linear_pitch_cache == 0) {      /* not yet cached -> compute the linear multiplier (lhu) */
+    if (!v->linear_pitch_cache) {      /* not yet cached -> compute the linear multiplier (lhu) */
         int cents = v->base_detune;
-        if (v->envelope_detune_depth != 0) {           /* envelope-driven detune */
-            if (v->detune_curve != 0)           /* != polarity -> oracle's beqz fall-through */
+        if (v->envelope_detune_depth) {           /* envelope-driven detune */
+            if (v->detune_curve)           /* != polarity -> oracle's beqz fall-through */
                 c = *(signed char *)(v->detune_curve + v->bend);
             else
                 c = v->bend;    /* +0x2f detune read signed (lb) */
             cents += ((c - 0x40) * v->envelope_detune_depth >> 6);
         }
-        if (v->pitch_lfo_table != 0) {             /* LFO-driven detune */
+        if (v->pitch_lfo_table) {             /* LFO-driven detune */
             cents += ((*(signed char *)(v->pitch_lfo_table + (unsigned)v->pitch_lfo_phase) - 0x40) *
                       v->pitch_lfo_depth >> 6);
         }

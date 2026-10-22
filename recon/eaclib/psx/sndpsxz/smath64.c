@@ -36,6 +36,6 @@ int iSNDdivu64(struct SNDu64Value value, unsigned int div)
             lo = lo - div;
             q = q + 1;
         }
-    } while (i != 0);
+    } while (i);
     return q;
 }

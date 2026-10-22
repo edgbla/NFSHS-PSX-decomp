@@ -289,7 +289,7 @@ int iSNDmalloc(int size)
         goto fail;
     size += 3;
     size >>= 2;
-    if (count == 0) {
+    if (!count) {
         block = 0;
         available = *(unsigned short *)(base + 6);
         iSNDmemconstrain(&block, &available);
@@ -307,7 +307,7 @@ int iSNDmalloc(int size)
              * index term FIRST in the adds (commutative-order lever). */
             j = i << 2;
             entry = (unsigned short *)(j + (int)tab);
-            if (i == 0) {
+            if (!i) {
                 /* MATCH (w50-a7): LOAD BEFORE STORE in this arm (the opposite of the note in the
                  * `i != 0` arm below, which is about a may-aliasing store).  Retail emits
                  * `lhu $v0,0($a1); sw $zero,0x10($sp)`; writing `block = 0;` first put the store

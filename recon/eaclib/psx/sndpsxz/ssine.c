@@ -40,7 +40,7 @@ int iSNDsin(int a)
 {
     unsigned int quad = (a >> 8) & 3;
     a &= 0xff;
-    if (quad == 0)
+    if (!quad)
         return sndsintbl[a];                      /* quad 0 */
     if (quad == 1)
         return sndsintbl[0x100 - a];             /* quad 1 */

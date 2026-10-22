@@ -25,8 +25,8 @@ extern unsigned char DAT_801479f0;   /* voice-table byte base; retained for exac
  * two identical stores without moving the shared store into the tag-0x82 branch delay slot;
  * (3) record fields are read/written through SndPacketVoiceState member views, while `slot` remains
  * the byte cursor that preserves the original manually-scaled voice index/address expression;
- * (4) link_index.vs preserves the signed -1 initialization; `.vu` preserves unsigned volatile
- * reads for linked-channel indexing. The persistent typed-pointer alias was tested and rejected
+ * (4) link_index.vs preserves both the signed -1 sentinel and signed volatile linked-row index.
+ * The persistent typed-pointer alias was tested and rejected
  * (95 diffs / 176 instructions); per-access typed views retain the exact 171-instruction match. */
 int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
                             int volAngle, int pitchOffset)
@@ -85,11 +85,17 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     ((volatile SndPacketVoiceState *)slot)->initial_pitch.vs = (short)((rate * 0x17c7) >> 0x10);
     if (1 < (unsigned char)((volatile SndPacketVoiceState *)slot)->channel_count) { /* arm linked voice */
         unsigned char *voiceBase = sndpd;
-        ((SndPacketVoiceState *)slot)->link_index.u = ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[voice].linked_tag_view.linked_channels[0];
-        voiceBase[(((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xf9] = 1;
-        *(int *)(voiceBase + (((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xe4) = 0;
-        *(int *)(voiceBase + (((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xe8) = 0;
-        *(int *)(voiceBase + (((int)(unsigned)((volatile SndPacketVoiceState *)slot)->link_index.vu << 24) >> 24) * 0x2c + 0xec) = ((SndPacketVoiceState *)slot)->loop_length;
+        ((SndPacketVoiceState *)slot)->link_index.vu = ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[voice].linked_tag_view.linked_channels[0];
+        /* MATCH: keep the linked-row base in these field expressions. Hoisting a typed
+         * `voiceTable` local changed the address/displacement schedule (15 diffs, 172 vs 171). */
+        ((SndPacketVoiceState *)(voiceBase + 0xd8))[
+            ((volatile SndPacketVoiceState *)slot)->link_index.vs].link_flag = 1;
+        ((SndPacketVoiceState *)(voiceBase + 0xd8))[
+            ((volatile SndPacketVoiceState *)slot)->link_index.vs].byte_position = 0;
+        ((SndPacketVoiceState *)(voiceBase + 0xd8))[
+            ((volatile SndPacketVoiceState *)slot)->link_index.vs].served_position = 0;
+        ((SndPacketVoiceState *)(voiceBase + 0xd8))[
+            ((volatile SndPacketVoiceState *)slot)->link_index.vs].loop_length = ((SndPacketVoiceState *)slot)->loop_length;
     }
     iSNDplatformpitch(voice, pitch);
     ((SndPacketVoiceState *)slot)->play_state = 1;                                     /* playstate = playing */

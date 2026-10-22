@@ -17,7 +17,7 @@ int SNDSTRM_setgreedylevel(int tag, int s)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     p = (SndStream *)iSNDstreamgetstreamptr(tag);
-    if (p == 0)
+    if (!p)
         return -8;
     STREAM_setgreedylevel(p->stream_handle, s);
     return 0;

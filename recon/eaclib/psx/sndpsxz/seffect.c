@@ -18,12 +18,12 @@
 /* SNDfxinitbus @0x800E6D58 : initialise effect bus `bus` (mode + depth params), then set its master level. */
 int SNDfxinitbus(int bus, int mode, int arg2, int arg3, int arg4)
 {
-    SndFxBus *e = (SndFxBus *)((unsigned char *)sndgs + 0x9C) + bus;
+    SndFxBus *e = &((SndFxBus *)((unsigned char *)sndgs + 0x9C))[bus];
     e->type = arg2;
     e->depth = arg3;
     e->delay = arg4;
     iSNDplatformfxinit(bus, arg2, arg3, arg4);
-    if (arg2 == 0)
+    if (!arg2)
         mode = 0;
     return SNDfxmasterlevel(bus, mode);
 }
@@ -36,19 +36,19 @@ int SNDfxmasterlevel(int bus, int level)
     int r, i;
     struct SndGlobalServerStateView *loopBase;
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
-    SndFxBus *fx = (SndFxBus *)((unsigned char *)base + bus * (int)sizeof(SndFxBus) + 0x9c);
+    SndFxBus *fx = &((SndFxBus *)((unsigned char *)base + 0x9c))[bus];
     fx->master = level;
     r = iSNDplatformfxmasterlevel(bus, level);
     if (r < 0)
         return r;
-    if (base->initialized == 0)
+    if (!base->initialized)
         return 0;
     for (i = 0; i < ((struct SndGlobalServerStateView *)sndgs)->channel_count; i++) {
         unsigned char *rec;
         loopBase = (struct SndGlobalServerStateView *)sndgs;
         rec = (unsigned char *)(i * sizeof(SndChannel) + loopBase->play_records);
-        SNDfxlevel((int)((SndChannel *)(unsigned int)rec)->owner_tag,
-                   bus, (int)((SndChannelFxLevelStepView *)(unsigned int)(rec + bus + 0x34))->next_level);
+        SNDfxlevel(((SndChannel *)rec)->owner_tag,
+                   bus, ((SndChannelPlaybackFxView *)(rec + bus + 0x34))->fx_level_window[1]);
     }
     return 0;
 }

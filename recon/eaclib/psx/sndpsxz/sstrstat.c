@@ -23,10 +23,10 @@ int SNDSTRM_requeststatus(unsigned int reqTag, int s)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
     if (-1 >= (int)reqTag) return -8;
     sp = (SndStream *)iSNDstreamgetstreamptr(reqTag & 0xff);
-    if (sp == 0) return -8;
+    if (!sp) return -8;
     iSNDenteraudio();
     rp = (SndStreamReq *)iSNDstreamgetrequestptr(reqTag);
-    if (rp == 0)
+    if (!rp)
         goto no_request;
     if (rp->firstqid < 0) {
         ((struct SNDREQUESTSTATUS *)(unsigned int)s)->state = 0;

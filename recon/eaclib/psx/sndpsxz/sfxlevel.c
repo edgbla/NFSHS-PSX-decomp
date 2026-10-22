@@ -38,20 +38,20 @@ int SNDfxlevel(int tag, int bus, int level)
 {
     int chanIdx;
     int cur[2];
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     iSNDenteraudio();
     chanIdx = iSNDgetchan(tag);
-    if (-1 < chanIdx) {
+    if (chanIdx >= 0) {
         cur[0] = -1;
-        while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
-            unsigned char *slot = (unsigned char *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + cur[0] * sizeof(SndChannel) + bus);
-            int scaled = level * ((SndChannelFxLevelStepView *)(slot + 0x34))->previous_level;
+        while (iSNDpatchkey(chanIdx, (int)cur)) {
+            unsigned char *slot = (unsigned char *)(((struct SndGlobalServerStateView *)sndgs)->play_records + cur[0] * sizeof(SndChannel) + bus);
+            int scaled = level * ((SndChannelPlaybackFxView *)(slot + 0x34))->fx_level_window[0];
             int fxArg;
-            ((SndChannelFxLevelStepView *)(slot + 0x34))->next_level = (signed char)level;
+            ((SndChannelPlaybackFxView *)(slot + 0x34))->fx_level_window[1] = level;
             /* The displacement view keeps GCC's exact retail lw 0xA0(s4) form; direct SndFxBus
              * indexing adds an address instruction and changes this function's exact match. */
-            fxArg = (scaled * ((const struct SndFxBusMasterDisplacementView *)((unsigned char *)sndgs + bus * 0x10))->master) / 16129; /* /(127*127): normalises BOTH the send byte
+            fxArg = (scaled * ((const struct SndFxBusMasterDisplacementView *)((unsigned char *)sndgs + bus * 0x10))->master) / (127 * 127); /* /(127*127): normalises BOTH the send byte
                                                                  * and the bus-master 0..127 fractions (oracle
                                                                  * magic 0x82061029 sra 13 == signed /16129) */
             iSNDplatformfxlevel(cur[0], bus, fxArg);

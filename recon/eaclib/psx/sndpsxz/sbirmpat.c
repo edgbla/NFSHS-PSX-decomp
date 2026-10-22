@@ -32,7 +32,7 @@ int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
         pp = ((struct SndBankPatchTable20Prefix *)(unsigned int)base)->first_relative_patch[patch_idx];
     else
         pp = ((struct SndBankPatchTable12Prefix *)(unsigned int)data)->first_relative_patch[patch_idx];
-    if (pp == 0)
+    if (!pp)
         return -8;
     iSNDremovetaggedpatch(pp, scratch);
     if (((struct SndBankDataHeaderPrefix *)(unsigned int)data)->type == 4)

@@ -23,7 +23,7 @@ typedef struct SndStreamReq {
     int remaining_bytes;            /* +0x1C */
     int submitted;                  /* +0x20 */
     int num_chunks;                 /* +0x24 */
-    unsigned short hold_threshold;  /* +0x28: signed sentinel/threshold interpretation is explicit */
+    short hold_threshold;           /* +0x28: negative is a sentinel; positive values are byte thresholds */
     short pad2a;                    /* +0x2A */
 } SndStreamReq;
 typedef char SndStreamReq_size_check[(sizeof(SndStreamReq) == 0x2c) ? 1 : -1];

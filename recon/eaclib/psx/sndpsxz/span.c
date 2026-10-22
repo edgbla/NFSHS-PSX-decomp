@@ -14,7 +14,7 @@
 int SNDpan(int handle, int pan)   /* @0x800E6884 */
 {
     int chan;
-    if (SND->enabled == 0)
+    if (!SND->enabled)
         return -10;
 
     iSNDenteraudio();
@@ -36,7 +36,7 @@ int SNDpan(int handle, int pan)   /* @0x800E6884 */
             p = v->pan + p - 0x40;
             if (p >= 0x80) p = 0x7F;
             else if (p < 0) p = 0;
-            if (v->pan_curve != 0)
+            if (v->pan_curve)
                 p = ((signed char *)v->pan_curve)[p];    /* pan curve remap */
             angle = ((p - 0x40) << 8) & 0xFF00;
             voiceIndex = *(volatile int *)&iter;

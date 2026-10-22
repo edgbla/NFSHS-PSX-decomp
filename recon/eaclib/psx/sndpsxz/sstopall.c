@@ -14,7 +14,7 @@ void SNDstopall(void)
 {
     int i, off;
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
-    if (base->channel_count != 0) {
+    if (base->channel_count) {
         struct SndGlobalServerStateView *gs;
         i = 0;
         off = i;

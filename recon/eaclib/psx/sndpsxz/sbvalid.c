@@ -17,9 +17,9 @@ int iSNDvalidbank(int bank_id)
     if (bank_id < 0 || ((struct SndGlobalServerStateView *)sndgs)->bank_count <= bank_id)
         return -8;
     bank = (struct SndBankTableEntry *)(bank_id * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table);
-    if (bank->data_block == 0)
+    if (!bank->data_block)
         return -8;
-    if (bank->load_state.s != 0)
+    if (bank->load_state.s)
         return -0x12;
     return 0;
 }

@@ -35,7 +35,7 @@ int SNDSTRM_destroy(int s)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     S = (SndStream *)iSNDstreamgetstreamptr(s);
-    if (S == 0)
+    if (!S)
         return -8;
 
     SNDSTRM_purge(s);
@@ -44,7 +44,7 @@ int SNDSTRM_destroy(int s)
         ((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook = 0;
     }
     SNDPKTPLAY_destroy(S->packet_player);
-    if (S->external_stream == 0)                         /* owns its ring */
+    if (!S->external_stream)                         /* owns its ring */
         STREAM_destroy(S->stream_handle);
     sndss[s] = 0;
     return 0;
@@ -67,7 +67,7 @@ int SNDSTRM_purge(int s)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     S = (SndStream *)iSNDstreamgetstreamptr(s);
-    if (S == 0)
+    if (!S)
         return -8;
     if (S->start_result < 0) {
         stopped = -1;

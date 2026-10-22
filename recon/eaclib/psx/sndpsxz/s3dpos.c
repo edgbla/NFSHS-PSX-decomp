@@ -27,7 +27,7 @@ int iSNDplatform3dpos(int chan, int x, int y)
     if (slot->route == 1)
         iSNDatodlrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
                     &outL, &outR, (signed char)slot->pan_left_cache, (signed char)slot->pan_right_cache);
-    else if (slot->route == 0)
+    else if (!slot->route)
         iSNDatolrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
                    &outL, &outR);
     slot->pan_left_cache = (unsigned char)outL;

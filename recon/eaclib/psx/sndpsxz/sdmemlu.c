@@ -40,7 +40,7 @@ int SNDmemlargestunused(int *out)
     *out = 0x41;
     best = 0;
     count = ((struct SndSpuMemoryStateView *)base)->memory.alloc_count;
-    if (count == 0) {
+    if (!count) {
         best = ((struct SndSpuMemoryStateView *)base)->memory.boundary.view.limits.reverb_mode - 0x41;
     } else {
         i = 0;
@@ -52,7 +52,7 @@ int SNDmemlargestunused(int *out)
             q = base;
             tbl = ((struct SndSpuMemoryStateView *)q)->entries;
             do {
-                if (i == 0) {
+                if (!i) {
                     gap = tbl->block - 0x41;
                     if (best < gap)
                         best = gap;

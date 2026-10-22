@@ -105,7 +105,7 @@ void iSNDdmtransfer(void)
     scanBase = pd;
     scanEntry = (struct SNDDmaEntry *)(scanBase + 0x10);
     do {
-        if (scanEntry->handle != 0) {                     /* active entry */
+        if (scanEntry->handle) {                     /* active entry */
             if (bestPrio < scanEntry->priority) {
                 ((struct SndDmaQueueStateView *)scanBase)->active_slot.plain = (signed char)i;
                 bestHandle = scanEntry->handle;
@@ -126,10 +126,10 @@ void iSNDdmtransfer(void)
         activeEntry = (struct SNDDmaEntry *)
             (((((int)((struct SndDmaQueueStateView *)tailBase)->active_slot.v) << 24) >> 24) * (int)sizeof(struct SNDDmaEntry)
              + (qbase = (int)tailBase + 0x10));
-        if (activeEntry->flag != 0) {
+        if (activeEntry->flag) {
             void (*hook)(void) = ((struct SndDriverHookStateView *)tailBase)->hooks.preload;
             ((struct SndDmaQueueStateView *)tailBase)->callback_guard.v = 1;
-            if (hook != 0)
+            if (hook)
                 (*hook)();
         }
     }
@@ -211,11 +211,11 @@ void iSNDdmcallback(void)
     slot = ((struct SndDmaQueueStateView *)pd)->active_slot.v;
     active = ((struct SNDDmaEntry *)(pd + 0x10 + slot * (int)sizeof(struct SNDDmaEntry)))->handle;
     MASK_INTERRUPTS_SR(sr);
-    if (active != 0) {        /* active entry present */
+    if (active) {        /* active entry present */
         if (((struct SndDmaQueueStateView *)pd)->callback_guard.v != 0) {
             hook = ((struct SndDriverHookStateView *)pd)->hooks.preload;
             ((struct SndDmaQueueStateView *)pd)->callback_guard.v = 0;
-            if (hook != 0)
+            if (hook)
                 (*hook)();
         }
         pd = sndpd;
@@ -273,7 +273,7 @@ int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
     ((struct SndDmaQueueStateView *)raw)->next_handle = ((struct SndDmaQueueStateView *)raw)->next_handle + 1;
     handleSnapshot = ((struct SndDmaQueueStateView *)raw)->next_handle;
     MASK_INTERRUPTS_SR(sr);
-    if (handleSnapshot == 0)
+    if (!handleSnapshot)
         ((struct SndDmaQueueStateView *)raw)->next_handle = 1;
 
     /* MATCH (w34-a5, 5->0 PASS).  The w31/w33 "no-copy-prop identity" residual was NOT an identity
@@ -300,7 +300,7 @@ int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
     pd = (unsigned char *)raw;
     ent = (volatile struct SNDDmaEntry *)(pd + 0x10);
 scan:
-    if (ent->handle != 0)
+    if (ent->handle)
         goto occupied;
     ((struct SndDmaQueueStateView *)pd)->in_flight_count.v = ((struct SndDmaQueueStateView *)pd)->in_flight_count.v + 1;
     handleSnapshot = ((struct SndDmaQueueStateView *)pd)->next_handle;

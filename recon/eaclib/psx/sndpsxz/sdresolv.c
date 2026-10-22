@@ -104,7 +104,7 @@ int iSNDplatformresolve(int cursor, int bank, int patch)
         else if (id == 0x82) count    = val;
         else if (id == 0x85) size     = val;
     }
-    if (bank != 0) {
+    if (bank) {
         e = (int *)(idx * 8 + patch);               /* find an existing resolve for this offset */
         if (*(int *)e != -1) {
             end = -1;
@@ -140,7 +140,7 @@ checked:
         scale = count << 4;
         blocks = blocks * scale;
         buf = iSNDpsxmalloc(blocks);
-        if (buf == 0)
+        if (!buf)
             return -6;
         goto resolve;
 found:

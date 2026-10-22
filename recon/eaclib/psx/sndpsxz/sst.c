@@ -97,7 +97,7 @@ int iSNDstreamdestroyall(void)
 /* iSNDstreamgetstreamptr @0x800E8C48 : map a stream index to its object (only index 0 exists). */
 int iSNDstreamgetstreamptr(int idx)
 {
-    if (idx != 0)
+    if (idx)
         return 0;
     return sndss[0]; /* MATCH (7/7): array storage plus the negative guard preserves both return tails. */
 }
@@ -190,7 +190,7 @@ void iSNDstreamnotifycallback(int handle, unsigned int bytes)
         iSNDstreamremoverequest(((volatile SndStreamReq *)req)->request_id);
     notdone:
         bytes = over;
-        if (bytes == 0)                                 /* MATCH: exit-in-the-middle -- prevents
+        if (!bytes)                                 /* MATCH: exit-in-the-middle -- prevents
                                                           * the do-while bottom-test rotation */
             break;
         over = 0;
@@ -213,7 +213,7 @@ int iSNDstreamparseheader(int S, int data)
     ((volatile SndStreamReq *)req)->total_size = outsize;
     STREAM_release(((SndStream *)S)->stream_handle, (void *)(unsigned int)data);
     ((volatile SndStreamReq *)req)->total_size = ((((volatile SndStreamReq *)req)->total_size + 0x1b) / 0x1c) * 0x1c;    /* round up to 0x1C */
-    ((volatile SndStreamReq *)req)->data_rate = iSNDplatformcalcdatarate(&((SndStream *)S)->current_rate.samplerate);
+    ((volatile SndStreamReq *)req)->data_rate = iSNDplatformcalcdatarate(&((SndStream *)S)->current_rate);
 
     if (memcmp(&((SndStream *)S)->locked_rate, &((SndStream *)S)->current_rate, sizeof(SNDSAMPLEFORMAT)) != 0)
         goto formatdiffers;
@@ -300,7 +300,7 @@ int iSNDstreamparsedata(int S, int chunk)
             flatPtr = flatBase;
             /* Keep the seed source live past its copy without emitting code.  Otherwise
              * cc1 copy-propagates flatPtr back into flatBase and deletes retail's a3->a2 move. */
-            if (flatBase != 0)
+            if (flatBase)
                 dp = desc.words;
             else
                 dp = desc.words;                              /* MATCH: base ptr materialized ONLY here --
@@ -479,21 +479,21 @@ int iSNDstreamisheld(int S)
 
     if (((SndStreamReq *)req)->data_rate == 0)                              /* data rate unknown -> not held */
         return 0;
-    if ((((int)(((volatile SndStreamReq *)req)->hold_threshold) << 16) >> 16) < 0)  /* held threshold negative -> held */
+    if (((volatile SndStreamReq *)req)->hold_threshold < 0)  /* held threshold negative -> held */
         return 1;
-    if ((((int)(((volatile SndStreamReq *)req)->hold_threshold) << 16) >> 16) == 0)  /* no threshold -> not held */
+    if (((volatile SndStreamReq *)req)->hold_threshold == 0)  /* no threshold -> not held */
         return 0;
 
     {
         unsigned int avail = STREAM_gettable(((SndStream *)S)->stream_handle);
-        unsigned int thresh;
+        int thresh;
         if (4000000 < avail)
             avail = 4000000;
-        thresh = (((int)(((volatile SndStreamReq *)req)->hold_threshold) << 16) >> 16);
+        thresh = ((volatile SndStreamReq *)req)->hold_threshold;
         /* MATCH (disasm-v4 trace, 9->0 diffs): keep the clear-threshold block physically before
          * the state check.  The true comparison branches forward to `check_state`; state==2 then
          * branches backward into the shared clear block, while state!=2 falls through with 1. */
-        if (avail * 1000 / (unsigned int)((SndStreamReq *)req)->data_rate < thresh)
+        if (avail * 1000 / ((SndStreamReq *)req)->data_rate < thresh)
             goto check_state;
 clear_threshold:
         ((SndStreamReq *)req)->hold_threshold = 0;
@@ -517,7 +517,7 @@ void iSNDstreamhotroddatachunks(void)
         /* MATCH: the zero-iteration guard scope below is behavior-neutral, but gives GCC
          * the oracle's saved-register coloring for S and the later availability value. */
         int S = *p;
-        if (S == 0)
+        if (!S)
             goto next;
         do {
             if (((SndStream *)S)->current_count == 0)
@@ -550,7 +550,7 @@ void iSNDstreamhotroddatachunks(void)
                          * (§3.11/D "dropped call arg"); the 3-arg extern decl stays for any other
                          * caller in the codebase that DOES pass buf/len. */
                         chunk = (int)(unsigned int)STREAM_get(((SndStream *)S)->stream_handle);
-                        if (chunk != 0) {
+                        if (chunk) {
                             int bytes = *(int *)(chunk + 4);
                             total += bytes;
                             iSNDstreamparsedata(S, chunk);
@@ -607,7 +607,7 @@ void iSNDstreamservice(void)
                 int n, r;
                 if ((((int)(((volatile SndStream *)S)->state) << 24) >> 24) == 1) {
                     n = SNDPKTPLAY_submitspace(((SndStream *)S)->packet_player);
-                    if (n == 0)
+                    if (!n)
                         goto next;
                     r = 0;
                 } else {
@@ -619,9 +619,9 @@ void iSNDstreamservice(void)
                     n--;
                     /* MATCH: only $a0 set at this call site too (§3.11/D dropped call arg). */
                     chunk = (int)(unsigned int)STREAM_get(((SndStream *)S)->stream_handle);
-                    if (chunk != 0)
+                    if (chunk)
                         r = iSNDstreamparsechunk(S, chunk);
-                    if (r == 0)
+                    if (!r)
                         break;
                 } while (0 < n);
             }
@@ -645,7 +645,7 @@ int iSNDstreamnumcreated(void)
     int count = 0;
     int slot;
     for (slot = 0; slot < 1; slot++) {
-        if (sndss[slot] != 0)
+        if (sndss[slot])
             count++;
     }
     return count;       /* MATCH (14/14): true sndss[] storage gives the oracle's split address. */
@@ -725,7 +725,7 @@ found:
         map[((volatile SndStream *)S)->packet_player + 4] = (unsigned char)slot;      /* handle -> slot (delay slot) */
     }
 
-    if (extFlag != 0) {                                  /* external ring */
+    if (extFlag) {                                  /* external ring */
         ((SndStream *)S)->stream_handle    = extHandle;
         ((volatile SndStream *)S)->external_stream = 1;   /* volatile: keeps the sb out of the j slot
                                                       * so the tail's li -1 gets target-stolen (W31) */
@@ -766,7 +766,7 @@ int iSNDstreamqueue(unsigned int s, int name, char *filename, int off, int mode)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     p = iSNDstreamgetstreamptr(s);
-    if (p == 0)
+    if (!p)
         return -8;
 
     iSNDenteraudio();
@@ -776,7 +776,7 @@ int iSNDstreamqueue(unsigned int s, int name, char *filename, int off, int mode)
     }
 
     req = (int)(unsigned int)((SndStream *)p)->requests + (((int)(((volatile SndStream *)p)->current_count) << 24) >> 24) * (int)sizeof(SndStreamReq);
-    if (mode == 0)
+    if (!mode)
         ((volatile SndStreamReq *)req)->stream_request_id = STREAM_queuefile(((SndStream *)p)->stream_handle, filename, off, 0x6c454353);
     else if (mode == 1)
         ((volatile SndStreamReq *)req)->stream_request_id = STREAM_queuemem(((SndStream *)p)->stream_handle, filename, 0, 0x6c454353);
@@ -797,7 +797,7 @@ int iSNDstreamqueue(unsigned int s, int name, char *filename, int off, int mode)
                                                    * lui-scratch/lwl-lwr floors documented above). */
         ((volatile SndStream *)p)->request_counter = 0;
     ((volatile SndStreamReq *)req)->request_id = ((volatile SndStream *)p)->request_counter | s;        /* full id = counter | slot */
-    ((volatile SndStreamReq *)req)->hold_threshold = (short)name;
+    ((volatile SndStreamReq *)req)->hold_threshold = name;
     ((SndStream *)p)->current_count = ((SndStream *)p)->current_count + 1;               /* curReqCount++ */
     ((SndStreamReq *)req)->data_rate = 0;
     ((SndStreamReq *)req)->firstqid    = -1;

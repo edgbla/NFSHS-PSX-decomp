@@ -146,7 +146,7 @@ int SNDbankheadercopy(void *dst, int bankId)
      * documented de-merger) does NOT reach it here. */
     do { id = bankId; } while (0);
     do {
-        if (base->initialized != 0)
+        if (base->initialized)
             goto initialized;
         return -10;
     } while (0);
@@ -181,11 +181,11 @@ initialized:
         do {
             if (((struct SndBankDataHeaderPrefix *)bankData)->type == type4) {
                 int sp = ((struct SndBankPatchOffset20CursorView *)(unsigned int)src20)->relative_offset;
-                if (sp != 0)
+                if (sp)
                     ((struct SndBankPatchOffset20CursorView *)(unsigned int)dst20)->relative_offset = (int)dest + (sp - (int)origin);
             } else {
                 int sp = ((struct SndBankPatchOffset12CursorView *)(unsigned int)src12)->relative_offset;
-                if (sp != 0)
+                if (sp)
                     ((struct SndBankPatchOffset12CursorView *)(unsigned int)dst12)->relative_offset = (int)dest + (sp - (int)bankData);
             }
             dst12 += 4;

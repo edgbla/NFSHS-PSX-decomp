@@ -46,7 +46,7 @@ int cSNDbankremove(int bankId, int recurse)
     struct SNDGlobals *base = &sndgs;
     int i;
 
-    if (base->initialized == 0)
+    if (!base->initialized)
         return -10;
     if (bankId == -1) {                  /* unload every bank */
         for (i = 0; i < base->bank_count; i++)
@@ -61,7 +61,7 @@ int cSNDbankremove(int bankId, int recurse)
         unsigned char *entry;
         struct SNDGlobals *base2;
         i = 0;
-        if (base->channel_count != 0) {     /* stop voices owned by this bank */
+        if (base->channel_count) {     /* stop voices owned by this bank */
             struct SNDGlobals *loopbase = base;
             off = 0;
             do {

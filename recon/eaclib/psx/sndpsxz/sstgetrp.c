@@ -19,7 +19,7 @@ int iSNDstreamgetrequestptr(unsigned int idx)
     if (-1 >= (int)idx)
         return 0;
     sp = (SndStream *)iSNDstreamgetstreamptr((int)(idx & 0xff));
-    if (sp == 0)
+    if (!sp)
         return 0;
     if (!(0 < (int)((unsigned)sp->current_count << 0x18)))   /* (signed char) count > 0 */
         return 0;

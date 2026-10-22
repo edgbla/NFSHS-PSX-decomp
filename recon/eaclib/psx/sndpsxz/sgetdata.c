@@ -10,7 +10,7 @@ int iSNDgetdata(unsigned char *p, int n)
 {
     int v = 0;
     int i = n - 1;
-    if (n != 0) {
+    if (n) {
         do {
             v = v * 0x100 + *p;
             p = p + 1;

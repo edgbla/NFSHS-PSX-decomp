@@ -14,7 +14,7 @@ int SNDSTRM_getvol(int tag)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     sp = (SndStream *)iSNDstreamgetstreamptr(tag);
-    if (sp == 0)
+    if (!sp)
         return -8;
     vol = SNDgetvol(sp->start_result);
     if (vol < 0)
