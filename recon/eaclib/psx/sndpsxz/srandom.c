@@ -40,15 +40,15 @@ int iSNDrandom(void)
     state[4] = sum;
 
     sum = sum + old3 + carry;
-    carry = (unsigned int)(sum < old3);
+    carry = sum < old3;
     state[3] = sum;
 
     sum = sum + old2 + carry;
-    carry = (unsigned int)(sum < old2);
+    carry = sum < old2;
     state[2] = sum;
 
     sum = sum + old1 + carry;
-    carry = (unsigned int)(sum < old1);
+    carry = sum < old1;
     state[1] = sum;
 
     {
@@ -72,5 +72,5 @@ int iSNDrandom(void)
     }
     }
 done:
-    return (int)sum;
+    return sum;
 }

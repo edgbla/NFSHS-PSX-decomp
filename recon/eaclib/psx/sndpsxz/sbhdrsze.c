@@ -13,5 +13,5 @@ int SNDbankheadersize(int bankId)
 {
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
-    return ((struct SndBankDataHeaderPrefix *)(unsigned int)((struct SndBankTableEntry *)(bankId * (int)sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block)->header_size;
+    return ((struct SndBankDataHeaderPrefix *)(unsigned int)((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block)->header_size;
 }

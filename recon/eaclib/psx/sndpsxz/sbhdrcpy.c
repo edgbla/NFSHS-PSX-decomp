@@ -24,9 +24,9 @@
 #include "sbhdrsze.h"
 #include "snd_globals.h"
 #include "sndbankpriv.h"
+#include "sndcrtpriv.h"
 #include "sndbankhdrpriv.h"
 
-extern void *memcpy(void *dst, const void *src, int n);   /* C42 (BIOS thunk) */
 
 /* SNDbankheadercopy @0x800E7BA8 : memcpy the bank header to `dst`, relocate each patch pointer (+0x14 for
  *   bank type 4, else +0xc) relative to `dst`, then point the bank table entry at `dst`.
@@ -155,7 +155,7 @@ initialized:
         size = SNDbankheadersize(id);
         if (size < 0)
             return size;
-    memcpy(dest, (unsigned char *)((struct SndBankTableEntry *)(id * (int)sizeof(struct SndBankTableEntry) + base->bank_table))->data_block, size);
+    memcpy(dest, (unsigned char *)((struct SndBankTableEntry *)(id * sizeof(struct SndBankTableEntry) + base->bank_table))->data_block, size);
     {
         int i;
         unsigned char *bankData;
@@ -169,10 +169,10 @@ initialized:
          * define `origin` before `i`.  sched1 then places i=0 in the bankData
          * pointer-load delay slot, and reorg steals origin into the count branch
          * slot, reproducing retail exactly. */
-        bankData = (unsigned char *)((struct SndBankTableEntry *)(id * (int)sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
+        bankData = (unsigned char *)((struct SndBankTableEntry *)(id * sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
         origin = bankData;
         i = 0;
-        if ((unsigned int)i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count) {
+        if (i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count) {
             type4 = 4;
             dst12 = dest;
             src12 = bankData;
@@ -193,10 +193,10 @@ initialized:
             dst20 += 4;
             src20 += 4;
             i++;
-        } while (i < (int)(unsigned)((struct SndBankDataHeaderPrefix *)bankData)->patch_count);
+        } while (i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count);
         }
     }
-        ((struct SndBankTableEntry *)(id * (int)sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = dest;
+        ((struct SndBankTableEntry *)(id * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = dest;
         return 0;
     }
 }

@@ -25,10 +25,10 @@ int iSNDplatform3dpos(int chan, int x, int y)
     if (((volatile SndPacketVoiceState *)slot)->play_state != 2)
         return 0;
     if (((volatile SndPacketVoiceState *)slot)->route == 1)
-        iSNDatodlrv((unsigned int)x, (int)((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
-                    &outL, &outR, (int)(signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[0], (int)(signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[1]);
+        iSNDatodlrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
+                    &outL, &outR, (signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[0], (signed char)((volatile SndPacketVoiceState *)slot)->pad24_25[1]);
     else if (((volatile SndPacketVoiceState *)slot)->route == 0)
-        iSNDatolrv((unsigned int)x, (int)((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
+        iSNDatolrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
                    &outL, &outR);
     ((volatile SndPacketVoiceState *)slot)->pad24_25[0] = (unsigned char)outL;
     ((volatile SndPacketVoiceState *)slot)->pad24_25[1] = (unsigned char)outR;

@@ -21,6 +21,6 @@ unsigned int iSNDtimeremaining(int chan)
     unsigned char *voice = D_801479F0 + chan * 0x2c;
     if (((SndPacketVoiceState *)voice)->word08 == 0)
         return 0x7fffffff;
-    return (unsigned int)(((SndPacketVoiceState *)voice)->loop_length - ((SndPacketVoiceState *)voice)->byte_position) /
+    return (((SndPacketVoiceState *)voice)->loop_length - ((SndPacketVoiceState *)voice)->byte_position) /
            *(volatile unsigned int *)&((SndPacketVoiceState *)voice)->word08;
 }

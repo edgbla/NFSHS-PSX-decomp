@@ -21,10 +21,8 @@
 #include "spatkey.h"
 #include "sdriver.h"
 #include "slib.h"
+#include "slib_state.h"
 
-extern unsigned char sndpd[];   /* EA sound-driver state base @0x80147918 (unsized array: forces
-                                     * the oracle's `lui;addiu &sndpd; lw r,0x514(base)` base+offset shape
-                                     * instead of folding &sndpd+const into one absolute %lo load) */
 /* iSNDpatchkey @0x800FEF4C : iterate the voices keyed to a channel group.  For a standalone channel,
  *   hands back `chan` once; for a group, walks the pool returning each held member.  `tag` points at a
  *   cursor (init -1).  Returns 1 while voices remain, 0 when exhausted. */
@@ -36,14 +34,14 @@ int iSNDpatchkey(int chan, int tag)
     if (grp != 0) {
         int i = *(int *)tag;
         *(int *)tag = i + 1;
-        if (i + 1 < (int)(unsigned)((unsigned char *)sndgs)[0x11]) {
+        if (i + 1 < ((unsigned char *)sndgs)[0x11]) {
             int *gs = sndgs;
             do {
                 SndChannel *p = &((SndChannel *)(unsigned int)gs[0x25])[*(int *)tag];
                 if (p->group_id == grp && p->state == 1 && -1 < (int)p->owner_tag)
                     return 1;
                 *(int *)tag = *(int *)tag + 1;
-            } while (*(int *)tag < (int)(unsigned)((unsigned char *)gs)[0x11]);
+            } while (*(int *)tag < ((unsigned char *)gs)[0x11]);
         }
         goto no_key;
     }

@@ -34,5 +34,5 @@ int SNDtimeremaining(unsigned int tag)
             best = rem;
     }
     iSNDleaveaudio();
-    return (int)best;
+    return best;
 }

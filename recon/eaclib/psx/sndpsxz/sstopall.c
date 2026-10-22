@@ -22,7 +22,7 @@ void SNDstopall(void)
         do {
             i++;
             SNDstop(((SndChannel *)(unsigned int)(off + gs[0x25]))->owner_tag);
-            off += (int)sizeof(SndChannel);
-        } while (i < (int)(unsigned)((unsigned char *)gs)[0x11]);
+            off += sizeof(SndChannel);
+        } while (i < ((unsigned char *)gs)[0x11]);
     }
 }

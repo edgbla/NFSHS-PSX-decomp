@@ -195,7 +195,7 @@ detune_done:
         field54 = vol->pan_curve.word;
         *(volatile int *)&slot->pan_curve = field54;
         field5c = vol->detune_curve.word;
-        *(volatile int *)&slot->autovol_position.word = (int)b8 << 0x10;
+        *(volatile int *)&slot->autovol_position.word = b8 << 0x10;
         *(volatile int *)&slot->detune_curve = field5c;
         active = slot->pan_scale;
         slot->autovol_step = 0;
@@ -243,13 +243,13 @@ pan_low:
         {
             unsigned int rv = vol->velocity_phase_seed.uword;
             if (rv != 0) {
-                rv = (unsigned int)iSNDrandom();
+                rv = iSNDrandom();
                 slot->velocity_phase = (char)(rv % vol->velocity_phase_limit.uword);
             } else
                 slot->velocity_phase = 0;
             rv = vol->pitch_lfo_seed.uword;
             if (rv != 0) {
-                rv = (unsigned int)iSNDrandom();
+                rv = iSNDrandom();
                 slot->pitch_lfo_phase = (char)(rv % vol->lfo_phase_limit.uword);
             } else
                 slot->pitch_lfo_phase = 0;
@@ -284,7 +284,7 @@ pan_low:
         if (playResult < 0)
             iSNDfreechan(chan);
         else
-            return (int)out;
+            return out;
         return playResult;
     }
 }
@@ -405,14 +405,14 @@ int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
 {
     unsigned int state[4];
     int r = -1;
-    state[0] = (unsigned int)bank;
+    state[0] = bank;
     if ((((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) != 0)
-        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte);
+        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
     else
-        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte);
+        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
     while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
         if (state[1] == 0xfd)
-            r = iSNDplatformresolve((int)state[0], patch_idx, scratch);
+            r = iSNDplatformresolve(state[0], patch_idx, scratch);
     }
     if (-1 < r)
         ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags = ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags | 1;
@@ -424,14 +424,14 @@ int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
 int iSNDremovetaggedpatch(int bank, int *patch_idx)
 {
     unsigned int state[4];
-    state[0] = (unsigned int)bank;
+    state[0] = bank;
     if ((((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) != 0)
-        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte);
+        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
     else
-        state[0] = (unsigned int)((int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte);
+        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
     while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
         if (state[1] == 0xfd)
-            iSNDplatformremove((int)state[0], patch_idx);
+            iSNDplatformremove(state[0], patch_idx);
     }
     ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags = ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 0xfe;
     return 0;

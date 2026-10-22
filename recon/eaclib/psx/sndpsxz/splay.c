@@ -31,13 +31,13 @@ int cSNDplay(struct SNDPLAYOPTS *info, int recurse)
 {
     int patch, bank, pp;
     (void)recurse;
-    if (iSNDvalidbank((int)(signed char)info->bhandle) < 0)
+    if (iSNDvalidbank((signed char)info->bhandle) < 0)
         return -8;
     patch = info->patnum;
-    bank = (int)(unsigned int)((struct SndBankTableEntry *)((signed char)info->bhandle * (int)sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block;
+    bank = (int)(unsigned int)((struct SndBankTableEntry *)((signed char)info->bhandle * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block;
     if (patch < 0)
         return -8;
-    if (!(patch < (int)(unsigned)((struct SndBankDataHeaderPrefix *)(unsigned int)bank)->patch_count))
+    if (!(patch < ((struct SndBankDataHeaderPrefix *)(unsigned int)bank)->patch_count))
         return -8;
     if (((struct SndBankDataHeaderPrefix *)(unsigned int)bank)->type == 4)
         pp = ((struct SndBankPatchTable20Prefix *)(unsigned int)bank)->first_relative_patch[patch];

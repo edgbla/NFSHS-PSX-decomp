@@ -22,7 +22,7 @@ int SNDSTRM_requeststatus(unsigned int reqTag, int s)
     ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timebuffered = 0;
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
     if (-1 >= (int)reqTag) return -8;
-    sp = (SndStream *)iSNDstreamgetstreamptr((int)(reqTag & 0xff));
+    sp = (SndStream *)iSNDstreamgetstreamptr(reqTag & 0xff);
     if (sp == 0) return -8;
     iSNDenteraudio();
     rp = (SndStreamReq *)iSNDstreamgetrequestptr(reqTag);
@@ -33,11 +33,11 @@ int SNDSTRM_requeststatus(unsigned int reqTag, int s)
     } else {
         if (sp->requests == rp) { ((struct SNDREQUESTSTATUS *)(unsigned int)s)->state = 2; div = sp->locked_rate.samplerate; }
         else                    { ((struct SNDREQUESTSTATUS *)(unsigned int)s)->state = 1; div = sp->current_rate.samplerate; }
-        (void)iSNDmulu64(&q, (unsigned int)rp->bytes_consumed, 1000);
+        (void)iSNDmulu64(&q, rp->bytes_consumed, 1000);
         ((struct SNDREQUESTSTATUS *)(unsigned int)s)->currenttime = iSNDdivu64(q, div);
-        (void)iSNDmulu64(&q, (unsigned int)(rp->total_size - rp->bytes_consumed), 1000);
+        (void)iSNDmulu64(&q, rp->total_size - rp->bytes_consumed, 1000);
         ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timetoend = iSNDdivu64(q, div);
-        ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timebuffered = (unsigned int)(rp->remaining_bytes * 1000) / div;
+        ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timebuffered = (rp->remaining_bytes * 1000) / div;
     }
     goto status_done;
 no_request:

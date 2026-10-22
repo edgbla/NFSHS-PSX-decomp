@@ -9,6 +9,7 @@
 
 #include "sdfx.h"
 #include "sdata.h"
+#include "sndcrtpriv.h"
 #include "sndchpriv.h"
 #include "sndserverpriv.h"
 #include "sndbankpriv.h"
@@ -46,9 +47,6 @@
  *                                         rate SNDPKTPLAY_start/stagpat load;
  *                                         inside the DAT_801478f4 sub-run) */
 /* (2026-09-20) the run itself is defined by sdata.obj (sdata.c), its retail link-order owner */
-
-extern void *memset(void *dst, int c, int n);        /* C43 (BIOS thunk) */
-
 
 /* SNDSYS_getopts @0x800F1D58 : copy the live option block sndgs[0..0xe] into the caller's struct (lazily
  *   publishing the platform output caps first, defaulting maxbanks to 0x10).
@@ -103,19 +101,19 @@ int SNDSYS_init(int membase, int memsize)
         return 0;
 
     iSNDmeminit(membase, memsize);
-    nchan = (unsigned int)((SNDSYSOPTS *)base)->set.inputvoices;
+    nchan = ((SNDSYSOPTS *)base)->set.inputvoices;
     if (nchan == 0) {                                              /* no caps yet -> defaults */
         SNDSYS_getopts((SNDSYSOPTS *)base);
         SNDSYS_setopts((SNDSYSOPTS *)base);
-        nchan = (unsigned int)((SNDSYSOPTS *)base)->set.inputvoices;
+        nchan = ((SNDSYSOPTS *)base)->set.inputvoices;
     }
     base->play_records = iSNDmalloc(nchan * sizeof(SndChannel));   /* channel pool */
     memset((unsigned char *)(unsigned int)base->play_records, 0,
-           (int)((unsigned)((SNDSYSOPTS *)base)->set.inputvoices * sizeof(SndChannel)));
+           ((SNDSYSOPTS *)base)->set.inputvoices * sizeof(SndChannel));
     base->bank_table = iSNDmalloc(
-        (unsigned int)((SNDSYSOPTS *)base)->set.maxbanks * (unsigned int)sizeof(struct SndBankTableEntry)); /* bank table */
+        ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry)); /* bank table */
     memset((unsigned char *)(unsigned int)base->bank_table, 0,
-           (int)((unsigned)((SNDSYSOPTS *)base)->set.maxbanks * (unsigned)sizeof(struct SndBankTableEntry)));
+           ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry));
     if (base->server_callback == 0)
         base->server_callback = (int)iSND100hzserver;
     SNDI_mutexalloc();

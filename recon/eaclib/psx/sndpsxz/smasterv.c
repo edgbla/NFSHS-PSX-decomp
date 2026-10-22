@@ -26,10 +26,10 @@ int SNDmastervol(int vol)
             SndChannel *slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
             if (slot->state == 1 && -1 < (int)slot->owner_tag) {
                 iSNDcalcvol(chan);
-                iSNDvol(chan, (int)slot->volume);
+                iSNDvol(chan, slot->volume);
             }
             chan++;
-        } while (chan < (int)(unsigned)((struct SndGlobalServerStateView *)sndgs)->channel_count);
+        } while (chan < ((struct SndGlobalServerStateView *)sndgs)->channel_count);
     }
     iSNDleaveaudio();
     return 0;

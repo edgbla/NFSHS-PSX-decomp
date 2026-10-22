@@ -19,5 +19,5 @@ int SNDgetvol(unsigned int tag)
         return -8;
     }
     iSNDleaveaudio();                               /* oracle: leaveaudio BEFORE reading the +0x2d vol */
-    return (int)((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[ch].volume; /* signed cached-volume load */
+    return ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[ch].volume; /* signed cached-volume load */
 }

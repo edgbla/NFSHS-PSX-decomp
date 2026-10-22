@@ -61,12 +61,12 @@ void iSNDserver(void)
             *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks = 0;
         }
         *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks = *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks + 1;
-        target = (unsigned int)(*(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks * 100) / (unsigned int)timerhz[0];
-        if ((unsigned int)((struct SndGlobalServerStateView *)p)->tick_count <= target) {
+        target = (*(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks * 100) / (unsigned int)timerhz[0];
+        if (((struct SndGlobalServerStateView *)p)->tick_count <= target) {
             g = p;
             do {
                 ((struct SndGlobalServerStateView *)g)->server_callback();
-            } while ((unsigned int)((struct SndGlobalServerStateView *)g)->tick_count <= target);
+            } while (((struct SndGlobalServerStateView *)g)->tick_count <= target);
         }
         { volatile char *q = (volatile char *)sndgs; ((volatile struct SndGlobalServerStateView *)q)->in_server = 0; }
     }
@@ -102,7 +102,7 @@ void iSND100hzserver(void)
             ((struct SndServer100HzClientCursorView *)g)->callback();
             g++;
             i++;
-        } while (i < (int)((struct SndGlobalServerStateView *)clientBase)->client_100hz_count.s);
+        } while (i < ((struct SndGlobalServerStateView *)clientBase)->client_100hz_count.s);
     }
 
     channelBase = sndgs;
@@ -120,7 +120,7 @@ void iSND100hzserver(void)
                         p->pitch_lfo_phase = 0;
                     p->linear_pitch_cache = 0;
                     iSNDcalcpitch(i);
-                    iSNDplatformpitch(i, (int)(unsigned)p->spu_pitch);
+                    iSNDplatformpitch(i, p->spu_pitch);
                 }
                 dirty = 0;
                 if (p->velocity_curve != 0) {                                 /* velocity envelope active */
@@ -137,14 +137,14 @@ void iSND100hzserver(void)
                     if (p->autovol_step != 0) {                                   /* autovol ramp step */
                         int position;
                         dirty = 1;
-                        position = (int)p->autovol_position.word + (int)p->autovol_step;
-                        p->autovol_position.word = (unsigned int)position;
-                        if ((int)p->autovol_step < 0) {
-                            if (!((int)p->autovol_limit < position)) {
+                        position = p->autovol_position.word + p->autovol_step;
+                        p->autovol_position.word = position;
+                        if (p->autovol_step < 0) {
+                            if (!(p->autovol_limit < position)) {
                                 p->autovol_position.word = p->autovol_limit;
                                 p->autovol_step = 0;
                             }
-                        } else if (!(position < (int)p->autovol_limit)) {
+                        } else if (!(position < p->autovol_limit)) {
                             p->autovol_position.word = p->autovol_limit;
                             p->autovol_step = 0;
                         }
@@ -155,7 +155,7 @@ void iSND100hzserver(void)
                          * check nested in `if (step != 0)`).  The old placement ran the
                          * check every tick.  verify_asm was BLIND to it (branch-target
                          * lenient by design) -- objdiff's 99.97% was flagging exactly this. */
-                        if ((int)p->autovol_position.word < 0) { SNDstop(p->owner_tag); goto next_chan; }
+                        if (p->autovol_position.word < 0) { SNDstop(p->owner_tag); goto next_chan; }
                     }
                 }
                 /* portamento done -> pitch sweep */
@@ -169,22 +169,22 @@ void iSND100hzserver(void)
                     } else {
                         SndSweepSegment *table = &p->sweep_table[index];
                         p->sweep_countdown = table->duration;
-                        if ((int)p->sweep_countdown < 0)
+                        if (p->sweep_countdown < 0)
                             p->sweep_countdown = 0x7fffffff;
-                        p->portamento_step = (table->target_pitch * 0x10000 - (int)p->portamento_position.word) / (int)p->sweep_countdown;
+                        p->portamento_step = (table->target_pitch * 0x10000 - p->portamento_position.word) / p->sweep_countdown;
                     }
                 }
                 p->sweep_countdown = p->sweep_countdown - 1;
                 if (dirty) {
                     iSNDcalcvol(i);
                     if (-1 < (int)p->owner_tag)
-                        iSNDvol(i, (int)p->volume);
+                        iSNDvol(i, p->volume);
                 }
             }
 next_chan:
-            chanIdx += (int)sizeof(SndChannel);
+            chanIdx += sizeof(SndChannel);
             i++;
-        } while (i < (int)(unsigned)((struct SndGlobalServerStateView *)globalBase)->channel_count);
+        } while (i < ((struct SndGlobalServerStateView *)globalBase)->channel_count);
     }
 }
 

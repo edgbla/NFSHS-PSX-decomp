@@ -244,8 +244,8 @@ void iSNDdmservice(void)
         int *entry = (int *)(pd + slot * (int)sizeof(struct SNDDmaEntry));
         /* MATCH: the volatile clock read keeps &sndgs materialized and, named before deadline,
          * fills the oracle's latency window with the two loads in their original order. */
-        unsigned int now = (unsigned int)*(volatile int *)&gs[0x11];
-        unsigned int deadline = (unsigned int)((struct SNDDmaEntry *)((char *)entry + 0x10))->deadline;
+        unsigned int now = *(volatile int *)&gs[0x11];
+        unsigned int deadline = ((struct SNDDmaEntry *)((char *)entry + 0x10))->deadline;
         if (deadline <= now)
             iSNDdmcallback();
     }

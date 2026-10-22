@@ -86,7 +86,7 @@ unsigned int iSNDmemrestore(void)
     char          *mm = (char *)&sndmm;
     int            hw = *(int *)(mm + 8);
     unsigned short ps = *(unsigned short *)(mm + 6);
-    return (unsigned int)(hw * 100) / (unsigned int)ps;
+    return (hw * 100) / (unsigned int)ps;
 }
 
 /* iSNDmalloc @0x80106238 : first-fit allocate `size` bytes (rounded to words) from the sndmm pool,
@@ -297,7 +297,7 @@ int iSNDmalloc(int size)
             goto commit;
         goto fail;
     }
-    if (i < (int)*(unsigned short *)(base + 4)) {
+    if (i < *(unsigned short *)(base + 4)) {
         tab = base + 0xc;
         prev = (unsigned short *)(base + 8);
         mm = base;
@@ -326,8 +326,8 @@ int iSNDmalloc(int size)
                  * add so combine_regs cannot tie the sum's dest to the dying offset pseudo; the add
                  * takes retail's FRESH dest ($a2) instead of mutating the offset reg in place. */
                 {
-                    int b = (int)pv[0] + (int)pv[1];
-                    int a = (int)*entry - b;
+                    int b = pv[0] + pv[1];
+                    int a = *entry - b;
                     block = b;
                     available = a;
                 }
@@ -351,7 +351,7 @@ int iSNDmalloc(int size)
              * reduce the per-iteration sll+addu into a walking pointer.  This dead store keeps
              * set_in_loop != 1 (loop.c counts it) and flow deletes it for free. */
             j = 0;
-        } while (i < (int)*(unsigned short *)(mm + 4));
+        } while (i < *(unsigned short *)(mm + 4));
     }
     {
         /* post-loop tail: fresh block-locals re-materialize the FUSED sndmm+8 symbol (oracle
@@ -385,8 +385,8 @@ int iSNDmalloc(int size)
          * keep `j` live PAST the add so the sum takes retail's FRESH `$a2` (`addu $a2,$v0,$v1`)
          * instead of mutating the offset register in place (`addu $a2,$a2,$v1`).  16 -> 8.
          * Fencing the SUM instead of `j` (or both) is 30 -- it is the OFFSET that must survive. */
-        block = (int)pv[0] + (int)pv[1];
-        available = (int)pb[-1] - block;
+        block = pv[0] + pv[1];
+        available = pb[-1] - block;
     }
     iSNDmemconstrain(&block, &available);
     if (available < size)

@@ -22,7 +22,7 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
             SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[cur[0]];
-            if ((int)v->bend == (int)chan)   /* signed +0x2f detune read (lb) */
+            if (v->bend == (int)chan)   /* signed +0x2f detune read (lb) */
                 return 0;
             if (v->envelope_detune_depth == 0)
                 return 0;
@@ -34,7 +34,7 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
                 v->linear_pitch_cache = 0;
                 iSNDcalcpitch(c);
             }
-            iSNDplatformpitch(cur[0], (int)(unsigned)v->spu_pitch);
+            iSNDplatformpitch(cur[0], v->spu_pitch);
         }
     }
     return chanIdx;
@@ -47,7 +47,7 @@ int SNDpitchbend(unsigned int tag, int bend)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
-    r = iSNDunsafebend(tag, (unsigned int)bend);
+    r = iSNDunsafebend(tag, bend);
     iSNDleaveaudio();
     return r;
 }

@@ -28,7 +28,7 @@ int iSNDstreamgetrequestptr(unsigned int idx)
     do {
         if (((SndStreamReq *)(unsigned int)rq)->request_id == idx)
             return rq;
-        rq += (int)sizeof(SndStreamReq);
+        rq += sizeof(SndStreamReq);
         i++;
     } while (i < (((int)((volatile SndStream *)sp)->current_count << 24) >> 24));
     return 0;

@@ -16,7 +16,7 @@ int SNDSTRM_getvol(int tag)
     sp = (SndStream *)iSNDstreamgetstreamptr(tag);
     if (sp == 0)
         return -8;
-    vol = SNDgetvol((unsigned int)sp->start_result);
+    vol = SNDgetvol(sp->start_result);
     if (vol < 0)
         vol = (signed char)sp->start_params.vol; /* signed view preserves the retail lb at +0x54 */
     return vol;

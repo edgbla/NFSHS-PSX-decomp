@@ -278,7 +278,7 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                         }
                         one = 0;
                         limit = ((struct SndGlobalServerStateView *)gs)->channel_count;
-                        c++; off += (int)sizeof(SndChannel);
+                        c++; off += sizeof(SndChannel);
                     } while ((int)c < limit);
                 }
                 if (-1 < (int)best) {
@@ -320,7 +320,7 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                             }
                         }
                         limit = ((struct SndGlobalServerStateView *)gs)->channel_count;
-                        c++; off += (int)sizeof(SndChannel);
+                        c++; off += sizeof(SndChannel);
                     } while ((int)c < limit);
                 }
                 if (-1 < (int)best) {
@@ -333,8 +333,8 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
         }
 
     if (reserved == numChannels) {                   /* got them all -> commit */
-        *out = DAT_80136dec[0] | (int)(signed char)sndchanreserved[0];
-        result = (int)(signed char)sndchanreserved[0];
+        *out = DAT_80136dec[0] | (signed char)sndchanreserved[0];
+        result = (signed char)sndchanreserved[0];
         i = 0;
         if (0 < reserved) {
             do {
@@ -515,9 +515,9 @@ done:
    shift by two. This is retail's exact 110-instruction order and introduces no extra code. */
 void iSNDfreechan(int chan)
 {
-    /* `state`, owner/group keys, and scan predicates use SndChannel members. Keep the +0x10
-     * timestamp stores as raw word views: expressing all of them as `allocation_tick` changed
-     * the liveness/register schedule by 6 diffs (108 vs oracle 110 instructions); this raw spelling is exact. */
+    /* `state`, owner/group keys, scan predicates, and all five +0x10 timestamp stores use named
+     * SndChannel members. A simultaneous rewrite first perturbed register scheduling, but the
+     * store-by-store member spelling (including the tail arm) is exact: 110 instructions. */
     unsigned int group;
     int count = 0;
     unsigned char *base = (unsigned char *)sndgs;
@@ -537,7 +537,7 @@ void iSNDfreechan(int chan)
         int poolv;
         int chan25;
 
-        if (count < (int)((struct SndGlobalServerStateView *)base)->channel_count) {
+        if (count < ((struct SndGlobalServerStateView *)base)->channel_count) {
             slot = count;
             /* MATCH (cse.c double evaluation): retail's `addu $t2,$v1,$zero` is a COPY of
              * the guard's own load -- the guard holds the FIRST evaluation of ((struct SndGlobalServerStateView *)base)->channel_count
@@ -572,7 +572,7 @@ void iSNDfreechan(int chan)
                     (count++, ((SndChannel *)scan)->playback_fx.playback.group_flag != 0))
                     partner = slot;
                 slot++;
-                scan += (int)sizeof(SndChannel);
+                scan += sizeof(SndChannel);
             } while (slot < limit);
         }
 
@@ -584,7 +584,7 @@ void iSNDfreechan(int chan)
 
         if (count == 1) {
             ((SndChannel *)(unsigned int)slot)->state = 0;
-            *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)gs)->tick_count;
+            ((SndChannel *)(unsigned int)slot)->allocation_tick = ((struct SndGlobalServerStateView *)gs)->tick_count;
             return;
         }
 
@@ -596,9 +596,9 @@ void iSNDfreechan(int chan)
             if (((SndChannel *)(unsigned int)(partnerOffset + poolv))->state == 2 &&
                 chan != partner && count == 2) {
                 ((SndChannel *)(unsigned int)slot)->state = 0;
-                *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)gs)->tick_count;
+                ((SndChannel *)(unsigned int)slot)->allocation_tick = ((struct SndGlobalServerStateView *)gs)->tick_count;
                 ((SndChannel *)(unsigned int)(partnerOffset + ((struct SndGlobalServerStateView *)gs)->play_records))->state = 0;
-                *(int *)(partnerOffset + ((struct SndGlobalServerStateView *)gs)->play_records + 0x10) = ((struct SndGlobalServerStateView *)gs)->tick_count;
+                ((SndChannel *)(unsigned int)(partnerOffset + ((struct SndGlobalServerStateView *)gs)->play_records))->allocation_tick = ((struct SndGlobalServerStateView *)gs)->tick_count;
                 return;
             }
 
@@ -627,14 +627,14 @@ void iSNDfreechan(int chan)
                 } else
                     gv = sndgs_v;
                 ((SndChannel *)(unsigned int)slot)->state = 0;
-                *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)gv)->tick_count;
+                ((SndChannel *)(unsigned int)slot)->allocation_tick = ((struct SndGlobalServerStateView *)gv)->tick_count;
             }
             return;
         }
     }
 
     ((SndChannel *)(unsigned int)slot)->state = 0;
-    *(int *)(slot + 0x10) = ((struct SndGlobalServerStateView *)base)->tick_count;
+    ((SndChannel *)(unsigned int)slot)->allocation_tick = ((struct SndGlobalServerStateView *)base)->tick_count;
 }
 
 /* iSNDgetchan @0x800FEDC4 : resolve a sound tag back to its channel index, validating that the channel is

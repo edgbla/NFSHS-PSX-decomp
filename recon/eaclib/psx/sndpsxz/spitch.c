@@ -33,7 +33,7 @@ int SNDpitchmult(unsigned int tag, unsigned int mult)
                 break;
             v->base_pitch = (short)mult;
             iSNDcalcpitch(note);
-            iSNDplatformpitch(cur[0], (int)(unsigned)v->spu_pitch);
+            iSNDplatformpitch(cur[0], v->spu_pitch);
         }
     }
     iSNDleaveaudio();

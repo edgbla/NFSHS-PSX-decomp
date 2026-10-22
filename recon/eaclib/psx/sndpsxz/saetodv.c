@@ -47,7 +47,7 @@ void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int pr
 
 have_quad:
     which = 0;
-    if ((unsigned int)(angle - 0x4000U) < 0x8000) {
+    if ((angle - 0x4000U) < 0x8000) {
         newdir = 4;
         if (*out_l < *out_r) newdir = 3;
         if (quad < 3) {

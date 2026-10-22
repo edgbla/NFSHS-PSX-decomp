@@ -14,8 +14,8 @@
 #include "sdplapat.h"
 #include "sdriver.h"
 #include "sgettag.h"
+#include "slib_state.h"
 
-extern unsigned char sndpd[];
 extern unsigned char DAT_801479f0;   /* voice-table byte base; retained for exact address materialization */
 
 /* iSNDplatformplay @0x8010BA48 : launch `voice` playing the patch whose tag stream starts at `chan`.

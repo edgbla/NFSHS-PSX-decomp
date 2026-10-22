@@ -25,7 +25,7 @@ int SNDSTRM_status(int tag, int s)
         ((struct SNDSTREAMSTATUS *)(unsigned int)s)->currentrequest = sp->requests->request_id;
         frames = sp->locked_rate.samplerate;
         if (frames != 0) {
-            outstanding = (unsigned int)SNDPKTPLAY_unsafeframesoutstanding(sp->packet_player);
+            outstanding = SNDPKTPLAY_unsafeframesoutstanding(sp->packet_player);
             ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered =
                 (outstanding * 1000) / sp->locked_rate.samplerate;
         }

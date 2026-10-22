@@ -65,17 +65,17 @@ int iSNDcalcpitch(int note)
                                                    * (sign-extend once), and `int c` avoids re-extending on use */
 
     if (v->linear_pitch_cache == 0) {      /* not yet cached -> compute the linear multiplier (lhu) */
-        int cents = (int)v->base_detune;
+        int cents = v->base_detune;
         if (v->envelope_detune_depth != 0) {           /* envelope-driven detune */
             if (v->detune_curve != 0)           /* != polarity -> oracle's beqz fall-through */
-                c = *(signed char *)(v->detune_curve + (int)v->bend);
+                c = *(signed char *)(v->detune_curve + v->bend);
             else
                 c = v->bend;    /* +0x2f detune read signed (lb) */
-            cents += ((c - 0x40) * (int)v->envelope_detune_depth >> 6);
+            cents += ((c - 0x40) * v->envelope_detune_depth >> 6);
         }
         if (v->pitch_lfo_table != 0) {             /* LFO-driven detune */
             cents += ((*(signed char *)(v->pitch_lfo_table + (unsigned)v->pitch_lfo_phase) - 0x40) *
-                      (int)v->pitch_lfo_depth >> 6);
+                      v->pitch_lfo_depth >> 6);
         }
         pitch = iSNDdetunetolinear(cents);
         v->linear_pitch_cache = (short)pitch;

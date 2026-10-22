@@ -12,5 +12,5 @@ int randrange(int range)
 {
     if (0x10000 < range) range = 0x10000;
     else if (range < 0)  range = 0;
-    return (int)((((int)(iSNDrandom() & 0x7fff)) - 0x4000) * range) >> 0xe;
+    return (((iSNDrandom() & 0x7fff) - 0x4000) * range) >> 0xe;
 }

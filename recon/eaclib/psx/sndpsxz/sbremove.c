@@ -49,14 +49,14 @@ int cSNDbankremove(int bankId, int recurse)
     if (base->initialized == 0)
         return -10;
     if (bankId == -1) {                  /* unload every bank */
-        for (i = 0; i < (int)(unsigned)base->bank_count; i++)
+        for (i = 0; i < base->bank_count; i++)
             cSNDbankremove(i, 0);
         return 0;
     }
     if (iSNDvalidbank(bankId) != 0)
         return -8;
     {
-        int data = (int)(unsigned int)((struct SndBankTableEntry *)(bankId * (int)sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
+        int data = (int)(unsigned int)((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
         int off;
         unsigned char *entry;
         struct SNDGlobals *base2;
@@ -66,21 +66,21 @@ int cSNDbankremove(int bankId, int recurse)
             off = 0;
             do {
                 SndChannel *slot = (SndChannel *)(unsigned int)(loopbase->play_records + off);
-                if ((int)slot->start_marker == bankId)
+                if (slot->start_marker == bankId)
                     SNDstop((int)slot->owner_tag);
-                off += (int)sizeof(SndChannel);
-            } while ((int)(unsigned)loopbase->channel_count > ++i);
+                off += sizeof(SndChannel);
+            } while (loopbase->channel_count > ++i);
         }
         base2 = &sndgs;
-        entry = (unsigned char *)(bankId * (int)sizeof(struct SndBankTableEntry) +
+        entry = (unsigned char *)(bankId * sizeof(struct SndBankTableEntry) +
             *(volatile int *)&base2->bank_table);
         if (((struct SndBankTableEntry *)entry)->platform_allocated.s != 0) {
             iSNDplatformfree((int)(unsigned int)((struct SndBankTableEntry *)entry)->platform_block);
-            ((struct SndBankTableEntry *)(bankId * (int)sizeof(struct SndBankTableEntry) + sndgs.bank_table))->platform_allocated.u = 0;
+            ((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->platform_allocated.u = 0;
         } else
-            iSNDremovepatches(bankId, (int)(unsigned)((struct SndBankDataHeaderPrefix *)(unsigned int)data)->patch_count);
-        ((struct SndBankTableEntry *)(bankId * (int)sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = 0;
-        ((struct SndBankTableEntry *)(bankId * (int)sizeof(struct SndBankTableEntry) + sndgs.bank_table))->load_state.u = 0;
+            iSNDremovepatches(bankId, ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->patch_count);
+        ((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = 0;
+        ((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->load_state.u = 0;
     }
     return 0;
 }

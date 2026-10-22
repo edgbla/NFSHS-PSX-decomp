@@ -142,6 +142,7 @@
 #include "snd_state.h"
 #include "sndspuregpriv.h"
 #include "sndhookpriv.h"
+#include "sndlibetcpriv.h"
 #include "sndpacketpriv.h"
 #include "spktplay.h"
 #include "sst.h"
@@ -170,9 +171,6 @@ extern int            sndpsxlimits;         /* base @0x801234D4 (5-int block; +0
 /* Callback slots are fields of sndpd, not independent globals. The private
  * SndDriverHookStateView in sndhookpriv.h maps user_serve (+0x720), voice_done (+0x724),
  * and preload (+0x728); sdma.c and slib.c use the same view for dispatch. */
-
-/* sibling-obj dependencies */
-extern void InterruptCallback(int idx, void (*handler)(void));  /* syslib INTR (real 2-arg sig -- see INTR_DMA.cpp/INTR_VB.c/drv.cpp) */
 
 /* cop0-Status critical section wrapping the SPU-IRQ re-arm (target-only; host calls through). */
 static inline void sdpacket_setirq_cs(void)
@@ -209,7 +207,7 @@ void iSNDpacketgetirq(void)
     unsigned char *slot = base + sndpp[0] * 4;       /* runtime index first, fixed OFFSET as load displacement */
     SndPacketPlayerContextPrefix *ctx =
         ((struct SndPacketContextSlotCursorView *)slot)->context;                 /* DAT_80147e10[sndpp] */
-    int note = (int)ctx->active_note;   /* plain char is UNSIGNED on this build -- lbu vs oracle lb */
+    int note = ctx->active_note;         /* signed-char promotion preserves the -1 idle sentinel (retail `lb`). */
     int vt;
     if (note < 0)
         return;
@@ -386,8 +384,7 @@ unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count)
      * commutative multiply operand order and result register. */
     SndPacketPlayerContextPrefix *ctx =
         ((struct SndPacketContextTableView *)sndpd)->contexts[p];
-    int          vt = ctx->active_note * (int)sizeof(SndPacketVoiceState);  /* BUG FIX: plain char is UNSIGNED on this
-                                                             * build (lbu) -- oracle uses `lb` (signed). */
+    int          vt = ctx->active_note * (int)sizeof(SndPacketVoiceState);  /* signed-char field; preserve -1 via `lb`. */
     unsigned int blk, q, span, taken, wrapped;
     unsigned short *fcnt;
     SndPacketVoiceState *vte;
@@ -413,8 +410,8 @@ unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count)
         *fcnt = *fcnt - (unsigned short)taken;
         if (taken != 0) {
             i = 0;
-            while (i < (int)(unsigned)vte->channel_count) {
-                iSNDpacketfreeframes(p, i, (int)taken);
+            while (i < vte->channel_count) {
+                iSNDpacketfreeframes(p, i, taken);
                 i++;
             }
         }
@@ -524,9 +521,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
     unsigned char *slot0 = base0 + p * 4;
     SndPacketPlayerContextPrefix *pp =
         ((struct SndPacketContextSlotCursorView *)slot0)->context;
-    int  vt = (int)pp->active_note * (int)sizeof(SndPacketVoiceState);   /* BUG FIX: plain char is UNSIGNED on this
-                                                           * build (lbu) -- oracle uses `lb` (signed),
-                                                           * same field iSNDpacketgetirq/setirq read. */
+    int  vt = pp->active_note * (int)sizeof(SndPacketVoiceState);       /* signed-char promotion preserves the -1 idle sentinel. */
     /* MATCH: materialize `voice = &table[vt]` (sndpd+0xD8+vt) ONCE at entry (oracle: `s4`, a
      * callee-saved reg computed from the SAME vt multiply chain that feeds it) and read the
      * per-voice CHANNEL COUNT (+0x1F == DAT_80147a0f[vt]) via this ONE fixed displacement at
@@ -568,7 +563,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
             /* MATCH: oracle increments `ch` in the JAL's OWN delay slot (right after the call),
              * `i` afterward -- swap the statement order from the natural i++/ch+=4. */
             do { iSNDpsxzerospu((int *)(unsigned int)((SndPacketPlayerContextPrefix *)ch)->channel_buffer0, 16); ch += 4; i++; }
-            while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+            while (i < *(volatile unsigned char *)&voice->channel_count);
         }
         pp->spu_buffer_offset.u = pp->spu_buffer_offset.s + 0x10;
         pp->spu_bytes_remaining.u = pp->spu_bytes_remaining.s - 0x10;
@@ -593,7 +588,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                     do {
                         ((SndPacketPlayerContextPrefix *)ch)->channel_frame_data0 = iSNDpacketget(p, i, &frameSize);
                         ch += 4; i++;
-                    } while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+                    } while (i < *(volatile unsigned char *)&voice->channel_count);
                 }
                 if (pp->channel_frame_data0 == 0) {             /* no frame available -> finish/flush */
                     int cursor;
@@ -603,7 +598,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                      * $v0, the second load $a0, and the limit/compare chain $v1, as in retail. */
                     do { do { do { cursor = pp->write_position; } while (0); } while (0); } while (0);
                     result = cursor - pp->serve_position;
-                    if ((int)(unsigned)pp->queue_fill_limit.u < result)
+                    if (pp->queue_fill_limit.u < result)
                         goto function_exit;
                     if (pp->fill36.u > pp->frame_count)
                         goto advance;
@@ -622,7 +617,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                                 iSNDpsxzerospu((int *)(chval + (unsigned)pp->spu_buffer_offset.u),
                                                pp->spu_bytes_remaining.u);
                                 i++;
-                            } while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+                            } while (i < *(volatile unsigned char *)&voice->channel_count);
                         }
                     } else {                                      /* mark SPU end (flag byte = 2) */
                         i = 0;
@@ -637,7 +632,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                                 i++;
                                 *(char *)((unsigned)pp->block_bytes.u + *(volatile int *)&((SndPacketPlayerContextPrefix *)ech)->channel_buffer0 - 0xf) = (char)endFlag;
                                 ech += 4;
-                            } while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+                            } while (i < *(volatile unsigned char *)&voice->channel_count);
                         }
                     }
                     if (pp->spu_buffer_offset.u == 0)
@@ -674,7 +669,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                               (int *)(((SndPacketPlayerContextPrefix *)ch)->channel_buffer0 + (unsigned)pp->spu_buffer_offset.u),
                               (unsigned)take);
                     ch += 4; i++;
-                } while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+                } while (i < *(volatile unsigned char *)&voice->channel_count);
             }
             pp->spu_buffer_offset.u = pp->spu_buffer_offset.s + take;
             pp->spu_bytes_remaining.u = pp->spu_bytes_remaining.s - take;
@@ -717,7 +712,7 @@ queue_dma:
                     *fb = fv | 4;
                 }
                 i++;
-            } while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+            } while (i < *(volatile unsigned char *)&voice->channel_count);
         }
     } else if (chunk == pp->frame_count - 1) {   /* last chunk -> loop-end (|1) */
         /* MATCH: `i=0` in the count-check branch's delay slot; `ch=pp` only on the taken path,
@@ -735,7 +730,7 @@ queue_dma:
                     *eb = ev | 1;
                 }
                 i++;
-            } while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+            } while (i < *(volatile unsigned char *)&voice->channel_count);
         }
     }
     i = 0;                                   /* kick the SPU DMA for each channel */
@@ -762,8 +757,8 @@ queue_dma:
             unsigned int len = pp->block_bytes.u;
             int  stride = pp->source_channel_stride * i;
             unsigned int src = (unsigned int)pp->spu_address +
-                                (unsigned int)(chunk << pp->block_shift) +
-                                (unsigned int)stride;
+                                (chunk << pp->block_shift) +
+                                stride;
             /* MATCH (w31): flag as default-0 + conditional OVERWRITE (int, no mask) -- the
              * `&&`-ternary form computed the compare into a temp then copied it into the arg reg
              * (`sltiu v0;addu a0,v0`), oracle overwrites a0 in place (`sltiu a0,s0,1`). */
@@ -773,7 +768,7 @@ queue_dma:
             dma = iSNDdmqueue(((SndPacketPlayerContextPrefix *)ch)->channel_buffer0, src, len, 2, flag);
             pp->dma_handle = dma;
             ch += 4; i++;
-        } while (i < (int)(unsigned)*(volatile unsigned char *)&voice->channel_count);
+        } while (i < *(volatile unsigned char *)&voice->channel_count);
     }
 advance:
     pp->frame_index.s = (short)chunk;
@@ -826,16 +821,16 @@ have_advance:
                 ctx->write_position += wrapAdjust;
             }
             ctx->serve_position += adv;
-            iSNDpacketpurgeframes(p, (unsigned)ctx->last_new_position, (int)adv);
+            iSNDpacketpurgeframes(p, (unsigned)ctx->last_new_position, adv);
             ctx->last_new_position = newPos;
             if (ctx->write_position - ctx->serve_position < ctx->queue_threshold) {
                 if (iSNDdmcomplete(ctx->dma_handle) != 0) {
                     int idx;
-                    idx = (int)ctx->frame_index.u;
+                    idx = ctx->frame_index.u;
                     idx++;
                     if (ctx->frame_count <= idx)
                         idx -= ctx->frame_count;
-                    iSNDfillspuwithpackets(p, (int)idx);
+                    iSNDfillspuwithpackets(p, idx);
                 }
             }
         }
@@ -950,7 +945,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
     chunkBytes = 0x1000 / (unsigned char)*(volatile unsigned char *)&voice->channel_count;
     ctx->block_bytes.u = (short)chunkBytes;
     ctx->frames_per_block.u =
-        (short)((int)(ctx->block_bytes.u * 0x1c) / 0x10);
+        (short)((ctx->block_bytes.u * 0x1c) / 0x10);
     /* MATCH (w32, 42->0) -- the whole block-geometry run is written as STORE-then-READ-BACK, which is
      * what retail's source did and what produces the oracle's truncating `andi`s instead of fresh
      * loads: gcc forwards the just-stored value out of the store insn and applies the field's width
@@ -980,7 +975,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
     perCh = *(volatile unsigned char *)&voice->channel_count;
     ctx->frame_count = (unsigned short)(frames / perCh);
     {
-        int total = (int)ctx->frame_count * ctx->frames_per_block.u;
+        int total = ctx->frame_count * ctx->frames_per_block.u;
         ctx->queue_fill_limit.s =
             *(volatile unsigned short *)&ctx->frames_per_block.u;
         ctx->active_note = (signed char)note;
@@ -1073,7 +1068,7 @@ void iSNDpsxpacketstop(void *parg)
          * delay slot every iter) not an index-multiply `i*0x2c` -- §3.12 #1 array-index-vs-pointer-
          * walk flip. */
         unsigned char *q;
-        int count = (int)(unsigned)D_80147871;
+        int count = D_80147871;
         /* MATCH: q walks from `base` (not base+0xFF) and reads the byte at the FIXED +0xFF
          * displacement each iter (oracle: `lbu v0,0xFF(v1)` -- offset stays in the load, base
          * is bare); and the sign test is the raw `(byte<<24)>=0` shift-idiom (oracle: unsigned
@@ -1083,7 +1078,7 @@ void iSNDpsxpacketstop(void *parg)
             if ((int)(((SndPacketVoiceState *)(q + 0xD8))->voice_done) << 24 >= 0)   /* bit7 clear == still active */
                 active++;
             i++;
-            q += (int)sizeof(SndPacketVoiceState);
+            q += sizeof(SndPacketVoiceState);
         } while (i < count);
     }
     if (active == 0) {

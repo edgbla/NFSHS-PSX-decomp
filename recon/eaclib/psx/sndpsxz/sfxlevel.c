@@ -41,11 +41,11 @@ int SNDfxlevel(int tag, int bus, int level)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
         return -10;
     iSNDenteraudio();
-    chanIdx = iSNDgetchan((unsigned int)tag);
+    chanIdx = iSNDgetchan(tag);
     if (-1 < chanIdx) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
-            int slot   = ((struct SndGlobalServerStateView *)sndgs)->play_records + cur[0] * (int)sizeof(SndChannel) + bus;
+            int slot   = ((struct SndGlobalServerStateView *)sndgs)->play_records + cur[0] * sizeof(SndChannel) + bus;
             int scaled = level * ((SndChannelFxLevelStepView *)(unsigned int)(slot + 0x34))->previous_level;
             int fxArg;
             ((SndChannelFxLevelStepView *)(unsigned int)(slot + 0x34))->next_level = (signed char)level;

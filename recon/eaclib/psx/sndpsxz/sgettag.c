@@ -21,7 +21,7 @@ int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr)
     while (*(unsigned char *)*cursor == 0xfc)    /* skip 0xfc padding tags */
         *cursor = *cursor + 1;
     id = *(unsigned char *)*cursor;
-    *outId = (unsigned int)id;
+    *outId = id;
     if (id == 0xff)
         return 0;                               /* end of stream */
     at = *cursor;
@@ -34,16 +34,16 @@ marker:
     return 1;                                   /* marker tag (no data) */
 
 data_tag:
-    len = (unsigned int)*(unsigned char *)(at + 1);
+    len = *(unsigned char *)(at + 1);
     if (len == 0xff) {                          /* extended 4-byte length */
         *cursor = at + 2;
-        len = (unsigned int)iSNDgetdata((unsigned char *)(at + 2), 4);
+        len = iSNDgetdata((unsigned char *)(at + 2), 4);
         *cursor = *cursor + 3;
     }
     *cursor = *cursor + 1;
     *outPtr = *cursor;
     if (len < 5) {
-        r = iSNDgetdata((unsigned char *)*cursor, (int)len);
+        r = iSNDgetdata((unsigned char *)*cursor, len);
         *outVal = r;
     }
     *cursor = *cursor + len;

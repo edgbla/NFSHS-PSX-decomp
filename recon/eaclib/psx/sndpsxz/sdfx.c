@@ -120,12 +120,12 @@ unsigned int iSNDpsxfxinit(int mode)
      * further down -- same early-hoist lever as `sg` above. */
     pd = sndpd;
     { unsigned char *tb = sndpe; src = tb + mode * 0x42; }
-    ((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode = (short)((int)(0x10000 - (unsigned int)*(unsigned short *)src) >> 3);
+    ((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode = (short)((int)(0x10000 - *(unsigned short *)src) >> 3);
     iSNDpsxeffectoff(0xffffff);
     iSNDpsxeffectvol(0, 0);
     blockmove((int *)src, (int *)rv, 0x42);
 
-    if ((unsigned int)(mode - 7U) < 2) {                  /* presets 7/8: scale taps by reverb depth */
+    if ((mode - 7U) < 2) {                  /* presets 7/8: scale taps by reverb depth */
         rv[0xb] = (short)((sg->depth * 0x2000) / 0x7f) - rv[1];
         rv[0xc] = (short)((sg->depth * 0x1000) / 0x7f) - rv[2];
         rv[0xd] = rv[0xe] + (short)((sg->depth * 0x1000) / 0x7f);
@@ -173,7 +173,7 @@ unsigned int iSNDpsxfxinit(int mode)
         int h;
         int chunk = 0x10000 - work;
         if (0x20 < chunk) chunk = 0x20;
-        h = iSNDdmqueue((int)scratch, (unsigned int)(work << 3), chunk << 3, 1, 0);
+        h = iSNDdmqueue((int)scratch, work << 3, chunk << 3, 1, 0);
         work += 0x20;
         do { } while (iSNDdmcomplete(h) == 0);
     }

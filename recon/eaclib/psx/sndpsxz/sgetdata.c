@@ -12,7 +12,7 @@ int iSNDgetdata(unsigned char *p, int n)
     int i = n - 1;
     if (n != 0) {
         do {
-            v = v * 0x100 + (unsigned int)*p;
+            v = v * 0x100 + *p;
             p = p + 1;
             i--;
         } while (i != -1);

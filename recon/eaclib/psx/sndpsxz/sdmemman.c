@@ -331,9 +331,9 @@ void iSNDpsxmemconstrain(unsigned int *size, int *avail)
         *avail = *avail - diff;
         s = *size;
     }
-    if ((int)(unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.block_total < (int)(s + *avail))
+    if (((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.block_total < (int)(s + *avail))
         *avail = (int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.block_total - s;
-    if ((int)(unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode < (int)(*size + *avail))
+    if (((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode < (int)(*size + *avail))
         *avail = (int)((struct SndSpuMemoryStateView *)pd)->memory.boundary.view.limits.reverb_mode - (int)*size;
 }
 
@@ -702,7 +702,7 @@ int iSNDpsxmalloc(int size)
     size += 0x3f;
     size >>= 6;
     if (count == 0) {
-        candidateBlock = (unsigned int)((struct SndSpuMemoryStateView *)base)->memory.engine_ver;
+        candidateBlock = ((struct SndSpuMemoryStateView *)base)->memory.engine_ver;
         availableBlocks = (int)((struct SndSpuMemoryStateView *)base)->memory.boundary.view.limits.block_total -
                       (int)((struct SndSpuMemoryStateView *)base)->memory.engine_ver;
         iSNDpsxmemconstrain(&candidateBlock, &availableBlocks);
@@ -715,8 +715,7 @@ nonempty:
         unsigned char *table;
         unsigned char *previous;
         table = (unsigned char *)((struct SndSpuMemoryStateView *)base)->entries;
-        if (idx >= (int)(unsigned int)
-                       ((struct SndSpuMemoryStateView *)base)->memory.alloc_count)
+        if (idx >= ((struct SndSpuMemoryStateView *)base)->memory.alloc_count)
             goto scan_done;
         pd = base;
         previous = pd + 0x51c;
@@ -727,7 +726,7 @@ scan:
                                       (unsigned int)table);
             if (idx == 0) {
                 unsigned int block =
-                    (unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.engine_ver;
+                    ((struct SndSpuMemoryStateView *)pd)->memory.engine_ver;
                 int avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
                 candidateBlock = block;
                 availableBlocks = avail;
@@ -735,15 +734,15 @@ scan:
                 unsigned int block;
                 int avail;
                 prev = (unsigned short *)(scan_off + (int)previous);
-                block = (unsigned int)((struct SndSpuFreeBlock *)prev)->block +
-                        (unsigned int)((struct SndSpuFreeBlock *)prev)->size;
+                block = ((struct SndSpuFreeBlock *)prev)->block +
+                        ((struct SndSpuFreeBlock *)prev)->size;
                 avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
                 candidateBlock = block;
                 availableBlocks = avail;
             }
             iSNDpsxmemconstrain(&candidateBlock, &availableBlocks);
             if (size <= availableBlocks) {
-                blk = (unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.alloc_count;
+                blk = ((struct SndSpuMemoryStateView *)pd)->memory.alloc_count;
                 if (idx < (int)blk) {
                     do {                                   /* shift entries up to open slot `idx` */
                         struct PackedAllocSlot {
@@ -767,7 +766,7 @@ scan:
             }
         }
         idx++;
-        if (idx < (int)(unsigned int)((struct SndSpuMemoryStateView *)pd)->memory.alloc_count)
+        if (idx < ((struct SndSpuMemoryStateView *)pd)->memory.alloc_count)
             goto scan;
 scan_done:
         {
@@ -791,8 +790,8 @@ scan_done:
             } while (0);
             prev = (unsigned short *)((unsigned int)adjusted_off +
                                       (unsigned int)pv);
-            candidateBlock = (unsigned int)((struct SndSpuFreeBlock *)prev)->block +
-                             (unsigned int)((struct SndSpuFreeBlock *)prev)->size;
+            candidateBlock = ((struct SndSpuFreeBlock *)prev)->block +
+                             ((struct SndSpuFreeBlock *)prev)->size;
             availableBlocks =
                 (int)((struct SndSpuFreeBlock *)pv)->block - (int)candidateBlock - off + off -
                 off + off - off + off;
@@ -825,8 +824,8 @@ commit:
         commit_block = (unsigned short)candidateBlock;
         entry = table + entry_off;
         commit_base = sndpd;
-        ((unsigned short *)entry)[1] = (short)size;
-        ((unsigned short *)entry)[0] = commit_block;
+        ((struct SndSpuFreeBlock *)entry)->size = size;
+        ((struct SndSpuFreeBlock *)entry)->block = commit_block;
         {
             /* MATCH (w61-a19, 40 -> 26 at COUNT-EXACT 127/127): retail computes the RETURN VALUE
              * (`lw v0,16(sp); sll v0,v0,6`) INTERLEAVED with the alloc-count read-modify-write,
@@ -864,11 +863,11 @@ int iSNDpsxfree(int ptr)
         unsigned char *table = (unsigned char *)((struct SndSpuMemoryStateView *)pd)->entries;
         unsigned char *base = pd;
         do {
-            if ((unsigned int)((struct SndSpuFreeBlock *)(table + idx * 4))->block == (unsigned int)ptr) {
+            if (((struct SndSpuFreeBlock *)(table + idx * 4))->block == ptr) {
                 unsigned short remaining =
                     ((struct SndSpuMemoryStateView *)base)->memory.alloc_count - 1;
                 ((struct SndSpuMemoryStateView *)base)->memory.alloc_count = remaining;
-                if (idx < (int)(unsigned int)remaining) {
+                if (idx < remaining) {
                   do {
                     struct PackedAllocSlot {
                         unsigned char pad[0x520];
@@ -883,12 +882,12 @@ int iSNDpsxfree(int ptr)
                                                    (base + next * 4))->word,
                                      4);
                     idx = next;
-                  } while (idx < (int)(unsigned int)((struct SndSpuMemoryStateView *)base)->memory.alloc_count);
+                  } while (idx < ((struct SndSpuMemoryStateView *)base)->memory.alloc_count);
                 }
                 return 0;
             }
             idx++;
-        } while (idx < (int)(unsigned int)((struct SndSpuMemoryStateView *)base)->memory.alloc_count);
+        } while (idx < ((struct SndSpuMemoryStateView *)base)->memory.alloc_count);
     }
     return -8;
 }

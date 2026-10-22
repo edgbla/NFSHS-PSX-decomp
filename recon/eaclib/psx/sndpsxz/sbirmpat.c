@@ -18,13 +18,13 @@
  *   patch pointer (+0x14 for bank type 4, else +0xc).  Returns 0 / -8. */
 int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
 {
-    int data = (int)(unsigned int)((struct SndBankTableEntry *)(bank * (int)sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block;
+    int data = (int)(unsigned int)((struct SndBankTableEntry *)(bank * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block;
     int base = (((struct SndBankDataHeaderPrefix *)(unsigned int)data)->type == 4) ? data : 0;
     int pp;
 
     if (iSNDvalidbank(bank) != 0)
         return -8;
-    if (patch_idx < 0 || patch_idx >= (int)(unsigned)((struct SndBankDataHeaderPrefix *)(unsigned int)data)->patch_count)
+    if (patch_idx < 0 || patch_idx >= ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->patch_count)
         return -8;
     /* MATCH: group `base + (patch_idx<<2)` so the base is addu operand 1 (oracle `addu v0,s1,v0`), NOT
      * the index-first order `addu v0,v0,s1` that `base + patch_idx*4 + 0x14` produced. */

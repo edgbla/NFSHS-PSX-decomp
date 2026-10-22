@@ -124,7 +124,7 @@ int iSNDdownloadbank(int bankData, int patchData)
              * void fence before the increment, and a void fence after it all measure 3. */
             cur4 += 4;
             i++;
-        } while (i < (int)(unsigned)((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->patch_count);
+        } while (i < ((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->patch_count);
     }
     /* RESIDUAL 42 diffs, 84/84 insns.  All nine callee-saved assignments now match the oracle;
      * what is left is ONE loop.c decision plus its fallout:

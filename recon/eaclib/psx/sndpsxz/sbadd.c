@@ -23,7 +23,7 @@ int SNDbankadd(int *bank_out, int bankData)
         return -10;
     slot = iSNDbankalloc();
     *bank_out = slot;
-    e = (struct SndBankTableEntry *)(((struct SndGlobalServerStateView *)sndgs)->bank_table + slot * (int)sizeof(struct SndBankTableEntry));
+    e = (struct SndBankTableEntry *)(((struct SndGlobalServerStateView *)sndgs)->bank_table + slot * sizeof(struct SndBankTableEntry));
     e->data_block = (void *)(unsigned int)bankData;
     e->platform_block = (void *)(unsigned int)bankData;
     ((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook = SNDbankremove;

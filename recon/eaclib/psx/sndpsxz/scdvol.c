@@ -16,7 +16,7 @@ int SNDcdvol(int vol_l, int vol_r)
     /* @0x800FAA90/94: iSNDplatformcdpanvol(*(short*)0x80136CAC = cached pan, (int)(short)level). The
      * recon passed the raw caller args (vol_l, vol_r) -- but the oracle passes the cached pan and the
      * just-computed master-scaled level; vol_r is in fact unused (IDA typed 1 arg) (M06). */
-    iSNDplatformcdpanvol((int)sndcdvs[0], (int)sndcdvs[1]);
+    iSNDplatformcdpanvol(sndcdvs[0], sndcdvs[1]);
     return 0;
 }
 

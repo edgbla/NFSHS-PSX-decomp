@@ -44,7 +44,7 @@ int SNDmemlargestunused(int *out)
         best = ((struct SndSpuMemoryStateView *)base)->memory.boundary.view.limits.reverb_mode - 0x41;
     } else {
         i = 0;
-        if (i < (int)count) {
+        if (i < count) {
             /* MATCH preamble order (oracle t2/t0/a2): prevt off the entry base, then the q COPY
              * of the base (oracle addu t0,v1,zero), then tbl off q -- the loop-side accesses
              * (tbl init + fresh count re-read) go through q, splitting the base live range. */

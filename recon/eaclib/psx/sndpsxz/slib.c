@@ -64,6 +64,7 @@
 #include "sndspuregpriv.h"
 #include "sndmempriv.h"
 #include "sndhookpriv.h"
+#include "sndlibetcpriv.h"
 #include "sndpacketpriv.h"
 #include "sdfx.h"
 #include "sdma.h"
@@ -103,8 +104,8 @@ __asm__("\t.globl\tsndpd\n\t.globl\tD_801479F0\n\t.globl\tDAT_801479f0\n\t.globl
 void iSNDcalcvol(int chan)
 {
     SndChannel  *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
-    int          n = (int)v->patch_volume * (int)v->autovol_position.halves.high *
-                     (int)v->portamento_position.halves.high * (int)((struct SndGlobalServerStateView *)sndgs)->master_volume;
+    int          n = v->patch_volume * v->autovol_position.halves.high *
+                     v->portamento_position.halves.high * ((struct SndGlobalServerStateView *)sndgs)->master_volume;
     /* VOID (W31): oracle exits `jr ra; nop` with nothing computed into $v0 -- the cached byte at
      * +0x2D is the only output and no caller consumes a result.  The old "v1-not-v0 coloring floor"
      * was the reserved-return symptom (3.2): dropping the return frees $v0 and the whole velocity-
@@ -117,7 +118,7 @@ void iSNDcalcvol(int chan)
     }
     if (v->final_volume_curve != 0) { /* final volume curve */
         *(unsigned char *)&v->volume =
-            *(unsigned char *)(v->final_volume_curve + (int)v->volume);
+            *(unsigned char *)(v->final_volume_curve + v->volume);
     }
 }
 
@@ -152,7 +153,7 @@ unsigned int iSNDpsxeffecton(int mask)
     *(volatile unsigned short *)(c0 + 0x198) = *(volatile unsigned short *)(c0 + 0x198) | (unsigned short)mask;
     {
         int c1 = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
-        r = (unsigned int)*(volatile unsigned short *)(c1 + 0x19a) | (mask >> 0x10);
+        r = *(volatile unsigned short *)(c1 + 0x19a) | (mask >> 0x10);
         *(volatile short *)(c1 + 0x19a) = (short)r;
     }
     return r;
@@ -167,7 +168,7 @@ unsigned int iSNDpsxeffectoff(int mask)
     *(volatile unsigned short *)(c0 + 0x198) = *(volatile unsigned short *)(c0 + 0x198) & ~(unsigned short)mask;
     {
         int c1 = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
-        r = (unsigned int)*(volatile unsigned short *)(c1 + 0x19a) & ~(mask >> 0x10);
+        r = *(volatile unsigned short *)(c1 + 0x19a) & ~(mask >> 0x10);
         *(volatile short *)(c1 + 0x19a) = (short)r;
     }
     return r;
@@ -270,8 +271,8 @@ unsigned int iSNDstartvoice(unsigned int chan)
 
     voice->pad24_25[0] = 0;
     voice->pad24_25[1] = 0;
-    pitch = (int)(voice->word08 / 441u);
-    iSNDsetslot((int)chan, voice->header_word0, pitch); /* +0x00 SPU start address / tag */
+    pitch = voice->word08 / 441u;
+    iSNDsetslot(chan, voice->header_word0, pitch); /* +0x00 SPU start address / tag */
     mask = 1u << (chan);
     voice->play_state = 2;
     voice->voice_status = 2;
@@ -289,9 +290,9 @@ unsigned int iSNDstartvoice(unsigned int chan)
             a3 = *(int *)((char *)pt + 8);
         } else {                                     /* bit7 set: index from +0x04 via 1/0x1c reciprocal */
             unsigned int checkNumerator;
-            a3 = (int)((unsigned int)voice->word04 / 0x1c);
+            a3 = (unsigned int)voice->word04 / 0x1c;
             checkNumerator = (unsigned int)voice->word04;
-            if ((int)checkNumerator != (int)((checkNumerator / 0x1c) * 0x1c))
+            if (checkNumerator != (checkNumerator / 0x1c) * 0x1c)
                 a3 = a3 + 1;
             a3 = a3 << 4;
         }
@@ -301,10 +302,10 @@ unsigned int iSNDstartvoice(unsigned int chan)
         ((volatile SndPacketVoiceState *)vte2)->play_state = 2;
         ((volatile SndPacketVoiceState *)vte2)->voice_status = 2;
         ((volatile SndPacketVoiceState *)vte2)->stop_pending = 0;
-        mask = mask | (1u << (int)maskLink);
+        mask = mask | (1u << maskLink);
     }
-    iSNDvol((int)chan, (int)(signed char)voice->level);
-    iSNDplatformfxlevel(chan, 0, (int)(signed char)voice->fx_level);
+    iSNDvol(chan, (signed char)voice->level);
+    iSNDplatformfxlevel(chan, 0, (signed char)voice->fx_level);
     return mask;
 }
 
@@ -326,16 +327,11 @@ unsigned char sndpdsafeloop[16] = {0x00, 0x07, 0x00, 0x00}; /* @0x80136DF0 */
  * (below, `spu`) rather than independent literal macros: gcc-2.8 -O2 keeps the pointer in a register
  * and reuses it via load/store displacements. This is the exact shape required by the oracle. */
 
-/* `syslib.h` has an obsolete no-argument declaration; retain the evidence-backed two-argument consumer prototype locally. */
-extern int DMACallback(int ch, int func); /* libetc INTR.obj @0x800F28AC; installed as DMA4 callback.
-                                          * Ghidra/older declarations dropped both args; see cdcont.cpp/SYS.cpp. */
-
    /* @0x800FF5A8 -- oracle explicitly zeroes $v0 before return */
     /* @0x800FF600 */
                  /* @0x800FF700 */
               /* @0x800FF9A0 */
                 /* @0x800FFAF4 */
-
 
 /* cop0 Status read/write (interrupts masked around the hardware-register pokes; host: plain). */
 #if defined(__mips__)
@@ -361,8 +357,6 @@ static inline void wr_sr(unsigned int s) { __asm__ volatile("mtc0 %0,$12" : : "r
  *   plain ints + `"=r"(x)` / `"N"(x)` MATCHING in/out operands ... 5/5 PASS  <- kept
  * No hard register is named anywhere; gcc chooses $a0/$a1 on its own because they are the
  * outgoing arguments of the `DMACallback` call that follows. */
-#define DECLARE_DMA_CHANNEL(name) int name
-#define DECLARE_DMA_CALLBACK(name) int name
 #define MASK_SR_FOR_DMA(sr, channel)                                                   \
     __asm__ volatile(                                                                 \
         "mfc0 %0,$12\n\t"                                                            \
@@ -390,8 +384,6 @@ static inline void wr_sr(unsigned int s) { __asm__ volatile("mtc0 %0,$12" : : "r
 static unsigned int g_sr = 0;
 static inline unsigned int rd_sr(void) { return g_sr; }
 static inline void wr_sr(unsigned int s) { g_sr = s; }
-#define DECLARE_DMA_CHANNEL(name) int name
-#define DECLARE_DMA_CALLBACK(name) int name
 #define MASK_SR_FOR_DMA(sr, channel) do { (sr) = rd_sr(); wr_sr((sr) & 0xfffffbfe); } while (0)
 #define MASK_SR_FOR_DMA_CALLBACK(sr, channel, callback) MASK_SR_FOR_DMA(sr, channel)
 #endif
@@ -441,13 +433,13 @@ int iSNDplatformoutputset(void)
             if (((volatile SndPacketVoiceState *)vp)->play_state == 2) {
                 if (((volatile SndPacketVoiceState *)vp)->link_flag == 0) {
                     iSNDsetvol(chan,
-                        ((int)((volatile SndPacketVoiceState *)vp)->pad24_25[0] << 24) >> 24,
-                        ((int)((volatile SndPacketVoiceState *)vp)->pad24_25[1] << 24) >> 24);
+                        (((volatile SndPacketVoiceState *)vp)->pad24_25[0] << 24) >> 24,
+                        (((volatile SndPacketVoiceState *)vp)->pad24_25[1] << 24) >> 24);
                 }
             }
             vp += 0x2c;
             /* Preincrement makes the channel-count load precede the counter increment. */
-            if (++chan < (int)(unsigned)vbase->channel_count) goto voiceloop;
+            if (++chan < vbase->channel_count) goto voiceloop;
         }
     }
     ((struct SndDriverBootstrapPrefixView *)sndpd)->last_channel_mode = ((struct SndGlobalServerStateView *)sndgs)->output_mode;   /* FRESH re-read, not through `base` -- oracle re-materializes
@@ -463,8 +455,8 @@ int iSNDplatformoutputset(void)
 int iSNDinit(void)
 {
     unsigned int sr;
-    DECLARE_DMA_CHANNEL(ch);      /* DMACallback channel arg (4), materialized early like the oracle */
-    DECLARE_DMA_CALLBACK(callback);
+    int ch;      /* DMACallback channel arg (4), materialized early like the oracle */
+    int callback;
     volatile unsigned int *delay;
     volatile unsigned int *madr;
     volatile unsigned int *bcr;
@@ -552,7 +544,7 @@ int iSNDinit(void)
             i++;
             *(signed char *)(vp + 0xff) = done;             /* mark voice done */
             vp += 0x2c;
-        } while (i < (int)(unsigned)((struct SndGlobalServerStateView *)loop_gs)->channel_count);
+        } while (i < ((struct SndGlobalServerStateView *)loop_gs)->channel_count);
     }
     iSNDpsxkeyon(0xffffff);
     post = sndpd;
@@ -595,7 +587,7 @@ int iSNDrestore(void)
     int          chan;
     unsigned int deadline;
     unsigned int sr;
-    DECLARE_DMA_CHANNEL(dma);
+    int dma;
 
     guard = (unsigned char *)sndgs;
     if (((struct SndGlobalServerStateView *)guard)->audio_lock_depth != 0) {
@@ -621,11 +613,11 @@ int iSNDrestore(void)
          * USE fence `__asm__("" : : "r"(chan))` after the vp store reaches the identical object,
          * confirming the mechanism is the chan REF COUNT -- but the guard is the honest spelling,
          * so the fence is not used here. */
-        if (chan < (int)(unsigned)((struct SndGlobalServerStateView *)gp)->channel_count) {
+        if (chan < ((struct SndGlobalServerStateView *)gp)->channel_count) {
             vp = base;
             do {
                 if (*(volatile unsigned char *)((unsigned char *)vp + 0xf5) != 0) { /* voice still active */
-                    if (deadline < (unsigned int)((struct SndGlobalServerStateView *)gp)->tick_count) {
+                    if (deadline < ((struct SndGlobalServerStateView *)gp)->tick_count) {
                         iSNDpsxkeyoff(0xffffff);
                         *(volatile unsigned char *)((unsigned char *)vp + 0xf5) = 0;
                         iSNDfreechan(chan);
@@ -633,7 +625,7 @@ int iSNDrestore(void)
                     quiet = 0;
                 }
                 vp += 0x2c;
-            } while ((int)(unsigned)((struct SndGlobalServerStateView *)gp)->channel_count > ++chan);
+            } while (((struct SndGlobalServerStateView *)gp)->channel_count > ++chan);
         }
         SNDSYS_service();
     } while (!quiet);
@@ -870,7 +862,7 @@ void iSNDserve(void)
      *   NOTE: nfsw.IDA.c's sub_48C0A8 is a BROKEN-BOUNDARY stub (`JUMPOUT(0x48C0A5)`) -- use
      *   nfsw.Ghidra.c FUN_0048c0a8 for this one. */
     chan = 0;
-    if ((int)kon < (int)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->channel_count) {
+    if ((int)kon < ((struct SndGlobalServerStateView *)sndgs)->channel_count) {
         fpbase = base;
         vt = chan;
         do {
@@ -883,7 +875,7 @@ void iSNDserve(void)
                     if (((struct SndPacketVoiceState *)vp)->stop_pending != 0 && ((struct SndPacketVoiceState *)vp)->link_flag == 0 &&
                         (int)((unsigned)((struct SndPacketVoiceState *)vp)->voice_done << 0x18) < 0) {
                         cvt = vt;
-                        n = (int)(unsigned)*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->channel_count;
+                        n = *(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->channel_count;
                         do {
                             int c = chan;
                             if (n == 2) {
@@ -958,7 +950,7 @@ void iSNDserve(void)
              * behavior, not a bug to "fix"). */
             /* Keep the adjacent +0x1C/+0x1D probe in byte-offset form: spelling both as struct
              * fields split the matched halfword load into two byte loads (+6 oracle diffs). */
-            if (vp[0x1c] == 1 && vp[0x1d] == 0 &&
+            if (((struct SndPacketVoiceState *)vp)->play_state == 1 && vp[0x1d] == 0 &&
                 ((unsigned char)((struct SndPacketVoiceState *)vp)->channel_count < 2 ||
                  ((struct SndPacketVoiceState *)(fpbase + 0xD8))[
                     ((int)((unsigned int)*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->link_index << 24) >> 24)
@@ -974,12 +966,12 @@ void iSNDserve(void)
              * `nop`s).  Operand order `bound > ++chan` (not `++chan < bound`) puts the load first
              * (catalog: compare-operand order IS evaluation/load order) and still emits
              * `slt chan,bound`. */
-        } while ((int)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->channel_count > ++chan);
+        } while (((struct SndGlobalServerStateView *)sndgs)->channel_count > ++chan);
     }
     if (koff != 0)
-        iSNDpsxkeyoff((int)koff);
+        iSNDpsxkeyoff(koff);
     do {
         if (kon != 0)
-            iSNDpsxkeyon((int)kon);
+            iSNDpsxkeyon(kon);
     } while (0);
 }

@@ -14,8 +14,7 @@
 #include "spvoices.h"
 #include "sst.h"
 #include "sstpriv.h"
-
-extern void *memset(void *d, int c, int n);
+#include "sndcrtpriv.h"
 
                       /* @0x8013EA80 stream slot ptr array */
                       /* (signed char)sndgs[0xf] = init flag, sndgs[0x22] = destroyall hook */
@@ -82,9 +81,9 @@ int SNDSTRM_purge(int s)
     ((volatile SndStream *)S)->current_count = 0;        /* curReqCount */
     ((volatile SndStream *)S)->parse_index = 0;          /* parseIdx */
     ((volatile SndStream *)S)->state = 0;
-    memset(&S->locked_rate, 0, (int)sizeof(SNDSAMPLEFORMAT)); /* locked rate */
-    memset(&S->current_rate, 0, (int)sizeof(SNDSAMPLEFORMAT)); /* current rate */
-    memset(&S->locked_header, 0, (int)sizeof(SndPatchAttributes)); /* locked header */
-    memset(&S->current_header, 0, (int)sizeof(SndPatchAttributes)); /* current header */
+    memset(&S->locked_rate, 0, sizeof(SNDSAMPLEFORMAT)); /* locked rate */
+    memset(&S->current_rate, 0, sizeof(SNDSAMPLEFORMAT)); /* current rate */
+    memset(&S->locked_header, 0, sizeof(SndPatchAttributes)); /* locked header */
+    memset(&S->current_header, 0, sizeof(SndPatchAttributes)); /* current header */
     return 0;
 }
