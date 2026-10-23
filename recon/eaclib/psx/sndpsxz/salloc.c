@@ -56,21 +56,15 @@
 #include "sstop.h"
 #include "sover.h"
 
-/* DISTINCT SYMBOL VIEW (catalog, w35-a4 device): a second declaration of the SAME storage under its
- * own asm label.  iSNDfreechan's final-else return block must NOT cross-jump-merge with the group==0
- * tail -- retail keeps them separate because their base regs differ; giving this arm its own RTL
- * symbol stops cse from unifying the two `&sndgs` materializations. */
-extern unsigned char sndgs_v[] __asm__("sndgs");
+/* Current exact form: the former `sndgs_v[] __asm__("sndgs")` second view was removed. The two
+ * branch-local `gv = (unsigned char *)sndgs` assignments still preserve the separate base-address
+ * materialization needed by iSNDfreechan (110/110 exact). */
 __asm__("\t.globl\tsndchanreserved\n\t.section\t.bss\nsndchanreserved:\n\t.space\t4\n\t.text");
-extern int  DAT_801478f4;
-/* DISTINCT UNSIZED VIEW of the same word (w50-a7).  Reading the scalar generates the `(high sym)`
- * AT the load, after the partner*100 scale chain; retail emits the `lui %hi` at the JOIN-BLOCK HEAD
- * (reorg then eager-steals it into the `bne t0,v1` delay slot and leaves the .L800FED5C duplicate).
- * The unsized view + an ARRAY-DECAY pointer local (`int *dp = DAT_801478f4_v;`) gives the address
- * its own early pseudo while cse still folds the lo_sum into the load -- zero insns, 6 -> 2.
- * (`&scalar`, the scalar `[0]` index, and a plain pointer-to-scalar all fold back: catalog
- * "ARRAY DECAY != &scalar".) */
-extern int  DAT_801478f4_v[] __asm__("DAT_801478f4");                                      /* channel-pool pointer (sndgs + 0x94) */
+extern int  DAT_801478f4[];
+/* The primary declaration is an unsized array so `DAT_801478f4` decays naturally to the pointer
+ * used by iSNDfreechan. This replaces the former second `__asm__` array view; `&DAT_801478f4`
+ * (scalar-address form) was tested and changed the exact address/codegen shape (7 diffs). */
+
 
 
 /* iSNDischanreserved @0x800FE724 : is channel `chan` already in the chosen list (first `count` entries)? */
@@ -464,12 +458,12 @@ done:
    beqz's EBB boundary so cse cannot fold count=0, restoring retail's real `slt $t0` (+1 insn);
    (2) the tail re-materializes ONE fresh sndgs base (`gs`) + cached `poolv` and reads 0x44/0x94
    as displacements, matching retail's $t1 la at .LECB4 (per-site fused sndgs[N] was the divergence);
-   (3) the final-else return block reads through the sndgs_v DISTINCT SYMBOL VIEW so it stops
+   (3) the final-else return block uses a branch-local `(unsigned char *)sndgs` base assignment so it stops
    cross-jump-merging with the group==0 tail (retail keeps separate jr blocks with different bases).
    Residual 16 = the scan-loop `lb`-vs-`lbu` at +0xB (ours emits lbu for a volatile signed char
    != 0 test -- cc1 legally widens; unresolved) + the partnerSlot block's per-path
-   `lui %hi(D_801478F4)` duplicates and split `%lo(sndgs)` la (DAT_801478f4_v[0] array view and a
-   gv pointer-hold were both tried = no-ops, single-use bases fold back to fused loads).
+   `lui %hi(D_801478F4)` duplicates and split `%lo(sndgs)` la (the current primary unsized
+   `DAT_801478f4[]` array-decay view and a gv pointer-hold were both tried = no-ops, single-use bases fold back to fused loads).
    NFS2 PC-beta contributes nothing to this function: its salloc.obj `_iSNDfreechan` is a
  *   THREE-LINE ungrouped release (`chan[i].state = 0;`) with no linked-group protocol at all, so
  *   the whole group/partner CFG is NFS3/NFS4-era and has no named-source ancestor to copy. */
@@ -487,13 +481,12 @@ done:
       GENERALIZES: any `*(volatile signed char*)x != 0` near-missing on lb/lbu is this.
    2. cse re-folds symbol+offset back into one %hi(sym+off)/%lo pair even through a pointer local;
       a fence on the pointer kept retail's base + 0x44 displacement (14 -> 9).  [EAC 2026-10-04:
-      superseded by a per-arm `gv = sndgs_v` assignment -- pure C, see the body.]
+      superseded by per-arm `gv = (unsigned char *)sndgs` assignments -- pure C; the aliasless form is exact.]
    3. A fence on `partner` between its two users restored retail's SECOND `partner*100` scale
       chain that cse had merged away (9 -> 6).  [Since removed; the dp view alone keeps it.]
-   4. UNSIZED VIEW + ARRAY-DECAY POINTER (`int *dp = DAT_801478f4_v;`) moves the (high sym) to the
-      join-block head where reorg eager-steals it into the `bne` delay slot and leaves the
-      .L800FED5C duplicate (6 -> 2).  `&scalar`, `view[0]` and a plain pointer-to-scalar all fold
-      back (catalog: ARRAY DECAY != &scalar).
+   4. The primary declaration is now `extern int DAT_801478f4[]`; natural array decay
+      (`int *dp = DAT_801478f4;`) preserves the exact join-block address shape without a second
+      asm-label declaration. The `&scalar` alternative was tested separately and differs by 7 diffs.
    RESIDUAL 2 = ONE instruction's sched1 issue POSITION: retail interleaves `lw $v1,0x94($t1)`
    INTO the chan*100 scale chain (sll,addu,sll,addu | lw | sll | addu) while ours issues it first.
    Byte-identical instruction, different slot -- and the IDENTICAL shape 60 insns earlier (block 1,
@@ -501,7 +494,7 @@ done:
    FALSIFIED IN THIS BASIN (all 2 or worse; basin = post-4-fence): operand swap chan*100+poolv (4),
    inline-load form (2), `slot=chan*100` split temp (7 @111), nested block-scope decl with
    initializer + dummy filler mirroring block 1's `partner=-1` (2), fences on slot / poolv / gs /
-   chan (2), sndgs_v as the base (2).  ALSO FALSIFIED (whole-loop level): goto-loop shapes (50-52),
+   chan (2), the former `sndgs_v` view as the base (2). ALSO FALSIFIED (whole-loop level): goto-loop shapes (50-52),
    index form (50), dropping the volatiles WITHOUT the fence (62-93 -- the giv re-anchor returns),
    fence placed AFTER the increment instead of at the body head (17 @109).
    NEXT ANGLE: no statement boundary exists between the scale chain and the load, so a fence has
@@ -609,18 +602,18 @@ void iSNDfreechan(int chan)
                  * re-fold sndgs+0x44 into one %lo pair, and reorg produces exactly retail's split la.
                  * Falsified: single assignment in the tail (folds), `X | (X & 3)` absorption on gv
                  * (combine folds, 5 diffs), single assignment before the test (la hoisted into t0, 8). */
-                int *dp = DAT_801478f4_v;
+                int *dp = DAT_801478f4;
                 int partnerSlot;
                 unsigned char *gv;
                 partnerSlot = partner * (int)sizeof(SndChannel) + *dp;
                 if (((SndChannel *)(unsigned int)partnerSlot)->state == 1) {
-                    gv = sndgs_v;
+                    gv = (unsigned char *)sndgs;
                     if (chan == partner) {
                         ((SndChannel *)(unsigned int)partnerSlot)->state = 2;
                         return;
                     }
                 } else
-                    gv = sndgs_v;
+                    gv = (unsigned char *)sndgs;
                 ((SndChannel *)(unsigned int)slot)->state = 0;
                 ((SndChannel *)(unsigned int)slot)->allocation_tick = ((struct SndGlobalServerStateView *)gv)->tick_count;
             }

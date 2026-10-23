@@ -34,7 +34,8 @@
  * align-2 4-byte struct = the oracle's lwl/lwr+swl/swr unaligned word copy). */
 /* W65-A6 DATA-MAT: `sndmm` was extern-only tree-wide (13 reloc-referenced undefined sites).
  * Retail: .bss @0x80148780 (VA > t_addr+t_size 0x8013E000 => no file bytes, pure zero-init).
- * smemman.obj owns it (sole referencer besides its own asm-label alias `sndmm_b`).
+ * smemman.obj owns it. The former `sndmm_b` asm-label view was removed after replacing its uses with
+ * explicit byte offsets from `(unsigned char *)&sndmm`; the owner and storage symbol remain `sndmm`.
  * Size = sizeof(SNDMemState) = 524, the oracle-derived struct above; the VA delta to the next
  * known symbol (drv.c's D_8014899C @0x8014899C) is 540, so 16 trailing bytes of that gap are
  * unattributed -- recorded, not invented.
@@ -45,11 +46,9 @@
 #include "smemman.h"
 
 SNDMemState sndmm;                  /* @0x80148780 [BSS] definition */
-/* UNSIZED-ARRAY VIEW of the same storage (asm-label alias): an unsized `unsigned char[]`
- * makes gcc materialize each `sndmm_b + K` as the FUSED high(sym+K)/lo_sum pair, so the two
- * distinct table bases (+8 and +0xC, splat D_80148788 / D_8014878C) cannot share one hoisted
- * `lui %hi(sndmm)`. */
-extern unsigned char sndmm_b[] __asm__("sndmm");
+/* Current exact form uses explicit byte offsets from the typed `sndmm` object; the former
+ * unsized-array `sndmm_b[] __asm__("sndmm")` view was removed. The strict gate confirms this
+ * ordinary C spelling retains the required object-code schedule in iSNDmalloc (135/135). */
 
 #define DAT_80148786 (sndmm.poolWords)
 
@@ -168,11 +167,10 @@ unsigned int iSNDmemrestore(void)
  *       pointer's register for `&sndmm` (`addiu $a1,$v1,-0xC`), not a fresh temp.  Re-assigning the
  *       `entry` variable instead of introducing `cb` makes the ENTIRE commit block byte-exact,
  *       including the oracle's load-delay `nop` after `lhu $v0,4($a1)`.
- *   Supporting shape change: `sndmm_b[]`, an unsized-array asm-label VIEW of the same storage, so
- *   the +8 and +0xC bases lower to the FUSED `high(sym+K)` RTL (three distinct high expressions in
- *   `-dl`) instead of one shareable `high(sndmm)`; codegen-neutral on its own but it is what lets
- *   levers (2)/(3) land.  Post-scan index-first (same lever as (2)) moved its base into the oracle's
- *   $v1 and its limit read onto that base (`lhu $v0,-2($v1)`), diff-neutral, shape-correct.
+ *   Earlier experiments used `sndmm_b[] __asm__("sndmm")` as a separate array view. In the current
+ *   exact source that alias is removed: `(unsigned char *)&sndmm + 8` and `+ 0xc` produce the same
+ *   required 135/135 object code. Post-scan index-first (same lever as (2)) moved its base into the
+ *   oracle's $v1 and its limit read onto that base (`lhu $v0,-2($v1)`), diff-neutral, shape-correct.
  * RESIDUAL = 2 instructions + the $v0/$v1 mirror inside the two remaining blocks:
  *   (a) `addiu $a0,$sp,0x10` DUPLICATED into the entry-guard delay slot -- the same reorg steal as
  *       (2), but in the post-scan block the first instruction is the sched1-hoisted call-arg setup
@@ -377,7 +375,7 @@ int iSNDmalloc(int size)
          * a distinct opaque 4th qty `q` from `"=r"(q):"0"(j)` (26 -- the 3-QTY-LAW probe), an
          * unused entry-value temp (6).  DO NOT re-split `pv` into a tail-local. */
         j = i << 2;
-        pb = (unsigned short *)(sndmm_b + 8);
+        pb = (unsigned short *)((unsigned char *)&sndmm + 8);
         pv = (unsigned short *)(j + (int)pb);
         /* MATCH (w50-a7): THIRD use fence, the same lever as the loop's `pv` add one block up --
          * keep `j` live PAST the add so the sum takes retail's FRESH `$a2` (`addu $a2,$v0,$v1`)
@@ -395,7 +393,7 @@ commit:
         /* fused sndmm+0xC table symbol (oracle D_8014878C); the state base is recovered by
          * subtracting 0xC from it, and the pool pointer is read at -0xC off the SAME symbol. */
         int off = i << 2;
-        unsigned char *tabsym = sndmm_b + 0xc;
+        unsigned char *tabsym = (unsigned char *)&sndmm + 0xc;
         unsigned char *cb;
         int addr;
         entry = (unsigned short *)(off + (int)tabsym);

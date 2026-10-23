@@ -165,14 +165,10 @@ int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *
     detune = vol->detune.word;
     if (vol->detune_range.word)
         detune += randrange(vol->detune_range.word);
-    if (detune < 0x80)
-        goto detune_low;
-    detune = 0x7f;
-    goto detune_done;
-detune_low:
-    if (detune < 0)
+    if (detune >= 0x80)
+        detune = 0x7f;
+    else if (detune < 0)
         detune = 0;
-detune_done:
 
     chan = iSNDallocchan(vol->channel_priority.uword, vol->channel_count.word, vol->allocation_flags.word, &out);
     if (chan < 0)
