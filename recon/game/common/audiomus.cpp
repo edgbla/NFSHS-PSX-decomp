@@ -50,10 +50,10 @@ void AudioMus_RefreshStatus(void)
 {
   if (AudioMus_g->streamhandle >= 0) {
 
-    SNDSTRM_status(AudioMus_g->streamhandle,(int)&AudioMus_g->streamstatus);
+    SNDSTRM_status(AudioMus_g->streamhandle, &AudioMus_g->streamstatus);
 
     if (0 < (AudioMus_g->streamstatus).outstandingrequests) {
-      SNDSTRM_requeststatus((AudioMus_g->streamstatus).currentrequest,(u_int)&AudioMus_g->requeststatus);
+      SNDSTRM_requeststatus((AudioMus_g->streamstatus).currentrequest, &AudioMus_g->requeststatus);
     }
   } else {
     (AudioMus_g->streamstatus).outstandingrequests = 0;
@@ -558,7 +558,7 @@ void AudioMus_DriverStartUp(int buffersize,int spusize)
         SNDplaysetdef(&opts);
         opts.vol = 0;
         AudioMus_g->streamhandle =
-            SNDSTRM_create((int *)&opts,1,chunks,AudioMus_g->streambuffer,size);
+            SNDSTRM_create(&opts, 1, chunks, AudioMus_g->streambuffer, size);
         if (-1 < AudioMus_g->streamhandle) {
           SNDSTRM_setgreedylevel(AudioMus_g->streamhandle,0);
           SNDSTRM_setpriority(AudioMus_g->streamhandle,0xff,5);

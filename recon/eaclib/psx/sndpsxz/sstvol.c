@@ -13,7 +13,7 @@ int SNDSTRM_vol(int tag, int vol)
 {
     SndStream *sp;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;
-    sp = (SndStream *)iSNDstreamgetstreamptr(tag);
+    sp = iSNDstreamgetstreamptr(tag);
     if (!sp) return -8;
     sp->start_params.vol = (char)vol;
     SNDvol(*(volatile unsigned int *)&sp->start_result, vol);

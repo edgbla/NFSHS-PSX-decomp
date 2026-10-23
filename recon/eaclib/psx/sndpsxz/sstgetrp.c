@@ -12,23 +12,24 @@
  * `((u8<<24)>>24)` via a `volatile` byte deref -- a plain `*(char*)` cast lets gcc cache/re-derive the
  * comparison from the earlier guard read instead of reloading+sign-extending fresh every iteration
  * (11->0; same lever as iSNDstreamparsenumchunks/sst.cpp). */
-int iSNDstreamgetrequestptr(unsigned int idx)
+SndStreamReq *iSNDstreamgetrequestptr(unsigned int idx)
 {
     SndStream *sp;
-    int  rq, i;
+    SndStreamReq *rq;
+    int i;
     if (-1 >= (int)idx)
         return 0;
-    sp = (SndStream *)iSNDstreamgetstreamptr((int)(idx & 0xff));
+    sp = iSNDstreamgetstreamptr((int)(idx & 0xff));
     if (!sp)
         return 0;
     if (!(0 < (int)((unsigned)sp->current_count << 0x18)))   /* (signed char) count > 0 */
         return 0;
-    rq = (int)(unsigned int)sp->requests;
+    rq = sp->requests;
     i = 0;
     do {
-        if (((SndStreamReq *)(unsigned int)rq)->request_id == idx)
+        if (rq->request_id == idx)
             return rq;
-        rq += sizeof(SndStreamReq);
+        rq++;
         i++;
     } while (i < (((int)((volatile SndStream *)sp)->current_count << 24) >> 24));
     return 0;

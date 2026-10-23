@@ -8,25 +8,25 @@
 #include "sstpriv.h"
 #include "sststat.h"
 
-/* SNDSTRM_status : fill the 3-int status block `s` (active, bytes, permille) for stream `tag`. */
-int SNDSTRM_status(int tag, int s)
+/* SNDSTRM_status : fill the 3-int status block `status` for stream `tag`. */
+int SNDSTRM_status(int tag, struct SNDSTREAMSTATUS *status)
 {
     SndStream *sp;
     unsigned int frames, outstanding;
-    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered = 0;
-    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->currentrequest = 0;
-    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->outstandingrequests = 0;
+    status->timebuffered = 0;
+    status->currentrequest = 0;
+    status->outstandingrequests = 0;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;
-    sp = (SndStream *)iSNDstreamgetstreamptr(tag);
+    sp = iSNDstreamgetstreamptr(tag);
     if (!sp) return -8;
     iSNDenteraudio();
-    ((struct SNDSTREAMSTATUS *)(unsigned int)s)->outstandingrequests = ((int)((unsigned)((volatile SndStream *)sp)->current_count << 24)) >> 24;
+    status->outstandingrequests = ((int)((unsigned)((volatile SndStream *)sp)->current_count << 24)) >> 24;
     if (sp->current_count) {
-        ((struct SNDSTREAMSTATUS *)(unsigned int)s)->currentrequest = sp->requests->request_id;
+        status->currentrequest = sp->requests->request_id;
         frames = sp->locked_rate.samplerate;
         if (frames) {
             outstanding = SNDPKTPLAY_unsafeframesoutstanding(sp->packet_player);
-            ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered =
+            status->timebuffered =
                 outstanding * 1000 / sp->locked_rate.samplerate;
         }
     }

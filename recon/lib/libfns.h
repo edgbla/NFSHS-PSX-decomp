@@ -14,6 +14,10 @@
 #ifndef _LIB_LIBFNS_H_
 #define _LIB_LIBFNS_H_
 
+struct SNDSTREAMSTATUS;
+struct SNDREQUESTSTATUS;
+struct SNDPLAYOPTS;
+
 extern "C" {
 
 /* =====================================================================
@@ -94,17 +98,17 @@ u_short PAD_state(int);   /* SYM: USHORT PAD_state(int padID) — was a bogus u_
 void PAD_update(...);
 int SND3dpos(...);   /* (u_int tag, u_int x, int y) */
 int SNDSTRM_autovol(...);   /* (int handle, int ticks, int flag) */
-int SNDSTRM_create(...);   /* (int *priority,int numReq,int pktArg,int objbuf,int memsize) -> stream handle; def in eaclib sndpsxz/spvoices.cpp */
+int SNDSTRM_create(struct SNDPLAYOPTS *priority, int numReq, int pktArg, char *objbuf, int memsize);   /* -> stream handle; def in eaclib sndpsxz/spvoices.c */
 int SNDSTRM_destroy(...);   /* (int handle) */
 int SNDSTRM_getvol(...);   /* (int handle) */
 int SNDSTRM_overhead(...);   /* (int a, int b) */
 int SNDSTRM_purge(...);   /* (int handle) */
 int SNDSTRM_queuefile(...);   /* (u_int handle,int name,char *filename,long off) -> queue handle; real def eaclib sndpsxz/spvoices.c returns int (w30-a7: was void, mismatched the real definition -- AudioMus_QueueRequestedSong stores its return into requesthandle) */
-int SNDSTRM_requeststatus(...);   /* (int req, u_int statusptr) */
+int SNDSTRM_requeststatus(unsigned int reqTag, struct SNDREQUESTSTATUS *status);   /* (unsigned int req, SNDREQUESTSTATUS *status) */
 void SNDSTRM_setgreedylevel(...);   /* (int handle, int level) */
 void SNDSTRM_setgreedystate(...);   /* (int handle, int state) */
 void SNDSTRM_setpriority(...);   /* (int handle, int prio, int n) */
-int SNDSTRM_status(...);   /* (int handle, int statusptr) */
+int SNDSTRM_status(int tag, struct SNDSTREAMSTATUS *status);   /* (int handle, SNDSTREAMSTATUS *status) */
 int SNDSTRM_vol(...);   /* (int handle, int vol) */
 int SNDSYS_getopts(...);   /* (void * outOpts) */
 void SNDSYS_init(...);   /* (void *, int, int) */

@@ -22,7 +22,7 @@
 
 /* SNDSTRM_create @0x800E9B44 : create a streaming voice with its OWN ring (extHandle/extFlag forced 0).
  *   Returns the stream slot or a negative error. */
-int SNDSTRM_create(struct SNDPLAYOPTS *priority, int numReq, int pktArg, int objbuf, int memsize)
+int SNDSTRM_create(struct SNDPLAYOPTS *priority, int numReq, int pktArg, char *objbuf, int memsize)
 {
     return iSNDstreamcreate(priority, numReq, pktArg, objbuf, memsize, 0, 0);
 }
@@ -34,7 +34,7 @@ int SNDSTRM_destroy(int s)
     SndStream *S;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
-    S = (SndStream *)iSNDstreamgetstreamptr(s);
+    S = iSNDstreamgetstreamptr(s);
     if (!S)
         return -8;
 
@@ -66,7 +66,7 @@ int SNDSTRM_purge(int s)
     int stopped;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
-    S = (SndStream *)iSNDstreamgetstreamptr(s);
+    S = iSNDstreamgetstreamptr(s);
     if (!S)
         return -8;
     if (S->start_result < 0) {

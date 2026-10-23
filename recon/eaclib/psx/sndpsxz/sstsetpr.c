@@ -17,7 +17,7 @@ int SNDSTRM_setpriority(int streamid, int prio, int a3)   /* @0x800E6CF0 */
     SndStream *strm;
     if (!SND->enabled)
         return -10;
-    strm = (SndStream *)iSNDstreamgetstreamptr(streamid);
+    strm = iSNDstreamgetstreamptr(streamid);
     if (!strm)
         return -8;
     STREAM_setpriority(strm->stream_handle, prio, a3);
