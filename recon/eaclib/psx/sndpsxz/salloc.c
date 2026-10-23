@@ -59,7 +59,7 @@
 /* Current exact form: the former `sndgs_v[] __asm__("sndgs")` second view was removed. The two
  * branch-local `gv = (unsigned char *)sndgs` assignments still preserve the separate base-address
  * materialization needed by iSNDfreechan (110/110 exact). */
-__asm__("\t.globl\tsndchanreserved\n\t.section\t.bss\nsndchanreserved:\n\t.space\t4\n\t.text");
+signed char sndchanreserved[4] __attribute__((section(".bss"))) = { 0 };
 extern int  DAT_801478f4[];
 /* The primary declaration is an unsized array so `DAT_801478f4` decays naturally to the pointer
  * used by iSNDfreechan. This replaces the former second `__asm__` array view; `&DAT_801478f4`

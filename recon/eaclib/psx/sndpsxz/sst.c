@@ -74,9 +74,8 @@
  * would make them LOCAL (not fixing the link) AND flip cc1 to gp-relative addressing.  The
  * oracle has ZERO `%gp_rel(sndss)`/`%gp_rel(sndStreamMap)` sites, so retail addressed them
  * absolutely -- the C view must therefore stay `extern` (byte-neutral by construction). */
-__asm__("\t.globl\tsndss\n\t.globl\tsndStreamMap\n\t.section\t.bss\n\t.align\t2\n"
-        "sndss:\n\t.space\t4\n"
-        "sndStreamMap:\n\t.space\t4\n\t.text");
+int sndss[1] __attribute__((section(".bss"))) = { 0 };
+unsigned char sndStreamMap[4] __attribute__((section(".bss"))) = { 0 };
 
 /* ---- SNDPKTPLAY packet-player declarations come from the owner header spktplay.h. ---- */
 /* ---- internal forward decls (mutually recursive) ---- */

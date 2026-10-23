@@ -149,7 +149,7 @@
 #include "spktplay.h"
 #include "sst.h"
 
-__asm__("\t.globl\tsndpp\n\t.section\t.bss\n\t.align\t2\nsndpp:\n\t.space\t4\n\t.text");
+int sndpp[1] __attribute__((section(".bss"))) = { 0 };
 
 /* `slimits.h` is the owner declaration: sndpsxlimits is a five-int block at 0x801234D4;
  * element [4] is the default SPU context size (retail displacement +0x10). */

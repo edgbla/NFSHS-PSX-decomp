@@ -56,7 +56,7 @@
 #include "sserver.h"
 #include "../../../shared/SNDPLAYOPTS.h"
 
-__asm__("\t.globl\tsndpps\n\t.section\t.bss\n\t.align\t2\nsndpps:\n\t.space\t4\n\t.text");
+int sndpps[1] __attribute__((section(".bss"))) = { 0 };
                   /* (signed char)sndgs[0xf]=init, sndgs[0x25]=channel pool base */
 /* HEADER WISH: the oracle actually loads this global from D_80147900 (SNDPKTPLAY_start @0x80102C34,
  * iSNDplaytaggedtimbre @0x801020D8 -- same "rate * ch-field * ch-field, magic-const mult, dur"

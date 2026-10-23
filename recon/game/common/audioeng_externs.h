@@ -17,8 +17,8 @@ int SNDplay(...);
 void SNDplaysetdef(...);
 int SNDstop(...);
 void SNDvol(...);
-short *iSNDserveradd100hzclient(...);
-int iSNDserverremove100hzclient(...);
+short *iSNDserveradd100hzclient(void (*cb)(void));
+void iSNDserverremove100hzclient(void (*cb)(void));
 void *memcpy(...);
 int sprintf(...);
 }

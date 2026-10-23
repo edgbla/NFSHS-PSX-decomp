@@ -144,17 +144,19 @@ unsigned int iSNDpsxfxinit(int mode)
      *  3. The rv source is a WALKING short pointer read at +2 (`lhu $a0,0x2($a1)`; `$a1 += 2`),
      *     while the SPU destination is indexed by the counter -- mixed walk/index, exactly as
      *     retail wrote it; indexing both sides costs 3 extra insns.
-     *  4. The per-iteration control-register reload uses the typed control_base field through a
-     *     volatile int view (`lw $v1,0x514($a3)`); the state displacement remains +0x514 on each iteration. */
+     *  4. The per-iteration control-register reload uses the ordinary typed state-view pointer `ctl`,
+     *     with an explicit volatile-int lvalue only on `control_base` (`lw $v1,0x514($a3)`); the
+     *     state displacement remains +0x514 on each iteration. Removing that field-level volatile
+     *     changes 6 instructions, but the pointer itself needs no volatile pointee qualifier. */
     n = 0;
     *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) & 0xff7f;  /* reverb off while loading */
     {
-        volatile int *ctl = (volatile int *)pd;
+        struct SndSpuRegisterBasesStateView *ctl = (struct SndSpuRegisterBasesStateView *)pd;
         short *rp = rv;
         for (; n < 0x20; n++) {                           /* 0x20 reverb coefficient regs */
             short v = rp[1];
             rp++;
-            *(unsigned short *)(n * 2 + *(volatile int *)&((struct SndSpuRegisterBasesStateView *)ctl)->registers.control_base + 0x1c0) = (unsigned short)v;
+            *(unsigned short *)(n * 2 + *(volatile int *)&ctl->registers.control_base + 0x1c0) = (unsigned short)v;
         }
     }
     work = 0x10000 - (unsigned short)rv[0];
