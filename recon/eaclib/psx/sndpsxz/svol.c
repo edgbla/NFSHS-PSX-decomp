@@ -41,7 +41,7 @@ done:
 int SNDvol(int handle, int vol)   /* @0x800E6A94 */
 {
     int r;
-    if (SND->enabled == 0)
+    if (!SND->enabled)
         return -10;
     iSNDenteraudio();
     r = iSNDunsafevol(handle, vol);

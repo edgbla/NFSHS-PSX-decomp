@@ -28,7 +28,7 @@ int SNDtimeremaining(unsigned int tag)
         return -8;
     }
     voice[0] = -1;
-    while (iSNDpatchkey(chan, (int)voice) != 0) {
+    while (iSNDpatchkey(chan, voice)) {
         unsigned int rem = iSNDtimeremaining(voice[0]);
         if ((int)best < (int)rem)
             best = rem;

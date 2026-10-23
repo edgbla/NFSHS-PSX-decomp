@@ -17,7 +17,7 @@ int iSNDsystemtaskreal(void)
 /* SNDSYS_vectortoreal @0x800F2150 : install iSNDsystemtaskreal as a real-time system task (once). */
 int SNDSYS_vectortoreal(void)
 {
-    if (D_80134A6C[0] == 0) {
+    if (!D_80134A6C[0]) {
         addsystemtask((unsigned int (*)(int, int))iSNDsystemtaskreal, 0, 1);
         D_80134A6C[0] = 1;
     }

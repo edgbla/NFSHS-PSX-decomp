@@ -12,7 +12,7 @@
 /* SNDcdvol @0x800FAA44 : cache (vol_l * masterVol)/0x7f and apply the CD pan/volume. */
 int SNDcdvol(int vol_l, int vol_r)
 {
-    sndcdvs[1] = (short)((vol_l * (int)((struct SndGlobalServerStateView *)sndgs)->master_volume) / 0x7f);
+    sndcdvs[1] = (short)(vol_l * (int)((struct SndGlobalServerStateView *)sndgs)->master_volume / 0x7f);
     /* @0x800FAA90/94: iSNDplatformcdpanvol(*(short*)0x80136CAC = cached pan, (int)(short)level). The
      * recon passed the raw caller args (vol_l, vol_r) -- but the oracle passes the cached pan and the
      * just-computed master-scaled level; vol_r is in fact unused (IDA typed 1 arg) (M06). */

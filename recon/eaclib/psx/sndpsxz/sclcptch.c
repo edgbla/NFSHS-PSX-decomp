@@ -40,7 +40,7 @@ int iSNDdetunetolinear(int detune)
 {
     int mul = 0x1000;
     int idx;
-    for (; 0x4af < detune; detune -= 0x4b0)        /* octave up */
+    for (; detune > 0x4af; detune -= 0x4b0)        /* octave up */
         mul = mul << 1;
     for (; detune < -0x4af; detune += 0x4b0)       /* octave down */
         mul = mul >> 1;
@@ -71,11 +71,11 @@ int iSNDcalcpitch(int note)
                 c = *(signed char *)(v->detune_curve + v->bend);
             else
                 c = v->bend;    /* +0x2f detune read signed (lb) */
-            cents += ((c - 0x40) * v->envelope_detune_depth >> 6);
+            cents += (c - 0x40) * v->envelope_detune_depth >> 6;
         }
         if (v->pitch_lfo_table) {             /* LFO-driven detune */
-            cents += ((*(signed char *)(v->pitch_lfo_table + (unsigned)v->pitch_lfo_phase) - 0x40) *
-                      v->pitch_lfo_depth >> 6);
+            cents += (*(signed char *)(v->pitch_lfo_table + (unsigned)v->pitch_lfo_phase) - 0x40) *
+                      v->pitch_lfo_depth >> 6;
         }
         pitch = iSNDdetunetolinear(cents);
         v->linear_pitch_cache = (short)pitch;

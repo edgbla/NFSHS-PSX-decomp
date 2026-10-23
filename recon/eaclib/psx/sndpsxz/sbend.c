@@ -18,7 +18,7 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
 {
     int chanIdx = iSNDgetchan(tag);
     int cur[2];
-    if (-1 < chanIdx) {
+    if (chanIdx > -1) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
             SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[cur[0]];

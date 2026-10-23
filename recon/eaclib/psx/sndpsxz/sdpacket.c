@@ -295,7 +295,7 @@ void iSNDpacketsetirq(void)
              * `char` is UNSIGNED on this build (lbu) -- `-1 < (unsigned char)x` is a gcc-provable
              * TAUTOLOGY, so a `(char)` cast here silently deletes the whole note-idle check as dead
              * code. Must be `signed char` (oracle: `lb`/`bgez`), same field iSNDpacketgetirq reads. */
-            if (ctx != 0 && ctx->active_note >= 0)
+            if (ctx && ctx->active_note >= 0)
                 goto success;
             i++;
         } while (i < 2);
@@ -410,12 +410,12 @@ unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count)
             }
         }
         wrapped = ctx->buffer_bytes;
-        byteoff = byteoff + span;
+        byteoff += span;
         wrapped = byteoff < wrapped;
-        count = count - span;
+        count -= span;
         if (!wrapped)
             byteoff = 0;
-    } while (0 < count);
+    } while (count > 0);
     return wrapped;
 }
 
@@ -759,7 +759,7 @@ queue_dma:
              * (`sltiu v0;addu a0,v0`), oracle overwrites a0 in place (`sltiu a0,s0,1`). */
             int flag = 0;
             if (!chunk)
-                flag = (i == 0);
+                flag = (!i);
             dma = iSNDdmqueue(((SndPacketPlayerContextPrefix *)ch)->channel_buffer0, src, len, 2, flag);
             pp->dma_handle = dma;
             ch += 4; i++;
@@ -790,7 +790,7 @@ void iSNDpacketserve(void)
     do {
         SndPacketPlayerContextPrefix *ctx =
             ((struct SndPacketContextSlotCursorView *)(base + p * 4))->context;
-        if (ctx != 0 && ctx->active_note >= 0) {
+        if (ctx && ctx->active_note >= 0) {
             int servePos = ctx->last_new_position;
             /* MATCH: 0x1c000 == 4096*0x1c (28) -- mathematically `x/0x1c000` == `(x>>0xc)/0x1c` for the
              * non-negative values here, but the ORACLE keeps the >>0xc as an EXPLICIT separate step
@@ -802,8 +802,8 @@ void iSNDpacketserve(void)
             int newPos = (unsigned)voices[ctx->active_note].byte_position >> 0xc;
             unsigned int adv;
 
-            newPos = newPos / 0x1c;
-            newPos = newPos * 0x1c;
+            newPos /= 0x1c;
+            newPos *= 0x1c;
             if (newPos < servePos)
                 goto wrapped_position;
             adv = newPos - servePos;
@@ -811,7 +811,7 @@ void iSNDpacketserve(void)
 wrapped_position:
             adv = (newPos + ctx->buffer_bytes) - servePos;
 have_advance:
-            if (0x70ffffff < ctx->serve_position) {     /* keep the 64-bit-ish byte counters from overflowing */
+            if (ctx->serve_position > 0x70ffffff) {     /* keep the 64-bit-ish byte counters from overflowing */
                 ctx->serve_position += wrapAdjust;
                 ctx->write_position += wrapAdjust;
             }
@@ -819,7 +819,7 @@ have_advance:
             iSNDpacketpurgeframes(p, ctx->last_new_position, adv);
             ctx->last_new_position = newPos;
             if (ctx->write_position - ctx->serve_position < ctx->queue_threshold) {
-                if (iSNDdmcomplete(ctx->dma_handle) != 0) {
+                if (iSNDdmcomplete(ctx->dma_handle)) {
                     int idx;
                     idx = ctx->frame_index.u;
                     idx++;
@@ -841,7 +841,7 @@ int iSNDplatformpacketoverhead(void)
     if (v < 0)
         v += 0xfff;
     v >>= 0xc;
-    return ((v + 3) & ~3) * 2 + 0x1050;
+    return (v + 3 & ~3) * 2 + 0x1050;
 }
 
 /* iSNDplatformcalcdatarate @0x801041EC : bytes/second for `sample_format->samplerate` and its

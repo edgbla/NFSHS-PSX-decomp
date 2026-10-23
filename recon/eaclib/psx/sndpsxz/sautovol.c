@@ -14,7 +14,7 @@ int SNDautovol(unsigned int tag, unsigned int rate, int target)
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;  /* signed -> lb (ccpsx char is unsigned) */
     iSNDenteraudio();
     ch = iSNDgetchan(tag);
-    if (-1 < ch) {
+    if (ch > -1) {
         if ((int)rate < 1) rate = 1;
         cur[0] = -1;
         while (iSNDpatchkey(ch, (int)cur) != 0) {

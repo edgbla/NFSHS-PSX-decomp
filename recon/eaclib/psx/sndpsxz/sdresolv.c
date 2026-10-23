@@ -97,7 +97,7 @@ int iSNDplatformresolve(int cursor, int bank, int patch)
     struct SNDResolveEntry *cur;
     int           end;
 
-    while (iSNDgettag(&cursor, &id, &val, &ptr) != 0 && id != 0xfe) {
+    while (iSNDgettag(&cursor, &id, &val, &ptr) && id != 0xfe) {
         if (id == 0x80)      { /* no-op tag */ }
         else if (id == 0x88) offset   = val;
         else if (id == 0x8a) spuField = (int *)ptr;
@@ -136,9 +136,9 @@ checked:
             return 7;                              /* already resolved */
         blocks = size / 0x1c;
         if (size != blocks * 0x1c)
-            blocks = blocks + 1;
+            blocks += 1;
         scale = count << 4;
-        blocks = blocks * scale;
+        blocks *= scale;
         buf = iSNDpsxmalloc(blocks);
         if (!buf)
             return -6;
@@ -165,7 +165,7 @@ int iSNDplatformremove(int cursor, int *patch)
     int          *spuField = 0;
     int           i;
 
-    while (iSNDgettag(&cursor, &id, &val, &ptr) != 0 && id != 0xfe) {
+    while (iSNDgettag(&cursor, &id, &val, &ptr) && id != 0xfe) {
         if (id == 0x8a)
             spuField = (int *)ptr;
     }

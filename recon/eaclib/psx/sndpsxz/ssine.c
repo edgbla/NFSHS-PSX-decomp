@@ -38,7 +38,7 @@ unsigned short sndsintbl[0x101] = {   /* @0x8013C348 */
  *   low-eight-bit phase; leaving quadrants 1..3 unmasked is both behaviorally wrong and byte-different. */
 int iSNDsin(int a)
 {
-    unsigned int quad = (a >> 8) & 3;
+    unsigned int quad = a >> 8 & 3;
     a &= 0xff;
     if (!quad)
         return sndsintbl[a];                      /* quad 0 */

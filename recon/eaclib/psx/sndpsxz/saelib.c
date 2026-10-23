@@ -14,13 +14,13 @@ int iSNDlibatodlrv(int angle, int level, int *out_l, int *out_r)
     unsigned int s = iSNDsin(angle >> 6);
     /* gain = (unsigned)(level * delta) >> 16  (srl, value 0..0xFFFF) but compared SIGNED (slti) -> store
      * into a signed int so the clamp test `0x7f < gain` emits `slti`, not `sltiu`. */
-    int l = ((unsigned int)(level * (int)(0x10000 - s)) >> 0x10);
+    int l = (unsigned int)(level * (int)(0x10000 - s)) >> 0x10;
     *out_l = l;
-    if (0x7f < l)
+    if (l > 0x7f)
         *out_l = 0x7f;
-    r = ((unsigned int)(level * (int)(s + 0x10000)) >> 0x10);
+    r = (unsigned int)(level * (int)(s + 0x10000)) >> 0x10;
     *out_r = r;
-    if (0x7f < r) {
+    if (r > 0x7f) {
         *out_r = 0x7f;
         return 0x7f;
     }

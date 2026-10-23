@@ -31,7 +31,7 @@ void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int pr
             if (prevL < prevR) quad = 1;
             goto have_quad;
         }
-    } else if (-1 < prevR) {
+    } else if (prevR > -1) {
         quad = 1;
         if (prevL < prevR) quad = 2;
         goto have_quad;
@@ -47,7 +47,7 @@ void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int pr
 
 have_quad:
     which = 0;
-    if ((angle - 0x4000U) < 0x8000) {
+    if (angle - 0x4000U < 0x8000) {
         newdir = 4;
         if (*out_l < *out_r) newdir = 3;
         if (quad < 3) {
@@ -58,7 +58,7 @@ have_quad:
     } else {
         newdir = 1;
         if (*out_l < *out_r) newdir = 2;
-        if (2 < quad && (which = 2, newdir == 2) && quad == 3) which = 1;
+        if (quad > 2 && (which = 2, newdir == 2) && quad == 3) which = 1;
     }
     if (prevL < 0) *out_l = -*out_l;
     if (prevR < 0) *out_r = -*out_r;

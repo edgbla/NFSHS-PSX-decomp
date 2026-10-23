@@ -43,9 +43,9 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     (void)pitchOffset;
 
     vt = voice << 1;
-    vt = vt + voice;
+    vt += voice;
     vt = vt << 2;
-    vt = vt - voice;
+    vt -= voice;
     vt = vt << 2;
     slot = &DAT_801479f0 + vt;
 
@@ -53,7 +53,7 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     ((volatile SndPacketVoiceState *)slot)->link_index.vs = -1;
     ((SndPacketVoiceState *)slot)->route = 0;
     ((volatile SndPacketVoiceState *)slot)->channel_count = 1;
-    while (iSNDgettag(&chan, &id, &val, (int *)&ptr) != 0 && id != 0xfe) {
+    while (iSNDgettag(&chan, &id, &val, (int *)&ptr) && id != 0xfe) {
         if (id == 0x8a) {
             sampleData = ptr;
             continue;

@@ -110,7 +110,7 @@ void iSNDcalcvol(int chan)
      * +0x2D is the only output and no caller consumes a result.  The old "v1-not-v0 coloring floor"
      * was the reserved-return symptom (3.2): dropping the return frees $v0 and the whole velocity-
      * curve block colors itself. */
-    n = n / 0x1f417f;
+    n /= 0x1f417f;
     v->volume = (char)n;
     if (v->velocity_curve) {                  /* velocity curve */
         v->volume = (char)(((n * 0x1000000 >> 0x18) *
@@ -217,11 +217,11 @@ void iSNDsetvol(int chan, int left, int right)
         if (slot->route == chan) { /* L/R-spread routing */
             if (left < 0)  left = -left;
             if (right < 0) right = -right;
-            if (0x7f < left)  left = 0x7f;
-            if (0x7f < right) right = 0x7f;
+            if (left > 0x7f)  left = 0x7f;
+            if (right > 0x7f) right = 0x7f;
             sum = left + right;
         }
-        vol = (sum * 0x81 >> 1) & 0x7fff;
+        vol = sum * 0x81 >> 1 & 0x7fff;
     } else {                                        /* linked pair */
         if (((struct SndGlobalServerStateView *)sndgs)->output_mode == 2) {
             *vreg   = left * 0x81 & 0x7fff;
@@ -232,10 +232,10 @@ void iSNDsetvol(int chan, int left, int right)
             vreg[1] = right * 0x81 & 0x7fff;
             return;
         }
-        vol = (left * 0x81 >> 1) & 0x7fff;
+        vol = left * 0x81 >> 1 & 0x7fff;
         *vreg   = vol;
         vreg[1] = vol;
-        vol = (right * 0x81 >> 1) & 0x7fff;
+        vol = right * 0x81 >> 1 & 0x7fff;
         vreg = (unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base +
                 ((volatile SndPacketVoiceState *)slot)->link_index.vs * 0x10);
     }
@@ -276,7 +276,7 @@ unsigned int iSNDstartvoice(unsigned int chan)
     voice->pan_right_cache = 0;
     pitch = voice->position_step / 441u;
     iSNDsetslot(chan, voice->spu_start_address, pitch); /* +0x00 SPU start address / tag */
-    mask = 1u << (chan);
+    mask = 1u << chan;
     voice->play_state = 2;
     voice->voice_status = 2;
     voice->stop_pending = 0;
@@ -295,7 +295,7 @@ unsigned int iSNDstartvoice(unsigned int chan)
             a3 = (unsigned int)voice->loop_length_param / 0x1c;
             checkNumerator = (unsigned int)voice->loop_length_param;
             if (checkNumerator != (checkNumerator / 0x1c) * 0x1c)
-                a3 = a3 + 1;
+                a3 += 1;
             a3 = a3 << 4;
         }
         iSNDsetslot(voice->link_index.vs,
@@ -304,7 +304,7 @@ unsigned int iSNDstartvoice(unsigned int chan)
         vte2->play_state = 2;
         vte2->voice_status = 2;
         vte2->stop_pending = 0;
-        mask = mask | (1u << maskLink);
+        mask |= 1u << maskLink;
     }
     iSNDvol(chan, (signed char)voice->level);
     iSNDplatformfxlevel(chan, 0, (signed char)voice->fx_level);
@@ -421,7 +421,7 @@ int iSNDplatformoutputset(void)
     base->channel_count = 0x18;
     if (base->output_mode < base->min_output_mode)   base->output_mode = base->min_output_mode;
     if (base->max_output_mode < base->output_mode)   base->output_mode = base->max_output_mode;
-    if (base->initialized != 0 && ((struct SndDriverBootstrapPrefixView *)sndpd)->last_channel_mode != base->output_mode) {  /* signed `initialized` at +0x3C: retail uses lb */
+    if (base->initialized && ((struct SndDriverBootstrapPrefixView *)sndpd)->last_channel_mode != base->output_mode) {  /* signed `initialized` at +0x3C: retail uses lb */
         chan = 0;
         vbase = base;
         vp = (volatile SndPacketVoiceState *)&DAT_801479f0;
@@ -536,7 +536,7 @@ int iSNDinit(void)
         vp = (int)latched;
         do {
             int vr = (int)((struct SndSpuRegisterBasesStateView *)loop_pd)->registers.voice_base + i * 0x10;
-            *(short *)(vr + 0) = 0;
+            *(short *)(vr) = 0;
             *(short *)(vr + 2) = 0;
             *(short *)(vr + 4) = 0;
             *(short *)(vr + 6) = pitch;
@@ -874,7 +874,7 @@ void iSNDserve(void)
                 if (vreg[6]) {
                     *(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->stop_pending = 1;
                 } else {                                             /* SPU ADSR reached 0 */
-                    if (((struct SndPacketVoiceState *)vp)->stop_pending != 0 && ((struct SndPacketVoiceState *)vp)->link_flag == 0 &&
+                    if (((struct SndPacketVoiceState *)vp)->stop_pending && ((struct SndPacketVoiceState *)vp)->link_flag == 0 &&
                         (int)((unsigned)((struct SndPacketVoiceState *)vp)->voice_done << 0x18) < 0) {
                         cvt = vt;
                         n = *(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->channel_count;
@@ -904,7 +904,7 @@ void iSNDserve(void)
                             iSNDfreechan(c);
                             *(unsigned short *)(c * 0x10 + (int)((struct SndSpuRegisterBasesStateView *)fpbase)->registers.voice_base + 6) = 0x200;
                             onec = 1;
-                            kon = kon | (onec << c);
+                            kon |= onec << c;
                             onec = 0;
                             *(unsigned short *)(c * 0x10 + (int)((struct SndSpuRegisterBasesStateView *)fpbase)->registers.voice_base) = 0;
                             *(unsigned short *)(c * 0x10 + (int)((struct SndSpuRegisterBasesStateView *)fpbase)->registers.voice_base + 2) = 0;
@@ -935,14 +935,14 @@ void iSNDserve(void)
             } else if (*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->voice_status == 3) { /* voice fully stopped */
                 if (!vreg[6]) {
                     one = 1;
-                    kon = kon | (one << chan);              /* (Ghidra `mask`) */
+                    kon |= one << chan;              /* (Ghidra `mask`) */
                     ((struct SndPacketVoiceState *)vp)->voice_status = 0;
                     vreg[3] = 0x200;
                     vreg[0] = 0;
                     vreg[1] = 0;
                 } else {
                     one = 1;
-                    koff = koff | (one << chan);            /* (Ghidra `local_30`) */
+                    koff |= one << chan;            /* (Ghidra `local_30`) */
                 }
                 one = 0;
             }
@@ -952,11 +952,11 @@ void iSNDserve(void)
              * behavior, not a bug to "fix"). */
             /* Keep the adjacent +0x1C/+0x1D probe in byte-offset form: spelling both as struct
              * fields split the matched halfword load into two byte loads (+6 oracle diffs). */
-            if (((struct SndPacketVoiceState *)vp)->play_state == 1 && vp[0x1d] == 0 &&
+            if (((struct SndPacketVoiceState *)vp)->play_state == 1 && !vp[0x1d] &&
                 ((unsigned char)((struct SndPacketVoiceState *)vp)->channel_count < 2 ||
-                 ((struct SndPacketVoiceState *)(fpbase + 0xD8))[
+                 !(((struct SndPacketVoiceState *)(fpbase + 0xD8))[
                     ((int)((unsigned int)*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->link_index << 24) >> 24)
-                 ].voice_status == 0)) {
+                 ].voice_status))) {
                 kon = kon | iSNDstartvoice(chan);                    /* arm newly-triggered voice */
             }
             vt += (int)sizeof(SndPacketVoiceState);

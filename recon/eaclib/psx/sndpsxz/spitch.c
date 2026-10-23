@@ -22,7 +22,7 @@ int SNDpitchmult(unsigned int tag, unsigned int mult)
         return -10;
     iSNDenteraudio();
     chanIdx = iSNDgetchan(tag);
-    if (-1 < chanIdx) {
+    if (chanIdx > -1) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
             /* MATCH: keeping this value live only through iSNDcalcpitch selects a0 for the

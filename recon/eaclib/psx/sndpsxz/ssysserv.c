@@ -115,7 +115,7 @@ void SNDSYS_service(void)
         i = 0;
         do {
             void (*cb)(void) = ((struct SndServerServiceClientCursorView *)p)->callback;
-            p = p + 4;
+            p += 4;
             (*cb)();
             i++;
         } while (i < ((struct SndGlobalServerStateView *)base)->service_client_count.s);

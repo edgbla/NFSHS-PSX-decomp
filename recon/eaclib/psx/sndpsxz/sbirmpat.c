@@ -19,7 +19,7 @@
 int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
 {
     int data = (int)(unsigned int)((struct SndBankTableEntry *)(bank * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block;
-    int base = (((struct SndBankDataHeaderPrefix *)(unsigned int)data)->type == 4) ? data : 0;
+    int base = ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->type == 4 ? data : 0;
     int pp;
 
     if (iSNDvalidbank(bank) != 0)

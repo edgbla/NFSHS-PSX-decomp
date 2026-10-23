@@ -289,7 +289,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
                                        * receipt at the fn tail; the 3-statement form is the
                                        * only one that emits retail's in-place shift/mask, and
                                        * its +2 gp refs are paid for by the ppp/note inflators. */
-        gp = gp & 0xffff;
+        gp &= 0xffff;
     }
 
     ch->start_marker  = -1;              /* li -1 (signed char), not li 255 */
@@ -528,7 +528,7 @@ int SNDPKTPLAY_purge(int p, int lo, int hi)
                                                       * ORDER is the live-length lever. */
     rd    = (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) >> 16);                          /* read index (2nd identical volatile read) */
     total = (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames) << 16) >> 16);                          /* frames to scan            */
-    if (0 < total) {
+    if (total > 0) {
         rdoff = rd * sizeof(PacketFrame) + sizeof(PacketPlayerHeader);
         wrptr = wr * sizeof(PacketFrame) + ppp;
         /* GOTO loop (W31, same finding as sbdload): a natural do/while gets loop notes and gcc
@@ -587,7 +587,7 @@ int SNDPKTPLAY_stop(int p)
     iSNDenteraudio();
     SNDstop(ppp->voice_id);
     SNDPKTPLAY_purge(p, 0, 0x7fffffff);
-    if (ppp->release_cb != 0 &&
+    if (ppp->release_cb &&
         -1 < (int)((unsigned)(unsigned short)((volatile PacketPlayerHeader *)ppp)->last_channel << 0x10)) {
         ppp->release_cb(((PacketFrame *)(unsigned int)((int)(unsigned int)ppp +
                            ((volatile PacketPlayerHeader *)ppp)->last_channel * sizeof(PacketFrame) +

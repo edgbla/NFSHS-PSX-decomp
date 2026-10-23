@@ -58,12 +58,12 @@ int SNDSYS_getopts(SNDSYSOPTS *opts)
 {
     int r = 0;
     SNDSYSOPTS *base;
-    if (DAT_80134a68[0] == 0) {
+    if (!DAT_80134a68[0]) {
         r = iSNDplatformoutputcaps();
         DAT_80134a68[0] = 1;
     }
     base = (SNDSYSOPTS *)sndgs;
-    if (base->set.maxbanks == 0)
+    if (!base->set.maxbanks)
         base->set.maxbanks = 0x10;
     *opts = *base;
     return r;
@@ -97,12 +97,12 @@ int SNDSYS_init(int membase, int memsize)
     int          rv;
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
 
-    if (base->initialized != 0)
+    if (base->initialized)
         return 0;
 
     iSNDmeminit(membase, memsize);
     nchan = ((SNDSYSOPTS *)base)->set.inputvoices;
-    if (nchan == 0) {                                              /* no caps yet -> defaults */
+    if (!nchan) {                                              /* no caps yet -> defaults */
         SNDSYS_getopts((SNDSYSOPTS *)base);
         SNDSYS_setopts((SNDSYSOPTS *)base);
         nchan = ((SNDSYSOPTS *)base)->set.inputvoices;
@@ -114,7 +114,7 @@ int SNDSYS_init(int membase, int memsize)
         ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry)); /* bank table */
     memset((unsigned char *)(unsigned int)base->bank_table, 0,
            ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry));
-    if (base->server_callback == 0)
+    if (!base->server_callback)
         base->server_callback = (int)iSND100hzserver;
     SNDI_mutexalloc();
     base->tick_count = 0;
@@ -135,14 +135,14 @@ int SNDSYS_restore(void)
 {
     if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)                             /* audio not up */
         return -10;
-    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10])();
-    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11])();
-    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8])();
-    if (((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook != 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10]) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11]) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8]) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[8])();
+    if (((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook)
         ((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook();
-    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7] != 0) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7])();
+    if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7]) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[7])();
     SNDstopall();
-    if (((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook != 0)
+    if (((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook)
         ((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook(-1);
     iSNDrestore();
     ((struct SndGlobalServerStateView *)sndgs)->initialized = 0;                                     /* audio down */

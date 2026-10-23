@@ -45,7 +45,7 @@ int iSNDstop(unsigned int chan)
     slot->voice_status = 3;
     slot->play_state = 0;
     mask = 1u << chan;
-    if (1 < slot->channel_count) {                                     /* linked pair -> stop the partner too */
+    if (slot->channel_count > 1) {                                     /* linked pair -> stop the partner too */
         chan = slot->link_index.vs;
         iSNDfreechan(chan);
         slot = (volatile SndPacketVoiceState *)(base + (int)chan * (int)sizeof(SndPacketVoiceState));
@@ -99,7 +99,7 @@ int iSNDplatformfxlevel(unsigned int chan, int bus, int fxon)
         slot->fx_level = (char)fxon;
         return 0;
     }
-    mask = 1u << (chan);                               /* (computed even when the branch below skips) */
+    mask = 1u << chan;                               /* (computed even when the branch below skips) */
     if (slot->channel_count == bus)
         mask |= 1u << slot->link_index.vu;
     if (fxon)

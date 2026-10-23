@@ -268,7 +268,7 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                     off = c;
                     do {
                         one = 1;
-                        if ((priority & (one << c)) != 0) {
+                        if ((priority & one << c) != 0) {
                             ch = ((struct SndGlobalServerStateView *)gs)->play_records + off;
                             if (((SndChannel *)(unsigned int)ch)->state == 0 &&
                                 iSNDischanreserved(c, reserved) == 0) {
@@ -300,7 +300,7 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                 if (((struct SndGlobalServerStateView *)gs)->channel_count != 0) {
                     off = c;
                     do {
-                        if ((priority & (1 << c)) != 0 &&
+                        if ((priority & (1 << c)) &&
                             iSNDischanreserved(c, reserved) == 0) {
                             ch = ((struct SndGlobalServerStateView *)gs)->play_records + off;
                             if (((SndChannel *)(unsigned int)ch)->age < 0x65) {
@@ -336,7 +336,7 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
         *out = DAT_80136dec[0] | (signed char)sndchanreserved[0];
         result = (signed char)sndchanreserved[0];
         i = 0;
-        if (0 < reserved) {
+        if (reserved > 0) {
             do {
                 unsigned int owner;
                 ch = ((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[i] * (int)sizeof(SndChannel);
@@ -565,11 +565,11 @@ void iSNDfreechan(int chan)
                  * variable -- exactly the anti-anchor job the opacity fence did -- while `combine`
                  * folds the whole identity away at ZERO instructions (110/110, 4/4 PASS).
                  * Do NOT "simplify" it; removing it costs 81 diffs.  Receipt: scratchpad/w86/. */
-                scan = (unsigned char *)((unsigned int)scan | ((unsigned int)scan & 3u));
+                scan = (unsigned char *)((unsigned int)scan | (unsigned int)scan & 3u);
                 if (((SndChannel *)scan)->group_id == group &&
                     0 <= (int)((SndChannel *)scan)->owner_tag &&
-                    ((SndChannel *)scan)->state != 0 &&
-                    (count++, ((SndChannel *)scan)->playback_fx.playback.group_flag != 0))
+                    ((SndChannel *)scan)->state &&
+                    (count++, ((SndChannel *)scan)->playback_fx.playback.group_flag))
                     partner = slot;
                 slot++;
                 scan += sizeof(SndChannel);

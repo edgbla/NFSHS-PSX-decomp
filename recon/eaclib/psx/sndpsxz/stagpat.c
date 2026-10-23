@@ -51,7 +51,7 @@ unsigned char *iSNDresettimbre(struct SndTimbre *t, struct SndTimbre *buf)
         *p = 0;
         i--;
         p--;
-    } while (-1 < i);
+    } while (i > -1);
     t->velocity_min.word = 0;
     t->velocity_max.word = 0x7f;
     t->note_min.word = 0;
@@ -95,7 +95,7 @@ void iSNDresolveheader(struct SndTimbre *hdr, struct SndTimbre *out)
     hdr->detune_curve.word = out->detune_curve.word + hdr->detune_curve.word;
     hdr->velocity_curve.word = out->velocity_curve.word + hdr->velocity_curve.word;
     hdr->pitch_lfo_table.word = out->pitch_lfo_table.word + hdr->pitch_lfo_table.word;
-    if (hdr->envelope_sweep_table.word != 0)
+    if (hdr->envelope_sweep_table.word)
         hdr->envelope_sweep_table.word = out->envelope_sweep_table.word + hdr->envelope_sweep_table.word;
 }
 
@@ -109,19 +109,19 @@ int iSNDfindfreekey(void)
     struct SndGlobalServerStateView *gs;
     SndChannel *slot;
 top:
-    DAT_801371cc = DAT_801371cc + 1;        /* lbu/addiu/sb; the == 0 test reuses the CSE'd value */
-    if (DAT_801371cc == 0)                     /* skip 0 (the "no group" sentinel) */
-        DAT_801371cc = DAT_801371cc + 1;
+    DAT_801371cc += 1;        /* lbu/addiu/sb; the == 0 test reuses the CSE'd value */
+    if (!DAT_801371cc)                     /* skip 0 (the "no group" sentinel) */
+        DAT_801371cc += 1;
     i = 0;
     gs = (struct SndGlobalServerStateView *)sndgs; /* one la base for the +0x11 / +0x94 displacements */
     probe = gs->channel_count;
-    if (probe == 0)
+    if (!probe)
         goto done;
     count = gs->channel_count;
     key   = DAT_801371cc;
     slot  = (SndChannel *)(unsigned int)gs->play_records;
 loop:                                             /* goto-formed: no LOOP notes -> no giv anchoring */
-    if (slot->state != 0) {
+    if (slot->state) {
         if (slot->group_id == key)
             goto top;                             /* key owned by a held channel -> try the next one */
     }
@@ -166,7 +166,7 @@ int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *
     iSNDresolveheader(vol, header);
 
     detune = vol->detune.word;
-    if (vol->detune_range.word != 0)
+    if (vol->detune_range.word)
         detune += randrange(vol->detune_range.word);
     if (detune < 0x80)
         goto detune_low;
@@ -185,11 +185,11 @@ detune_done:
         slot->pan_scale = vol->pan_scale.ubyte;
         sv = vol->base_detune.uhalf;
         slot->base_detune = sv;
-        sv = sv - (vol->base_note.word - baseNote) * 100;
+        sv -= (vol->base_note.word - baseNote) * 100;
         slot->base_detune = sv;
-        if (vol->apply_pitch_offset.word != 0)
+        if (vol->apply_pitch_offset.word)
             slot->base_detune = sv + pitchOff;
-        if (vol->base_detune_range.word != 0)
+        if (vol->base_detune_range.word)
             slot->base_detune = (unsigned short)slot->base_detune + randrange(vol->base_detune_range.word);
         *(volatile int *)&slot->final_volume_curve = vol->final_volume_curve.word;
         field54 = vol->pan_curve.word;
@@ -205,12 +205,12 @@ detune_done:
         b7 = detune + b7 - 0x40;
         if (b7 < 0)
             b7 = 0;
-        else if (0x7f < b7)
+        else if (b7 > 0x7f)
             b7 = 0x7f;
-        if (slot->pan_curve != 0)
+        if (slot->pan_curve)
             b7 = *(signed char *)(slot->pan_curve + b7);
         pan = vol->pan.word;
-        if (vol->pan_range.word != 0)
+        if (vol->pan_range.word)
             pan += randrange(vol->pan_range.word);
         if (pan < 0x80)
             goto pan_low;
@@ -242,13 +242,13 @@ pan_low:
         slot->pitch_lfo_depth = (unsigned short)vol->pitch_lfo_depth.ubyte;
         {
             unsigned int rv = vol->velocity_phase_seed.uword;
-            if (rv != 0) {
+            if (rv) {
                 rv = iSNDrandom();
                 slot->velocity_phase = (char)(rv % vol->velocity_phase_limit.uword);
             } else
                 slot->velocity_phase = 0;
             rv = vol->pitch_lfo_seed.uword;
-            if (rv != 0) {
+            if (rv) {
                 rv = iSNDrandom();
                 slot->pitch_lfo_phase = (char)(rv % vol->lfo_phase_limit.uword);
             } else
@@ -269,7 +269,7 @@ pan_low:
             playOffset = tag->elevation;
         } else {
             tmp = b7;
-            tmp = tmp - 0x40;
+            tmp -= 0x40;
             tmp = tmp << 8;
             tmp = (unsigned short)tmp;
             playOffset = 0;
@@ -319,7 +319,7 @@ int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
     int           id, val;                 /* a1 / a2 one-shot copies of g0/g1 */
     int           i, ch;                   /* ch: getchan result, BOTH branches (a0, never crosses a call) */
 
-    if (bank == 0)
+    if (!bank)
         return -8;
     note = (signed char)tag->keynum;
     vel  = (signed char)tag->velocity;
@@ -367,11 +367,11 @@ int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
         nStarted++;
     }
 
-    if (nStarted == 0)
+    if (!nStarted)
         goto fail;                         /* nothing started: leaveaudio + return ret (-9 or the fail) */
     if (nStarted == 1) {                   /* single voice: no key group */
         ch = iSNDgetchan(started[0]);
-        if (-1 < ch) {
+        if (ch > -1) {
             slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[ch];
             slot->group_id = 0;
             slot->playback_fx.playback.group_flag = 0;
@@ -381,7 +381,7 @@ int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
             char *gs = (char *)sndgs;      /* in-body: loop-invariant-HOISTED after the entry blez,
                                             * into a callee-saved reg (held ACROSS the getchan calls) */
             ch = iSNDgetchan(started[i]);
-            if (-1 < ch) {
+            if (ch > -1) {
                 slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)gs)->play_records)[ch];
                 slot->group_id = (unsigned char)key;
                 slot->playback_fx.playback.group_flag = 0;
@@ -406,7 +406,7 @@ int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
     unsigned int state[4];
     int r = -1;
     state[0] = bank;
-    if ((((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) != 0)
+    if (((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2)
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
     else
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
@@ -414,7 +414,7 @@ int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
         if (state[1] == 0xfd)
             r = iSNDplatformresolve(state[0], patch_idx, scratch);
     }
-    if (-1 < r)
+    if (r > -1)
         ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags = ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags | 1;
     return r;
 }
@@ -425,7 +425,7 @@ int iSNDremovetaggedpatch(int bank, int *patch_idx)
 {
     unsigned int state[4];
     state[0] = bank;
-    if ((((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) != 0)
+    if (((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2)
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
     else
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;

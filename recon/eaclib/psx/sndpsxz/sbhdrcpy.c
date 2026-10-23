@@ -180,13 +180,13 @@ initialized:
             src20 = bankData;
         do {
             if (((struct SndBankDataHeaderPrefix *)bankData)->type == type4) {
-                int sp = ((struct SndBankPatchOffset20CursorView *)(unsigned int)src20)->relative_offset;
+                int sp = ((struct SndBankPatchOffset20CursorView *)src20)->relative_offset;
                 if (sp)
-                    ((struct SndBankPatchOffset20CursorView *)(unsigned int)dst20)->relative_offset = (int)dest + (sp - (int)origin);
+                    ((struct SndBankPatchOffset20CursorView *)dst20)->relative_offset = (int)dest + (sp - (int)origin);
             } else {
-                int sp = ((struct SndBankPatchOffset12CursorView *)(unsigned int)src12)->relative_offset;
+                int sp = ((struct SndBankPatchOffset12CursorView *)src12)->relative_offset;
                 if (sp)
-                    ((struct SndBankPatchOffset12CursorView *)(unsigned int)dst12)->relative_offset = (int)dest + (sp - (int)bankData);
+                    ((struct SndBankPatchOffset12CursorView *)dst12)->relative_offset = (int)dest + (sp - (int)bankData);
             }
             dst12 += 4;
             src12 += 4;

@@ -33,8 +33,8 @@ int iSNDdivu64(struct SNDu64Value value, unsigned int div)
         lo += hi >> 0x1f;   /* H07: ADD carry bit; hi is unsigned so >>31 is logical 0/1 (oracle 0x801034E0 $a1+=$v0). Was `- (hi>>31)` which is only correct for SIGNED hi (math64a.cpp). */
         hi <<= 1;
         if (div <= lo) {
-            lo = lo - div;
-            q = q + 1;
+            lo -= div;
+            q += 1;
         }
     } while (i);
     return q;

@@ -205,7 +205,7 @@ void iSNDleaveaudio(void)
         ((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth - 1;
     SNDI_mutexunlock();
     if (((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth == 0) {
-        while (((struct SndGlobalServerStateView *)g)->deferred_requests.u != 0) {
+        while (((struct SndGlobalServerStateView *)g)->deferred_requests.u) {
             ((struct SndGlobalServerStateView *)g)->deferred_requests.u =
                 ((struct SndGlobalServerStateView *)g)->deferred_requests.u - 1;
             iSNDserver();

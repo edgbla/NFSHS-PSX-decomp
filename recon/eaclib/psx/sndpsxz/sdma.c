@@ -193,7 +193,7 @@ void iSNDdmcallback(void)
     wait = 0;
     while ((*(volatile unsigned short *)(ctrl + 0x1aa) & 0x30) != 0) {
         wait++;
-        if (4000 < wait)
+        if (wait > 4000)
             break;
     }
     /* NOTE (superseded by the w50-a8 block above): `wait` used to carry the sndpd base through both
@@ -267,7 +267,7 @@ int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
     int handleSnapshot;
 
     if ((len & 0x3f) != 0)
-        len = len + 0x40;
+        len += 0x40;
 
     raw = (volatile int *)sndpd;
     ((struct SndDmaQueueStateView *)raw)->next_handle = ((struct SndDmaQueueStateView *)raw)->next_handle + 1;
@@ -329,7 +329,7 @@ occupied:
 int iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio)
 {
     int r = 0, chunk;
-    if (0 < len) {
+    if (len > 0) {
         unsigned char *pd = sndpd;
         int slots = 10;
         for (;;) {

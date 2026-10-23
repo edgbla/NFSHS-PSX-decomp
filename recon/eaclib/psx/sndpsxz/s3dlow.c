@@ -19,7 +19,7 @@ int SND3dpos(unsigned int tag, unsigned int pos, int y)
         y = -0x4000;
     iSNDenteraudio();
     ch = iSNDgetchan(tag);
-    if (-1 < ch) {
+    if (ch > -1) {
         cur[0] = -1;
         while (iSNDpatchkey(ch, (int)cur) != 0)
             iSNDplatform3dpos(cur[0], pos, y);

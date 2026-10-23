@@ -89,7 +89,7 @@ int iSNDstreamdestroyall(void)
     int s = 0;
     do {
         SNDSTRM_destroy(s);
-        s = s + 1;
+        s += 1;
     } while (s < 1);
     return 0;
 }
@@ -133,7 +133,7 @@ void iSNDstreamremoverequest(unsigned int reqid)
                     ((SndStream *)S)->parse_index = newidx;
                 *(SndStreamReq *)(wr + (int)(unsigned int)((volatile SndStream *)S)->requests) = *(SndStreamReq *)src;
                 wr += sizeof(SndStreamReq);
-                newidx = newidx + 1;
+                newidx += 1;
             }
             rd += sizeof(SndStreamReq);
             i++;
@@ -177,7 +177,7 @@ void iSNDstreamnotifycallback(int handle, unsigned int bytes)
         SndStreamReq *req = ((SndStream *)S)->requests; /* head request */
         if (((volatile SndStreamReq *)req)->remaining_bytes < bytes) {     /* more than remains in this request */
             over  = bytes - ((volatile SndStreamReq *)req)->remaining_bytes;              /* MATCH: fresh re-read (volatile) */
-            bytes = bytes - over;
+            bytes -= over;
         }
         ((volatile SndStreamReq *)req)->bytes_consumed = ((volatile SndStreamReq *)req)->bytes_consumed + bytes;         /* consumed += */
         ((volatile SndStreamReq *)req)->remaining_bytes = ((volatile SndStreamReq *)req)->remaining_bytes - bytes;         /* remaining -= */
@@ -220,7 +220,7 @@ int iSNDstreamparseheader(int S, int data)
     if (memcmp(&((SndStream *)S)->locked_header, &((SndStream *)S)->current_header, sizeof(SndPatchAttributes)) == 0)
         goto formatsame;
 formatdiffers:
-    if (((SndStream *)S)->locked_rate.samplerate != 0) {        /* already locked -> illegal change */
+    if (((SndStream *)S)->locked_rate.samplerate) {        /* already locked -> illegal change */
         ((volatile SndStream *)S)->state = 2;
         return 0;
     }
@@ -487,7 +487,7 @@ int iSNDstreamisheld(int S)
     {
         unsigned int avail = STREAM_gettable(((SndStream *)S)->stream_handle);
         int thresh;
-        if (4000000 < avail)
+        if (avail > 4000000)
             avail = 4000000;
         thresh = ((volatile SndStreamReq *)req)->hold_threshold;
         /* MATCH (disasm-v4 trace, 9->0 diffs): keep the clear-threshold block physically before
@@ -539,8 +539,8 @@ void iSNDstreamhotroddatachunks(void)
                 int avail = ((volatile SndStreamReq *)req)->num_chunks - ((volatile SndStreamReq *)req)->submitted; /* MATCH: volatile -- oracle RELOADS
                             * both fields fresh here rather than reusing the guards' loaded values. */
                 int space = SNDPKTPLAY_submitspace(((SndStream *)S)->packet_player);
-                int n = (avail < space) ? avail : space;
-                if (0 < n) {
+                int n = avail < space ? avail : space;
+                if (n > 0) {
                     do {
                         int chunk;
                         n--;
@@ -592,7 +592,7 @@ void iSNDstreamservice(void)
     p    = sndss;
     do {
         int S = *p;
-        if (S != 0 && ((SndStream *)S)->current_count != 0) {                /* curReqCount != 0 */
+        if (S && ((SndStream *)S)->current_count != 0) {                /* curReqCount != 0 */
             if ((((int)(((volatile SndStream *)S)->state) << 24) >> 24) == 2) {  /* needs restart */
                 if (0 < SNDPKTPLAY_framesoutstanding(((SndStream *)S)->packet_player))
                     goto next;
@@ -623,7 +623,7 @@ void iSNDstreamservice(void)
                         r = iSNDstreamparsechunk(S, chunk);
                     if (!r)
                         break;
-                } while (0 < n);
+                } while (n > 0);
             }
         }
     next:

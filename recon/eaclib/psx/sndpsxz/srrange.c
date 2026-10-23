@@ -10,7 +10,7 @@
 /* randrange @0x8010BCF4 : return a signed random in roughly [-range/4, +range/4]. */
 int randrange(int range)
 {
-    if (0x10000 < range) range = 0x10000;
+    if (range > 0x10000) range = 0x10000;
     else if (range < 0)  range = 0;
     return (((iSNDrandom() & 0x7fff) - 0x4000) * range) >> 0xe;
 }
