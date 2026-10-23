@@ -272,7 +272,7 @@ void iSNDpacketsetirq(void)
     unsigned char *base;
     iSNDpsxdisablespuirq();
     base = sndpd;                        /* materialize the sndpd address AFTER the call (oracle: post-call $v0/$v1) */
-    if (((struct SndDmaQueueStateView *)base)->callback_guard.plain == 0) {                  /* DAT_80147919 == sndpd+1 */
+    if (!((struct SndDmaQueueStateView *)base)->callback_guard.plain) {                  /* DAT_80147919 == sndpd+1 */
         /* MATCH: sndpp materialized ONCE right before the loop (oracle: `lui a0,%hi(sndpp)` here,
          * shared via %lo(sndpp)(a0) displacement addressing across every read/write below) -- a
          * bare `sndpp` global reference at each site instead makes GNU-as re-materialize a fresh
@@ -550,7 +550,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
          * count,skip / addu s0,zero,zero`); `ch=pp` is set only on the taken (nonzero) path,
          * inside the guard -- split the two inits instead of setting both before the `if`. */
         i = 0;
-        if (((volatile SndPacketVoiceState *)voice)->channel_count != 0) {
+        if (((volatile SndPacketVoiceState *)voice)->channel_count) {
             ch = (unsigned char *)pp;
             /* BUG FIX: len=0x10 (16) -- oracle loads `li a1,16` before the loop and re-materializes
              * it in the branch-back delay slot every iter (a1 is caller-saved, clobbered by the
@@ -578,7 +578,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                                                                * plus this lets the clamp below CSE
                                                                * the SAME v0 across both join paths). */
                 i = 0;
-                if (((volatile SndPacketVoiceState *)voice)->channel_count != 0) {
+                if (((volatile SndPacketVoiceState *)voice)->channel_count) {
                     ch = (unsigned char *)pp;
                     do {
                         ((SndPacketPlayerContextPrefix *)ch)->channel_frame_data0 = iSNDpacketget(p, i, &frameSize);
@@ -599,7 +599,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                         goto advance;
                     if (pp->empty_source_loop_count.u < 2) {     /* mark SPU loop-back */
                         i = 0;
-                        if (((volatile SndPacketVoiceState *)voice)->channel_count != 0) {
+                        if (((volatile SndPacketVoiceState *)voice)->channel_count) {
                             ch = (unsigned char *)pp;
                             do {
                                 /* MATCH: read *(int*)(ch+0x48) via LOAD DISPLACEMENT off the bare
@@ -616,7 +616,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                         }
                     } else {                                      /* mark SPU end (flag byte = 2) */
                         i = 0;
-                        if (((volatile SndPacketVoiceState *)voice)->channel_count != 0) {
+                        if (((volatile SndPacketVoiceState *)voice)->channel_count) {
                             unsigned char *ech = (unsigned char *)pp;   /* MATCH: a SEPARATE block-scoped walk pointer (oracle
                                               * picks `a0`, not the function-wide `ch`/s1, for this
                                               * loop) -- reusing the persistent `ch` name here forces
@@ -636,7 +636,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                     goto queue_dma;
                 }
                 {
-                    int chunkSize = (frameSize * 4) / 7;   /* ADPCM bytes per chunk */
+                    int chunkSize = frameSize * 4 / 7;   /* ADPCM bytes per chunk */
                     pp->empty_source_loop_count.s = 0;
                     pp->source_frame_offset.s = 0;
                     pp->source_frame_remaining.s = chunkSize;
@@ -656,7 +656,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
             ringp = (short *)(chunk * 2 + pp->frame_size_table);
             *ringp = *ringp + (short)((int)((unsigned)take * 7) >> 2);
             i = 0;
-            if (((volatile SndPacketVoiceState *)voice)->channel_count != 0) {
+            if (((volatile SndPacketVoiceState *)voice)->channel_count) {
                 ch = (unsigned char *)pp;
                 do {
                     blockmove((int *)(pp->channel_frame_data0 + pp->source_frame_offset.u +
@@ -670,7 +670,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
             pp->spu_bytes_remaining.u = pp->spu_bytes_remaining.s - take;
             pp->source_frame_offset.u = pp->source_frame_offset.s + take;
             pp->source_frame_remaining.u = pp->source_frame_remaining.s - take;
-        } while (((volatile SndPacketPlayerContextPrefix *)pp)->spu_bytes_remaining.u != 0);
+        } while (((volatile SndPacketPlayerContextPrefix *)pp)->spu_bytes_remaining.u);
     }
 queue_dma:
     if (!chunk) {                            /* first chunk -> set SPU loop-start flag (|4) */
@@ -714,7 +714,7 @@ queue_dma:
          * via a SEPARATE walk pointer (oracle: `a0`) -- same levers as the loop-start-flag loop
          * above and the earlier zerospu warm-up loop. */
         i = 0;
-        if (((volatile SndPacketVoiceState *)voice)->channel_count != 0) {
+        if (((volatile SndPacketVoiceState *)voice)->channel_count) {
             unsigned char *lch = (unsigned char *)pp;
             do {
                 {
@@ -743,7 +743,7 @@ queue_dma:
      * rtx, so thread_jumps declines and the edge stays.  ZERO instructions either way:
      * gate PASS 308/308 both, psyqproof REAL 1 -> 0.  (First production landing of the
      * jump-threading class; the named alternative PER_FN_NO_THREAD_JUMPS is not needed.) */
-    if (((volatile SndPacketVoiceState *)voice)->channel_count != 0) {
+    if (((volatile SndPacketVoiceState *)voice)->channel_count) {
         ch = (unsigned char *)pp;
         do {
             /* MATCH: oracle evaluates pp->0x08*i (mult/mflo) BEFORE the shift/add chain, and the
@@ -759,7 +759,7 @@ queue_dma:
              * (`sltiu v0;addu a0,v0`), oracle overwrites a0 in place (`sltiu a0,s0,1`). */
             int flag = 0;
             if (!chunk)
-                flag = (!i);
+                flag = !i;
             dma = iSNDdmqueue(((SndPacketPlayerContextPrefix *)ch)->channel_buffer0, src, len, 2, flag);
             pp->dma_handle = dma;
             ch += 4; i++;
@@ -809,7 +809,7 @@ void iSNDpacketserve(void)
             adv = newPos - servePos;
             goto have_advance;
 wrapped_position:
-            adv = (newPos + ctx->buffer_bytes) - servePos;
+            adv = newPos + ctx->buffer_bytes - servePos;
 have_advance:
             if (ctx->serve_position > 0x70ffffff) {     /* keep the 64-bit-ish byte counters from overflowing */
                 ctx->serve_position += wrapAdjust;
@@ -930,7 +930,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
     chunkBytes = 0x1000 / ((volatile SndPacketVoiceState *)voice)->channel_count;
     ctx->block_bytes.u = chunkBytes;
     ctx->frames_per_block.u =
-        (ctx->block_bytes.u * 0x1c) / 0x10;
+        ctx->block_bytes.u * 0x1c / 0x10;
     /* MATCH (w32, 42->0) -- the whole block-geometry run is written as STORE-then-READ-BACK, which is
      * what retail's source did and what produces the oracle's truncating `andi`s instead of fresh
      * loads: gcc forwards the just-stored value out of the store insn and applies the field's width
@@ -981,7 +981,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
     }
     i = 0;
     do {
-        while (iSNDdmcomplete(ctx->dma_handle) == 0) { }
+        while (!(iSNDdmcomplete(ctx->dma_handle))) { }
         iSNDfillspuwithpackets(p, i);
         i++;
     } while (i < 2);

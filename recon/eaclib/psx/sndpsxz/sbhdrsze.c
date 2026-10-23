@@ -11,7 +11,7 @@
 /* SNDbankheadersize @0x800E7B64 : bank @ sndgs[0x26]+bankId*0xc, +0 = data ptr, [data+8] = header size. */
 int SNDbankheadersize(int bankId)
 {
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     return ((struct SndBankDataHeaderPrefix *)(unsigned int)((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block)->header_size;
 }

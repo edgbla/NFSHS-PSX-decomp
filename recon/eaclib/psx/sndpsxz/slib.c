@@ -113,8 +113,8 @@ void iSNDcalcvol(int chan)
     n /= 0x1f417f;
     v->volume = (char)n;
     if (v->velocity_curve) {                  /* velocity curve */
-        v->volume = (char)(((n * 0x1000000 >> 0x18) *
-               (int)*(signed char *)(v->velocity_curve + (unsigned)v->velocity_phase)) / 0x7f);
+        v->volume = (char)((n * 0x1000000 >> 0x18) *
+               (int)*(signed char *)(v->velocity_curve + (unsigned)v->velocity_phase) / 0x7f);
     }
     if (v->final_volume_curve) { /* final volume curve */
         *(unsigned char *)&v->volume =
@@ -502,7 +502,7 @@ int iSNDinit(void)
     ((struct SndSpuRegisterBasesStateView *)pd)->registers.dpcr = dpcr;
     ((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base = spu;
     ((struct SndSpuRegisterBasesStateView *)pd)->registers.control_base = spu;
-    if ((((struct SndSpuControlRegisterView *)spu)->status & 0x7ff) != 0) {
+    if (((struct SndSpuControlRegisterView *)spu)->status & 0x7ff) {
         do {
             wait_spu = (unsigned char *)0x1f801c00;
         } while ((*(volatile unsigned short *)(wait_spu + 0x1ae) & 0x7ff) != 0);
@@ -528,7 +528,7 @@ int iSNDinit(void)
 
     i = 0;
     gs = (unsigned char *)sndgs;
-    if (((struct SndGlobalServerStateView *)gs)->channel_count != 0) {
+    if (((struct SndGlobalServerStateView *)gs)->channel_count) {
         pitch = 0x200;
         done = -1;
         loop_pd = latched;
@@ -592,11 +592,11 @@ int iSNDrestore(void)
     int dma;
 
     guard = (unsigned char *)sndgs;
-    if (((struct SndGlobalServerStateView *)guard)->audio_lock_depth != 0) {
+    if (((struct SndGlobalServerStateView *)guard)->audio_lock_depth) {
         unsigned char *waitBase = guard;
         do {
             iSNDleaveaudio();
-        } while (((struct SndGlobalServerStateView *)waitBase)->audio_lock_depth != 0);
+        } while (((struct SndGlobalServerStateView *)waitBase)->audio_lock_depth);
     }
     gpraw = (unsigned char *)sndgs;
     deadline = (unsigned int)((struct SndGlobalServerStateView *)gpraw)->tick_count + 100;
@@ -618,7 +618,7 @@ int iSNDrestore(void)
         if (chan < ((struct SndGlobalServerStateView *)gp)->channel_count) {
             vp = base;
             do {
-                if (*(volatile unsigned char *)((unsigned char *)vp + 0xf5) != 0) { /* voice still active */
+                if (*(volatile unsigned char *)((unsigned char *)vp + 0xf5)) { /* voice still active */
                     if (deadline < ((struct SndGlobalServerStateView *)gp)->tick_count) {
                         iSNDpsxkeyoff(0xffffff);
                         *(volatile unsigned char *)((unsigned char *)vp + 0xf5) = 0;
@@ -668,7 +668,7 @@ void iSNDserve(void)
             kon = 0;
         } while (0);
     } while (0);
-    if (((struct SndDriverHookStateView *)base)->hooks.user_serve != 0)
+    if (((struct SndDriverHookStateView *)base)->hooks.user_serve)
         ((struct SndDriverHookStateView *)base)->hooks.user_serve();
 
     /* W31 (106 -> 101): `chan = kon` (== 0) -- the oracle's entry-guard is a real slt against the
@@ -874,7 +874,7 @@ void iSNDserve(void)
                 if (vreg[6]) {
                     *(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->stop_pending = 1;
                 } else {                                             /* SPU ADSR reached 0 */
-                    if (((struct SndPacketVoiceState *)vp)->stop_pending && ((struct SndPacketVoiceState *)vp)->link_flag == 0 &&
+                    if (((struct SndPacketVoiceState *)vp)->stop_pending && !((struct SndPacketVoiceState *)vp)->link_flag &&
                         (int)((unsigned)((struct SndPacketVoiceState *)vp)->voice_done << 0x18) < 0) {
                         cvt = vt;
                         n = *(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->channel_count;
@@ -913,7 +913,7 @@ void iSNDserve(void)
                         } while (0 < --n);
                     }
                 }
-                if (((struct SndPacketVoiceState *)vp)->pitch_dirty != 0) {                                 /* pitch dirty -> reprogram */
+                if (((struct SndPacketVoiceState *)vp)->pitch_dirty) {                                 /* pitch dirty -> reprogram */
                     vreg[2] = (short)(((struct SndPacketVoiceState *)vp)->position_step / 0x1b9);
                     ((struct SndPacketVoiceState *)vp)->pitch_dirty = 0;
                 }

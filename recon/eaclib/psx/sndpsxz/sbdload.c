@@ -91,7 +91,7 @@ int iSNDdownloadbank(int bankData, int patchData)
      * (4, copy still sinks), anchor copy wrapped instead (44, its ref weight re-colors s3..fp),
      * guard read through `anchor` (2), anchor copy before the clear loop (4). */
     do { i = 0; } while (0);
-    if (((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->patch_count != 0) {
+    if (((struct SndBankDataHeaderPrefix *)(unsigned int)bankData)->patch_count) {
         type4 = 4;
         off2 = 0xc;
         cur2 = bankData;

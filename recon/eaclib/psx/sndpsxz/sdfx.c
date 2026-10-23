@@ -126,13 +126,13 @@ unsigned int iSNDpsxfxinit(int mode)
     blockmove((int *)src, (int *)rv, 0x42);
 
     if (mode - 7U < 2) {                  /* presets 7/8: scale taps by reverb depth */
-        rv[0xb] = (short)((sg->depth * 0x2000) / 0x7f) - rv[1];
-        rv[0xc] = (short)((sg->depth * 0x1000) / 0x7f) - rv[2];
-        rv[0xd] = rv[0xe] + (short)((sg->depth * 0x1000) / 0x7f);
-        rv[0x11] = rv[0x12] + (short)((sg->depth * 0x1000) / 0x7f);
-        rv[0x1b] = rv[0x1d] + (short)((sg->depth * 0x1000) / 0x7f);
-        rv[0x1c] = rv[0x1e] + (short)((sg->depth * 0x1000) / 0x7f);
-        rv[8] = (short)((sg->delay * 0x8100) / 0x7f);
+        rv[0xb] = (short)(sg->depth * 0x2000 / 0x7f) - rv[1];
+        rv[0xc] = (short)(sg->depth * 0x1000 / 0x7f) - rv[2];
+        rv[0xd] = rv[0xe] + (short)(sg->depth * 0x1000 / 0x7f);
+        rv[0x11] = rv[0x12] + (short)(sg->depth * 0x1000 / 0x7f);
+        rv[0x1b] = rv[0x1d] + (short)(sg->depth * 0x1000 / 0x7f);
+        rv[0x1c] = rv[0x1e] + (short)(sg->depth * 0x1000 / 0x7f);
+        rv[8] = (short)(sg->delay * 0x8100 / 0x7f);
     }
 
     /* MATCH (w32, 49->6): four shape facts, all read off the oracle's loop at .L8010049C.
@@ -175,7 +175,7 @@ unsigned int iSNDpsxfxinit(int mode)
         if (chunk > 0x20) chunk = 0x20;
         h = iSNDdmqueue((int)scratch, work << 3, chunk << 3, 1, 0);
         work += 0x20;
-        do { } while (iSNDdmcomplete(h) == 0);
+        do { } while (!(iSNDdmcomplete(h)));
     }
 
     /* 🔴 FLOOR REFUTED (w34-a5, 6 -> 0 PASS).  The w32/w33 notes had certified these last 6 diffs as
@@ -217,7 +217,7 @@ int iSNDplatformfxinit(int reserved, int mode, int depthL, int depthR)
     (void)depthL;
     (void)depthR;
     DAT_8014791c = mode;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized != 0)
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized)
         iSNDpsxfxinit(mode);
     return 0;
 }

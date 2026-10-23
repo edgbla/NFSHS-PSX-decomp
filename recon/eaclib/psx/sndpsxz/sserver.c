@@ -49,8 +49,8 @@ void iSNDserver(void)
     unsigned int target;
 
     p = (char *)sndgs;
-    if (((struct SndGlobalServerStateView *)p)->in_server == 0) {           /* not already inside the server */
-        if (((struct SndGlobalServerStateView *)p)->audio_lock_depth != 0) {       /* audio locked -- defer */
+    if (!((struct SndGlobalServerStateView *)p)->in_server) {           /* not already inside the server */
+        if (((struct SndGlobalServerStateView *)p)->audio_lock_depth) {       /* audio locked -- defer */
             ((struct SndGlobalServerStateView *)p)->deferred_requests.s = ((struct SndGlobalServerStateView *)p)->deferred_requests.s + 1;   /* run it later, on leaveaudio */
             return;
         }
@@ -61,7 +61,7 @@ void iSNDserver(void)
             *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks = 0;
         }
         *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks = *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks + 1;
-        target = (*(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks * 100) / (unsigned int)timerhz[0];
+        target = *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks * 100 / (unsigned int)timerhz[0];
         if (((struct SndGlobalServerStateView *)p)->tick_count <= target) {
             g = p;
             do {
@@ -107,7 +107,7 @@ void iSND100hzserver(void)
 
     channelBase = sndgs;
     i = 0;
-    if (((struct SndGlobalServerStateView *)channelBase)->channel_count != 0) { /* over every channel */
+    if (((struct SndGlobalServerStateView *)channelBase)->channel_count) { /* over every channel */
         globalBase = channelBase;
         chanIdx = i;
         do {
@@ -204,7 +204,7 @@ void iSNDleaveaudio(void)
     ((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth =
         ((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth - 1;
     SNDI_mutexunlock();
-    if (((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth == 0) {
+    if (!((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth) {
         while (((struct SndGlobalServerStateView *)g)->deferred_requests.u) {
             ((struct SndGlobalServerStateView *)g)->deferred_requests.u =
                 ((struct SndGlobalServerStateView *)g)->deferred_requests.u - 1;

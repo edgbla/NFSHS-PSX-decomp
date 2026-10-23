@@ -16,7 +16,7 @@ int SNDSTRM_status(int tag, int s)
     ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered = 0;
     ((struct SNDSTREAMSTATUS *)(unsigned int)s)->currentrequest = 0;
     ((struct SNDSTREAMSTATUS *)(unsigned int)s)->outstandingrequests = 0;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;
     sp = (SndStream *)iSNDstreamgetstreamptr(tag);
     if (!sp) return -8;
     iSNDenteraudio();
@@ -27,7 +27,7 @@ int SNDSTRM_status(int tag, int s)
         if (frames) {
             outstanding = SNDPKTPLAY_unsafeframesoutstanding(sp->packet_player);
             ((struct SNDSTREAMSTATUS *)(unsigned int)s)->timebuffered =
-                (outstanding * 1000) / sp->locked_rate.samplerate;
+                outstanding * 1000 / sp->locked_rate.samplerate;
         }
     }
     iSNDleaveaudio();

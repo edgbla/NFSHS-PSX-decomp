@@ -18,13 +18,13 @@ int SNDpitchmult(unsigned int tag, unsigned int mult)
 {
     int chanIdx;
     int cur[2];
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     iSNDenteraudio();
     chanIdx = iSNDgetchan(tag);
     if (chanIdx > -1) {
         cur[0] = -1;
-        while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
+        while (iSNDpatchkey(chanIdx, (int)cur)) {
             /* MATCH: keeping this value live only through iSNDcalcpitch selects a0 for the
              * multiply and lets the pitch-multiplier store fill that call's delay slot. */
             int note = cur[0];

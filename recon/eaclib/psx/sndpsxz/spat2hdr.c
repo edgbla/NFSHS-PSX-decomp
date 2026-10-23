@@ -40,7 +40,7 @@ int iSNDpatchtohdr(short *sampleData, SNDSAMPLEFORMAT *format, SndPatchAttribute
     format->channels = 1;
     format->samplerep = 5;
     *extraOut = 0;
-    while (iSNDgettag((int *)&cursor, &id, &val, &ptr) != 0) {
+    while (iSNDgettag((int *)&cursor, &id, &val, &ptr)) {
         if (id == 0x80)      attr->use3dpos = (unsigned char)val;
         else if (id == 0x82) format->channels    = (unsigned char)val;
         else if (id == 0x84) format->samplerate = (unsigned short)val;

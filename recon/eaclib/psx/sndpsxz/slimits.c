@@ -12,7 +12,7 @@ struct LimitsBlock { int value[5]; };
 /* SNDgetlimits : read the SPU memory/voice limit block into opts[0..4]. */
 int SNDgetlimits(int *opts)
 {
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -0xe;
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -0xe;
     /* MATCH: the library copies this contiguous 20-byte option block as one aggregate. */
     *(struct LimitsBlock *)opts = *(struct LimitsBlock *)sndpsxlimits;
     return 0;
@@ -20,7 +20,7 @@ int SNDgetlimits(int *opts)
 /* SNDsetlimits : apply opts[0..4] (SPU ctx size opts[4] rounded down to 0x2000). */
 int SNDsetlimits(int *opts)
 {
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;
     if (opts[4] < 0x2000) return -1;
     *(struct LimitsBlock *)sndpsxlimits = *(struct LimitsBlock *)opts;
     sndpsxlimits[4] &= 0xffffe000;

@@ -264,14 +264,14 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                  * `beqz` slot (retail's exact slot) instead of `bestval = best`, which stays at the
                  * loop head where retail has it. */
                 c = 0;
-                if (((struct SndGlobalServerStateView *)gs)->channel_count != 0) {
+                if (((struct SndGlobalServerStateView *)gs)->channel_count) {
                     off = c;
                     do {
                         one = 1;
-                        if ((priority & one << c) != 0) {
+                        if (priority & one << c) {
                             ch = ((struct SndGlobalServerStateView *)gs)->play_records + off;
-                            if (((SndChannel *)(unsigned int)ch)->state == 0 &&
-                                iSNDischanreserved(c, reserved) == 0) {
+                            if (!((SndChannel *)(unsigned int)ch)->state &&
+                                !(iSNDischanreserved(c, reserved))) {
                                 v = ((SndChannel *)(unsigned int)ch)->allocation_tick;
                                 if (v < bestval) { bestval = v; best = c; }
                             }
@@ -297,11 +297,11 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                 best = 0xffffffff;
                 bestv = best;
                 c = 0;                 /* MATCH (w47-a3): same delay-slot lever as pass 1 */
-                if (((struct SndGlobalServerStateView *)gs)->channel_count != 0) {
+                if (((struct SndGlobalServerStateView *)gs)->channel_count) {
                     off = c;
                     do {
                         if ((priority & (1 << c)) &&
-                            iSNDischanreserved(c, reserved) == 0) {
+                            !(iSNDischanreserved(c, reserved))) {
                             ch = ((struct SndGlobalServerStateView *)gs)->play_records + off;
                             if (((SndChannel *)(unsigned int)ch)->age < 0x65) {
                                 /* MATCH: `age` is an int -- the oracle re-loads the byte with a
@@ -654,7 +654,7 @@ invalid:
 valid_range:
     {
         int *slot = (int *)(base->play_records + ch * (int)sizeof(SndChannel));
-        if (((SndChannel *)slot)->state == 0 || ((SndChannel *)slot)->owner_tag != tag)
+        if (!((SndChannel *)slot)->state || ((SndChannel *)slot)->owner_tag != tag)
             ch = 0xfffffff8;
         return ch;
     }

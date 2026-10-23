@@ -17,7 +17,7 @@
 /* SNDplay @0x800E7A30 : play `info` if the audio system is up; -10 if down. */
 int SNDplay(struct SNDPLAYOPTS *info)
 {
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     return cSNDplay(info, 0);
 }

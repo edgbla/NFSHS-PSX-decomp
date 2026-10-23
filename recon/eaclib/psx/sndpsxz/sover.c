@@ -15,7 +15,7 @@
 unsigned int SNDover(unsigned int tag)
 {
     unsigned int r;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized != 0) {   /* init flag = low byte of sndgs[0xf]; direct-addr read */
+    if (((struct SndGlobalServerStateView *)sndgs)->initialized) {   /* init flag = low byte of sndgs[0xf]; direct-addr read */
         iSNDenteraudio();
         r = (unsigned int)iSNDgetchan(tag) >> 0x1f;   /* 1 == finished, 0 == still playing */
         iSNDleaveaudio();

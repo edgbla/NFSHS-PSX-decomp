@@ -53,7 +53,7 @@ int cSNDbankremove(int bankId, int recurse)
             cSNDbankremove(i, 0);
         return 0;
     }
-    if (iSNDvalidbank(bankId) != 0)
+    if (iSNDvalidbank(bankId))
         return -8;
     {
         int data = (int)(unsigned int)((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
@@ -74,7 +74,7 @@ int cSNDbankremove(int bankId, int recurse)
         base2 = &sndgs;
         entry = (unsigned char *)(bankId * sizeof(struct SndBankTableEntry) +
             *(volatile int *)&base2->bank_table);
-        if (((struct SndBankTableEntry *)entry)->platform_allocated.s != 0) {
+        if (((struct SndBankTableEntry *)entry)->platform_allocated.s) {
             iSNDplatformfree((int)(unsigned int)((struct SndBankTableEntry *)entry)->platform_block);
             ((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->platform_allocated.u = 0;
         } else

@@ -20,7 +20,7 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
     int cur[2];
     if (chanIdx > -1) {
         cur[0] = -1;
-        while (iSNDpatchkey(chanIdx, (int)cur) != 0) {
+        while (iSNDpatchkey(chanIdx, (int)cur)) {
             SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[cur[0]];
             if (v->bend == (int)chan)   /* signed +0x2f detune read (lb) */
                 return 0;
@@ -44,7 +44,7 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
 int SNDpitchbend(unsigned int tag, int bend)
 {
     int r;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     iSNDenteraudio();
     r = iSNDunsafebend(tag, bend);

@@ -19,7 +19,7 @@ int SNDbankadd(int *bank_out, int bankData)
 {
     int  slot;
     struct SndBankTableEntry *e;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     slot = iSNDbankalloc();
     *bank_out = slot;

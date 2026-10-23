@@ -82,7 +82,7 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     ((volatile SndPacketVoiceState *)slot)->byte_position = 0;
     ((volatile SndPacketVoiceState *)slot)->served_position = 0;
     ((volatile SndPacketVoiceState *)slot)->loop_length = loopVal << 0xc;
-    ((volatile SndPacketVoiceState *)slot)->initial_pitch.vs = (short)((rate * 0x17c7) >> 0x10);
+    ((volatile SndPacketVoiceState *)slot)->initial_pitch.vs = (short)(rate * 0x17c7 >> 0x10);
     if (1 < (unsigned char)((volatile SndPacketVoiceState *)slot)->channel_count) { /* arm linked voice */
         unsigned char *voiceBase = sndpd;
         ((SndPacketVoiceState *)slot)->link_index.vu = ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[voice].linked_tag_view.linked_channels[0];

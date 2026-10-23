@@ -22,7 +22,7 @@ int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
     int base = ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->type == 4 ? data : 0;
     int pp;
 
-    if (iSNDvalidbank(bank) != 0)
+    if (iSNDvalidbank(bank))
         return -8;
     if (patch_idx < 0 || patch_idx >= ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->patch_count)
         return -8;

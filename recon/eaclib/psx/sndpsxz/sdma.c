@@ -212,7 +212,7 @@ void iSNDdmcallback(void)
     active = ((struct SNDDmaEntry *)(pd + 0x10 + slot * (int)sizeof(struct SNDDmaEntry)))->handle;
     MASK_INTERRUPTS_SR(sr);
     if (active) {        /* active entry present */
-        if (((struct SndDmaQueueStateView *)pd)->callback_guard.v != 0) {
+        if (((struct SndDmaQueueStateView *)pd)->callback_guard.v) {
             hook = ((struct SndDriverHookStateView *)pd)->hooks.preload;
             ((struct SndDmaQueueStateView *)pd)->callback_guard.v = 0;
             if (hook)
@@ -236,7 +236,7 @@ void iSNDdmcallback(void)
 void iSNDdmservice(void)
 {
     unsigned char *pd = sndpd;
-    if (((struct SndDmaQueueStateView *)pd)->transfer_busy.plain == 0)
+    if (!((struct SndDmaQueueStateView *)pd)->transfer_busy.plain)
         iSNDdmtransfer();
     else {
         int *gs = sndgs;
@@ -266,7 +266,7 @@ int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
     unsigned int sr;
     int handleSnapshot;
 
-    if ((len & 0x3f) != 0)
+    if (len & 0x3f)
         len += 0x40;
 
     raw = (volatile int *)sndpd;

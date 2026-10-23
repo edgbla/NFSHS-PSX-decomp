@@ -11,13 +11,13 @@
 int SNDautovol(unsigned int tag, unsigned int rate, int target)
 {
     int ch, cur[2];
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;  /* signed -> lb (ccpsx char is unsigned) */
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;  /* signed -> lb (ccpsx char is unsigned) */
     iSNDenteraudio();
     ch = iSNDgetchan(tag);
     if (ch > -1) {
         if ((int)rate < 1) rate = 1;
         cur[0] = -1;
-        while (iSNDpatchkey(ch, (int)cur) != 0) {
+        while (iSNDpatchkey(ch, (int)cur)) {
             SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[cur[0]];
             int delta = target * 0x10000 - v->autovol_position.word;
             v->autovol_limit = target * 0x10000;

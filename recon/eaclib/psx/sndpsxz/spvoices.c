@@ -32,7 +32,7 @@ int SNDSTRM_create(struct SNDPLAYOPTS *priority, int numReq, int pktArg, int obj
 int SNDSTRM_destroy(int s)
 {
     SndStream *S;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     S = (SndStream *)iSNDstreamgetstreamptr(s);
     if (!S)
@@ -64,7 +64,7 @@ int SNDSTRM_purge(int s)
 {
     SndStream *S;
     int stopped;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     S = (SndStream *)iSNDstreamgetstreamptr(s);
     if (!S)
@@ -76,7 +76,7 @@ int SNDSTRM_purge(int s)
         stopped = -1;
     }
     ((volatile SndStream *)S)->start_result = stopped;
-    if (((volatile SndStream *)S)->external_stream == 0)
+    if (!((volatile SndStream *)S)->external_stream)
         STREAM_kill(S->stream_handle);
     ((volatile SndStream *)S)->current_count = 0;        /* curReqCount */
     ((volatile SndStream *)S)->parse_index = 0;          /* parseIdx */

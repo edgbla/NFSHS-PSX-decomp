@@ -132,7 +132,7 @@ int iSNDplatformresolve(int cursor, int bank, int patch)
             } while (*(int *)&cur[1].offset != end);
         }
 checked:
-        if (*spuField != 0)
+        if (*spuField)
             return 7;                              /* already resolved */
         blocks = size / 0x1c;
         if (size != blocks * 0x1c)
@@ -151,7 +151,7 @@ resolve:
         *spuField = buf;
         *(int *)(idx * 8 + patch) = offset;
         *(int *)(idx * 8 + patch + 4) = buf;
-        do { } while (iSNDdmcomplete(dma) == 0);
+        do { } while (!(iSNDdmcomplete(dma)));
     }
     return 7;
 }
@@ -178,7 +178,7 @@ int iSNDplatformremove(int cursor, int *patch)
         } while (patch[i * 2] != -1);
     }
     patch[i * 2] = *spuField;
-    if (*spuField != 0)
+    if (*spuField)
         iSNDpsxfree((void *)*spuField);
     return 0;
 }

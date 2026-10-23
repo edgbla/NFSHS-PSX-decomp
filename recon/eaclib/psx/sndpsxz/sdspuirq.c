@@ -14,15 +14,15 @@
  *   base ptr in $v1 and the value in $v0). */
 int iSNDpsxenablespuirq(void)
 {
-    unsigned short v = *(unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) | 0x40;
-    *(volatile unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) = v;
+    unsigned short v = *(unsigned short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) | 0x40;
+    *(volatile unsigned short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = v;
     return v;
 }
 
 /* iSNDpsxdisablespuirq @0x8010BFA4 : clear the SPU IRQ-enable bit in SPUCNT. */
 int iSNDpsxdisablespuirq(void)
 {
-    unsigned short v = *(unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) & 0xffbf;
-    *(volatile unsigned short *)(((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base) + 0x1aa) = v;
+    unsigned short v = *(unsigned short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) & 0xffbf;
+    *(volatile unsigned short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = v;
     return v;
 }

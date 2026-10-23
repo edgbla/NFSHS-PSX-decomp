@@ -20,7 +20,7 @@ int SNDSTRM_requeststatus(unsigned int reqTag, int s)
     ((struct SNDREQUESTSTATUS *)(unsigned int)s)->currenttime = 0;
     ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timetoend = 0;
     ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timebuffered = 0;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;
     if (-1 >= (int)reqTag) return -8;
     sp = (SndStream *)iSNDstreamgetstreamptr(reqTag & 0xff);
     if (!sp) return -8;
@@ -37,7 +37,7 @@ int SNDSTRM_requeststatus(unsigned int reqTag, int s)
         ((struct SNDREQUESTSTATUS *)(unsigned int)s)->currenttime = iSNDdivu64(q, div);
         (void)iSNDmulu64(&q, rp->total_size - rp->bytes_consumed, 1000);
         ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timetoend = iSNDdivu64(q, div);
-        ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timebuffered = (rp->remaining_bytes * 1000) / div;
+        ((struct SNDREQUESTSTATUS *)(unsigned int)s)->timebuffered = rp->remaining_bytes * 1000 / div;
     }
     goto status_done;
 no_request:

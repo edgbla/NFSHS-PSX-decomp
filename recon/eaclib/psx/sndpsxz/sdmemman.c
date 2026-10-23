@@ -859,7 +859,7 @@ int iSNDpsxfree(int ptr)
     int idx = 0;
     unsigned char *pd = sndpd;
     ptr >>= 6;
-    if (((struct SndSpuMemoryStateView *)pd)->memory.alloc_count != 0) {
+    if (((struct SndSpuMemoryStateView *)pd)->memory.alloc_count) {
         unsigned char *table = (unsigned char *)((struct SndSpuMemoryStateView *)pd)->entries;
         unsigned char *base = pd;
         do {

@@ -148,7 +148,7 @@ int SNDPKTPLAY_create(void *mem, int memsize, void (*relcb)(int),
                       void (*notifycb)(int, unsigned int))
 {
     int slot, off, savedmem;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     for (slot = 0; slot < 1; slot++) {
         if (!sndpps[slot])
@@ -218,7 +218,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
      * unnecessary.  PASS 187/187 with ZERO devices.  (Register-level fidelity is unchanged:
      * gcc still hands both roles $s3 -- the source-level split is invisible in the output.) */
     gsp = (int)sndgs;
-    if (((struct SndGlobalServerStateView *)(unsigned int)gsp)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)(unsigned int)gsp)->initialized)
         return -10;
     rateb2 = rate->channels;                         /* MATCH: evaluated before the ppp lookup/
                                                     * enteraudio -- oracle hoists this arg early */
@@ -386,7 +386,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
 int SNDPKTPLAY_submit(int p, void *frame)
 {
     int ppp, slot;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     ppp = sndpps[p];
     iSNDenteraudio();
@@ -415,7 +415,7 @@ room:
         }
         ((PacketFrame *)(unsigned int)slot)->size = ((SndPacketSubmitFrameView *)frame)->fields.data_size;                /* size */
         ((PacketFrame *)(unsigned int)slot)->sequence = ((PacketPlayerHeader *)(unsigned int)ppp)->submit_sequence;                         /* sequence */
-        if (((PacketPlayerHeader *)(unsigned int)ppp)->rate.channels != 0) {                         /* copy the per-channel pointers */
+        if (((PacketPlayerHeader *)(unsigned int)ppp)->rate.channels) {                         /* copy the per-channel pointers */
             int j, src;
             do { j = 0; } while (0);              /* MATCH: zero-insn REF INFLATOR on j (see
                                                      * the header receipt) -- j must be born
@@ -450,7 +450,7 @@ leave:
 /* SNDPKTPLAY_submitspace @0x80102E70 : free frame slots in the ring. */
 int SNDPKTPLAY_submitspace(int p)
 {
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     {
         PacketPlayerHeader *base = (PacketPlayerHeader *)(unsigned int)sndpps[p];
@@ -475,7 +475,7 @@ int SNDPKTPLAY_unsafeframesoutstanding(int p)
 int SNDPKTPLAY_framesoutstanding(int p)
 {
     int r;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     iSNDenteraudio();
     r = SNDPKTPLAY_unsafeframesoutstanding(p);
@@ -509,7 +509,7 @@ int SNDPKTPLAY_purge(int p, int lo, int hi)
 {
     int   ppp, i, wrptr, wr, rd, total, rdoff;
 
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     ppp = sndpps[p];
     i = 0;                                         /* MATCH: set before the ring reads -- oracle
@@ -540,7 +540,7 @@ purge_next: {
             if (lo <= fr[0] && fr[0] <= hi) {      /* remove (branch-away, oracle fallthrough) */
                 ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames - 1;  /* plain lhu, no shift (no compare) */
                 ((volatile PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes = ((PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes - fr[1];
-                if (((PacketPlayerHeader *)(unsigned int)ppp)->release_cb != 0)
+                if (((PacketPlayerHeader *)(unsigned int)ppp)->release_cb)
                     ((PacketPlayerHeader *)(unsigned int)ppp)->release_cb(fr[2]);
             } else {                               /* keep -> move down (oracle branch target) */
                 /* The 0x18-byte ring copy, written as the TWO movstrsi batches gcc would emit for a
@@ -581,7 +581,7 @@ purge_next: {
 int SNDPKTPLAY_stop(int p)
 {
     PacketPlayerHeader *ppp;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     ppp = (PacketPlayerHeader *)(unsigned int)sndpps[p];
     iSNDenteraudio();
@@ -601,7 +601,7 @@ int SNDPKTPLAY_stop(int p)
 /* SNDPKTPLAY_destroy @0x801031F4 : release the player slot. */
 int SNDPKTPLAY_destroy(int p)
 {
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     iSNDplatformpacketplaydestroy(p);
     sndpps[p] = 0;
@@ -632,7 +632,7 @@ int iSNDpacketget(int p, int idx, int *out)
                 cb(fr->channel[0]);
         }
     }
-    if (((PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames == 0)                           /* MATCH: direct `return 0` (oracle's v0=0
+    if (!((PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames)                           /* MATCH: direct `return 0` (oracle's v0=0
                                                         * lands in the beqz's delay slot -- the
                                                         * epilogue label IS the return), not a
                                                         * fall-through `fr=0`. */
@@ -675,7 +675,7 @@ void iSNDpacketfreeframes(int p, int idx, int bytes)
             v = ((PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes - bytes;
             ((volatile PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes = (int)v;   /* Volatile preserves the async-touched field store and its
                                                                                              * position before the callback guard. */
-            if (((PacketPlayerHeader *)(unsigned int)ppp)->notify_cb != 0)
+            if (((PacketPlayerHeader *)(unsigned int)ppp)->notify_cb)
                 ((PacketPlayerHeader *)(unsigned int)ppp)->notify_cb(p, bytes);
             /* The typed notify callback receives the original player index and consumed byte count. */
         }

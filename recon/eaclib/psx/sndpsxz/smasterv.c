@@ -16,12 +16,12 @@
 int SNDmastervol(int vol)
 {
     int chan;
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     iSNDenteraudio();
     ((struct SndGlobalServerStateView *)sndgs)->master_volume = (signed char)vol;             /* sndgs[0xf]._1_1_ : master volume */
     chan = 0;
-    if (((struct SndGlobalServerStateView *)sndgs)->channel_count != 0) {
+    if (((struct SndGlobalServerStateView *)sndgs)->channel_count) {
         do {
             SndChannel *slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
             if (slot->state == 1 && -1 < (int)slot->owner_tag) {

@@ -219,7 +219,7 @@ pan_low:
         if (pan < -0x80)
             pan = -0x80;
         slot->pan = (char)detune;
-        slot->patch_volume = (char)((pan * velScale) / 0x7f);
+        slot->patch_volume = (char)(pan * velScale / 0x7f);
         field28 = vol->envelope_detune.word;
         slot->bend = b9;
         slot->envelope_detune_depth = (short)(field28 * 100);
@@ -278,8 +278,8 @@ pan_low:
         playLevel = slot->volume;
         playPitch = slot->spu_pitch;
         playResult = iSNDplatformplay(timbre, chan, playLevel, playPitch, playTag,
-                                      (sndgs_fx_bus0_master[0] * slot->playback_fx.playback.playback_factor34 *
-                                       slot->playback_fx.playback.playback_factor35) / 16129,
+                                      sndgs_fx_bus0_master[0] * slot->playback_fx.playback.playback_factor34 *
+                                       slot->playback_fx.playback.playback_factor35 / 16129,
                                       tmp, playOffset);
         if (playResult < 0)
             iSNDfreechan(chan);
@@ -332,7 +332,7 @@ int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
     key = iSNDfindfreekey();
 
     for (;;) {
-        if (iSNDgettag(&cursor, &g0, &g1, &g2) == 0)
+        if (!(iSNDgettag(&cursor, &g0, &g1, &g2)))
             break;
         id = g0;                           /* ONE lw; kept in a1 for all the tag tests */
         if (id == 0xfd) {                  /* after a 0xfd tag the cursor IS the sample data */
@@ -410,7 +410,7 @@ int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
     else
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
-    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
+    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3])) {
         if (state[1] == 0xfd)
             r = iSNDplatformresolve(state[0], patch_idx, scratch);
     }
@@ -429,7 +429,7 @@ int iSNDremovetaggedpatch(int bank, int *patch_idx)
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
     else
         state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
-    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
+    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3])) {
         if (state[1] == 0xfd)
             iSNDplatformremove(state[0], patch_idx);
     }

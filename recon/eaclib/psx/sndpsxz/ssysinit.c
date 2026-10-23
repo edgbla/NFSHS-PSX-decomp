@@ -133,7 +133,7 @@ int SNDSYS_init(int membase, int memsize)
  *   voices, restore the SPU, free the mutex + memory.  No-op if not up. */
 int SNDSYS_restore(void)
 {
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0)                             /* audio not up */
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized)                             /* audio not up */
         return -10;
     if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10]) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[10])();
     if (((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11]) (*(void (*)(void))((struct SndGlobalServerStateView *)sndgs)->service_callbacks[11])();

@@ -11,7 +11,7 @@
 int SND3dpos(unsigned int tag, unsigned int pos, int y)
 {
     int ch, cur[2];
-    if (((struct SndGlobalServerStateView *)sndgs)->initialized == 0) return -10;
+    if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;
     pos &= 0xffff;
     if (y >= 0x4000)
         y = 0x3fff;
@@ -21,7 +21,7 @@ int SND3dpos(unsigned int tag, unsigned int pos, int y)
     ch = iSNDgetchan(tag);
     if (ch > -1) {
         cur[0] = -1;
-        while (iSNDpatchkey(ch, (int)cur) != 0)
+        while (iSNDpatchkey(ch, (int)cur))
             iSNDplatform3dpos(cur[0], pos, y);
     }
     iSNDleaveaudio();
