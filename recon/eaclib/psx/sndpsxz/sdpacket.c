@@ -591,10 +591,10 @@ int iSNDfillspuwithpackets(int p, int chunk)
                      * flow.c weights only cursor's defining quantity before loop.c removes the
                      * wrappers; that crosses the 3-QTY handout threshold and gives cursor/result
                      * $v0, the second load $a0, and the limit/compare chain $v1, as in retail. */
-                    do { do { do { cursor = pp->write_position; } while (0); } while (0); } while (0);
+                    do { do { cursor = pp->write_position; } while (0); } while (0);
                     result = cursor - pp->serve_position;
                     if (pp->queue_fill_limit.u < result)
-                        goto function_exit;
+                        return result;
                     if (pp->empty_source_loop_count.u > pp->frame_count)
                         goto advance;
                     if (pp->empty_source_loop_count.u < 2) {     /* mark SPU loop-back */
@@ -769,7 +769,6 @@ advance:
     pp->frame_index.s = chunk;
     result = pp->write_position + pp->frames_per_block.u;
     pp->write_position = result;
-function_exit:
     return result;
 }
 
@@ -787,7 +786,7 @@ void iSNDpacketserve(void)
     base = sndpd;
     voices = (SndPacketVoiceState *)(base + 0xd8);
     wrapAdjust = 0x90000000;
-    do {
+    for (; p <= 0; p++) {
         SndPacketPlayerContextPrefix *ctx =
             ((struct SndPacketContextSlotCursorView *)(base + p * 4))->context;
         if (ctx && ctx->active_note >= 0) {
@@ -829,8 +828,7 @@ have_advance:
                 }
             }
         }
-        p++;
-    } while (p <= 0);
+    }
 }
 
 /* iSNDplatformpacketoverhead @0x801041B8 : per-player SPU-context byte overhead (the malloc'd voice ctx
@@ -979,12 +977,10 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
         ctx->queue_threshold =
             total - ctx->frames_per_block.u;
     }
-    i = 0;
-    do {
+    for (i = 0; i < 2; i++) {
         while (!(iSNDdmcomplete(ctx->dma_handle))) { }
         iSNDfillspuwithpackets(p, i);
-        i++;
-    } while (i < 2);
+    }
 
     {
         /* MATCH: oracle re-materializes a FRESH bare &sndpd here (a0), shared between the HOOK_

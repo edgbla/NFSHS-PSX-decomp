@@ -104,7 +104,7 @@ void iSNDdmtransfer(void)
     i = bestPrio;
     scanBase = pd;
     scanEntry = (struct SNDDmaEntry *)(scanBase + 0x10);
-    do {
+    for (; i < 10; i++, scanEntry++) {
         if (scanEntry->handle) {                     /* active entry */
             if (bestPrio < scanEntry->priority) {
                 ((struct SndDmaQueueStateView *)scanBase)->active_slot.plain = (signed char)i;
@@ -116,9 +116,7 @@ void iSNDdmtransfer(void)
                 bestHandle = scanEntry->handle;
             }
         }
-        i++;
-        scanEntry++;
-    } while (i < 10);
+    }
 
     {
         unsigned char *tailBase = sndpd;
@@ -300,20 +298,19 @@ int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
     pd = (unsigned char *)raw;
     ent = (volatile struct SNDDmaEntry *)(pd + 0x10);
 scan:
-    if (ent->handle)
-        goto occupied;
-    ((struct SndDmaQueueStateView *)pd)->in_flight_count.v = ((struct SndDmaQueueStateView *)pd)->in_flight_count.v + 1;
-    handleSnapshot = ((struct SndDmaQueueStateView *)pd)->next_handle;
-    ent->dstSpu = dst_spu;
-    ent->handle = handleSnapshot;
-    ent->srcHi = (unsigned short)(src_ram >> 3);
-    ent->len64 = (unsigned char)(len >> 6);
-    ent->priority = (unsigned char)prio;
-    ent->flag = (unsigned char)queuedFlag;
-    wr_sr(sr);
-    iSNDdmservice();
-    return ((struct SndDmaQueueStateView *)pd)->next_handle;
-occupied:
+    if (!ent->handle) {
+        ((struct SndDmaQueueStateView *)pd)->in_flight_count.v = ((struct SndDmaQueueStateView *)pd)->in_flight_count.v + 1;
+        handleSnapshot = ((struct SndDmaQueueStateView *)pd)->next_handle;
+        ent->dstSpu = dst_spu;
+        ent->handle = handleSnapshot;
+        ent->srcHi = (unsigned short)(src_ram >> 3);
+        ent->len64 = (unsigned char)(len >> 6);
+        ent->priority = (unsigned char)prio;
+        ent->flag = (unsigned char)queuedFlag;
+        wr_sr(sr);
+        iSNDdmservice();
+        return ((struct SndDmaQueueStateView *)pd)->next_handle;
+    }
     i++;
     if (i < 10) {
         ent++;
@@ -362,21 +359,11 @@ int iSNDdmcomplete(int handle)
     iSNDdmservice();
     base = sndpd;
     i = 0;
-    if (0 < (int)((unsigned)((struct SndDmaQueueStateView *)base)->in_flight_count.plain << 0x18))
-        goto scan;
-    result = 1;
-    goto done;
-found:
-    result = 0;
-    goto done;
-scan:
-    do {
+    if (!(0 < (int)((unsigned)((struct SndDmaQueueStateView *)base)->in_flight_count.plain << 0x18)))
+        return 1;
+    for (; i < 10; i++, base += sizeof(struct SNDDmaEntry)) {
         if (((struct SNDDmaEntry *)(base + 0x10))->handle == handle)
-            goto found;
-        i++;
-        base += sizeof(struct SNDDmaEntry);
-    } while (i < 10);
-    result = 1;
-done:
-    return result;
+            return 0;
+    }
+    return 1;
 }

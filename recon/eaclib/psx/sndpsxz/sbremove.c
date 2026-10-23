@@ -21,13 +21,9 @@ int iSNDremovepatches(int bank, int count)
     int *p;
     int i;
     int neg1 = -1;
-    i = 0xFF;
-    p = &scratch[510];
-    do {                                 /* seed the {id} slots to -1, back to front */
+    for (i = 0xFF, p = &scratch[510]; i >= 0; i--, p -= 2) {
         *p = neg1;
-        i--;
-        p -= 2;
-    } while (i >= 0);
+    }
     for (i = 0; i < count; i++)
         iSNDbankremovepat(bank, i, scratch);
     return 0;

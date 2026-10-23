@@ -781,12 +781,8 @@ scan_done:
             unsigned int adjusted_off;
             unsigned short *pv;
             do {
-                do {
-                    adjusted_off = off;
-                    do {
-                        pv = D_80147E34;
-                    } while (0);
-                } while (0);
+                adjusted_off = off;
+                pv = D_80147E34;
             } while (0);
             prev = (unsigned short *)((unsigned int)adjusted_off +
                                       (unsigned int)pv);

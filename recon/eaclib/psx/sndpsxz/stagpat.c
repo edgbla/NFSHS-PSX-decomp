@@ -45,13 +45,10 @@ void iSNDresetpatch(struct SndTimbre *patch)
  *   (note range 0..0x3c, full velocity, default envelope). */
 unsigned char *iSNDresettimbre(struct SndTimbre *t, struct SndTimbre *buf)
 {
-    int i = 0x25;
-    int *p = &buf->pan_scale.word;
-    do {                                              /* zero the whole timbre buffer */
+    int i;
+    int *p;
+    for (i = 0x25, p = &buf->pan_scale.word; i > -1; i--, p--)
         *p = 0;
-        i--;
-        p--;
-    } while (i > -1);
     t->velocity_min.word = 0;
     t->velocity_max.word = 0x7f;
     t->note_min.word = 0;
@@ -191,12 +188,12 @@ detune_done:
             slot->base_detune = sv + pitchOff;
         if (vol->base_detune_range.word)
             slot->base_detune = (unsigned short)slot->base_detune + randrange(vol->base_detune_range.word);
-        *(volatile int *)&slot->final_volume_curve = vol->final_volume_curve.word;
+        slot->final_volume_curve = vol->final_volume_curve.word;
         field54 = vol->pan_curve.word;
-        *(volatile int *)&slot->pan_curve = field54;
+        slot->pan_curve = field54;
         field5c = vol->detune_curve.word;
-        *(volatile int *)&slot->autovol_position.word = b8 << 0x10;
-        *(volatile int *)&slot->detune_curve = field5c;
+        slot->autovol_position.word = b8 << 0x10;
+        slot->detune_curve = field5c;
         active = slot->pan_scale;
         slot->autovol_step = 0;
         slot->current_pan = b7;

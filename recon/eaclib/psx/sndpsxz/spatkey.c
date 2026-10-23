@@ -36,12 +36,11 @@ int iSNDpatchkey(int chan, int tag)
         *(int *)tag = i + 1;
         if (i + 1 < ((struct SndGlobalServerStateView *)sndgs)->channel_count) {
             struct SndGlobalServerStateView *gs = (struct SndGlobalServerStateView *)sndgs;
-            do {
+            for (; *(int *)tag < gs->channel_count; *(int *)tag = *(int *)tag + 1) {
                 SndChannel *p = &((SndChannel *)(unsigned int)gs->play_records)[*(int *)tag];
                 if (p->group_id == grp && p->state == 1 && -1 < (int)p->owner_tag)
                     return 1;
-                *(int *)tag = *(int *)tag + 1;
-            } while (*(int *)tag < gs->channel_count);
+            }
         }
         goto no_key;
     }

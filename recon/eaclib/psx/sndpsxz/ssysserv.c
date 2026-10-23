@@ -113,11 +113,10 @@ void SNDSYS_service(void)
         base = guard;
         p = base;
         i = 0;
-        do {
+        for (; i < ((struct SndGlobalServerStateView *)base)->service_client_count.s; i++) {
             void (*cb)(void) = ((struct SndServerServiceClientCursorView *)p)->callback;
             p += 4;
             (*cb)();
-            i++;
-        } while (i < ((struct SndGlobalServerStateView *)base)->service_client_count.s);
+        }
     }
 }

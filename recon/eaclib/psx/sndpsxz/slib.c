@@ -617,7 +617,7 @@ int iSNDrestore(void)
          * so the fence is not used here. */
         if (chan < ((struct SndGlobalServerStateView *)gp)->channel_count) {
             vp = base;
-            do {
+            for (; chan < ((struct SndGlobalServerStateView *)gp)->channel_count; chan++) {
                 if (*(volatile unsigned char *)((unsigned char *)vp + 0xf5)) { /* voice still active */
                     if (deadline < ((struct SndGlobalServerStateView *)gp)->tick_count) {
                         iSNDpsxkeyoff(0xffffff);
@@ -627,7 +627,7 @@ int iSNDrestore(void)
                     quiet = 0;
                 }
                 vp += sizeof(SndPacketVoiceState);
-            } while (((struct SndGlobalServerStateView *)gp)->channel_count > ++chan);
+            }
         }
         SNDSYS_service();
     } while (!quiet);
@@ -661,7 +661,7 @@ void iSNDserve(void)
                                 * through this cached base instead of re-materializing sndpd's own
                                 * %hi/%lo every time. */
 
-    *(volatile unsigned int *)&koff = 0;
+    koff = 0;
     base = sndpd;
     do {
         do {
@@ -867,7 +867,7 @@ void iSNDserve(void)
     if ((int)kon < ((struct SndGlobalServerStateView *)sndgs)->channel_count) {
         fpbase = base;
         vt = chan;
-        do {
+        for (; chan < ((struct SndGlobalServerStateView *)sndgs)->channel_count; chan++) {
             vp   = D_801479F0 + vt;
             vreg = (unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)fpbase)->registers.voice_base + chan * 0x10);
             if (*(volatile unsigned char *)&((struct SndPacketVoiceState *)vp)->voice_status == 2) {       /* voice stopping */
@@ -968,7 +968,7 @@ void iSNDserve(void)
              * `nop`s).  Operand order `bound > ++chan` (not `++chan < bound`) puts the load first
              * (catalog: compare-operand order IS evaluation/load order) and still emits
              * `slt chan,bound`. */
-        } while (((struct SndGlobalServerStateView *)sndgs)->channel_count > ++chan);
+        }
     }
     if (koff)
         iSNDpsxkeyoff(koff);

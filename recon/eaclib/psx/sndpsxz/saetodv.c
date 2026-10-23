@@ -25,18 +25,13 @@ void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int pr
     int          which;      /* which channel to negate (0 none / 1 L / 2 R) */
     int          newdir;
 
-    if (prevL < 0) {
-        if (prevR < 0) {
-            quad = 2;
-            if (prevL < prevR) quad = 1;
-            goto have_quad;
-        }
-    } else if (prevR > -1) {
+    if (prevL < 0 && prevR < 0) {
+        quad = 2;
+        if (prevL < prevR) quad = 1;
+    } else if (prevL >= 0 && prevR >= 0) {
         quad = 1;
         if (prevL < prevR) quad = 2;
-        goto have_quad;
-    }
-    {
+    } else {
         int absL = iSNDabs(prevL);
         int absR = iSNDabs(prevR);
         if (absR < absL)
@@ -44,8 +39,6 @@ void iSNDatodlrv(int angle, int level, int *out_l, int *out_r, int prevL, int pr
         else
             quad = 3;
     }
-
-have_quad:
     which = 0;
     if (angle - 0x4000U < 0x8000) {
         newdir = 4;

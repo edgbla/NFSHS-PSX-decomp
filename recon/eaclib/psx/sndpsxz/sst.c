@@ -86,11 +86,9 @@ __asm__("\t.globl\tsndss\n\t.globl\tsndStreamMap\n\t.section\t.bss\n\t.align\t2\
 /* iSNDstreamdestroyall @0x800E8C14 : destroy every stream (addexit/shutdown hook). */
 int iSNDstreamdestroyall(void)
 {
-    int s = 0;
-    do {
+    int s;
+    for (s = 0; s < 1; s++)
         SNDSTRM_destroy(s);
-        s += 1;
-    } while (s < 1);
     return 0;
 }
 
@@ -181,14 +179,9 @@ void iSNDstreamnotifycallback(int handle, unsigned int bytes)
         }
         ((volatile SndStreamReq *)req)->bytes_consumed = ((volatile SndStreamReq *)req)->bytes_consumed + bytes;         /* consumed += */
         ((volatile SndStreamReq *)req)->remaining_bytes = ((volatile SndStreamReq *)req)->remaining_bytes - bytes;         /* remaining -= */
-        if ((unsigned int)((volatile SndStreamReq *)req)->bytes_consumed < (unsigned int)((volatile SndStreamReq *)req)->total_size)   /* consumed < totalSize ->
-                                                          * skip the remove (goto-skip avoids an
-                                                          * xori vs the `<=`-negated form); MATCH:
-                                                          * fresh re-read of consumed, not the value
-                                                          * just stored above */
-            goto notdone;
-        iSNDstreamremoverequest(((volatile SndStreamReq *)req)->request_id);
-    notdone:
+        if ((unsigned int)((volatile SndStreamReq *)req)->bytes_consumed >=
+            (unsigned int)((volatile SndStreamReq *)req)->total_size)
+            iSNDstreamremoverequest(((volatile SndStreamReq *)req)->request_id);
         bytes = over;
         if (!bytes)                                 /* MATCH: exit-in-the-middle -- prevents
                                                           * the do-while bottom-test rotation */
@@ -215,21 +208,15 @@ int iSNDstreamparseheader(int S, int data)
     ((volatile SndStreamReq *)req)->total_size = ((((volatile SndStreamReq *)req)->total_size + 0x1b) / 0x1c) * 0x1c;    /* round up to 0x1C */
     ((volatile SndStreamReq *)req)->data_rate = iSNDplatformcalcdatarate(&((SndStream *)S)->current_rate);
 
-    if (memcmp(&((SndStream *)S)->locked_rate, &((SndStream *)S)->current_rate, sizeof(SNDSAMPLEFORMAT)))
-        goto formatdiffers;
-    if (!(memcmp(&((SndStream *)S)->locked_header, &((SndStream *)S)->current_header, sizeof(SndPatchAttributes))))
-        goto formatsame;
-formatdiffers:
-    if (((SndStream *)S)->locked_rate.samplerate) {        /* already locked -> illegal change */
-        ((volatile SndStream *)S)->state = 2;
-        return 0;
+    if (memcmp(&((SndStream *)S)->locked_rate, &((SndStream *)S)->current_rate, sizeof(SNDSAMPLEFORMAT)) ||
+        memcmp(&((SndStream *)S)->locked_header, &((SndStream *)S)->current_header, sizeof(SndPatchAttributes))) {
+        if (((SndStream *)S)->locked_rate.samplerate) {    /* already locked -> illegal change */
+            ((volatile SndStream *)S)->state = 2;
+            return 0;
+        }
+        ((SndStream *)S)->locked_rate = ((SndStream *)S)->current_rate;
+        ((SndStream *)S)->locked_header = ((SndStream *)S)->current_header;
     }
-    /* MATCH (106/106): packed assignment emits the unaligned-safe lwl/lwr+swl/swr rate copy;
-     * the five-word header assignment expands as the oracle's load-4/store-4 then trailing
-     * load/store sequence. The volatile error-state byte keeps its store ahead of the return jump. */
-    ((SndStream *)S)->locked_rate = ((SndStream *)S)->current_rate;
-    ((SndStream *)S)->locked_header = ((SndStream *)S)->current_header;
-formatsame:
     if ((((int)(((volatile SndStream *)S)->state) << 24) >> 24) != 1) {  /* MATCH: shift-chain,
                         * not the MB macro's plain compare -- not yet playing -> start */
         ((SndStream *)S)->start_result = SNDPKTPLAY_start(((SndStream *)S)->packet_player, &((SndStream *)S)->locked_rate,
@@ -318,12 +305,9 @@ int iSNDstreamparsedata(int S, int chunk)
         i = 0;
         if (i < ((SndStream *)S)->locked_rate.channels) {
             int *dp = desc.words;
-            do {
+            for (; i < ((SndStream *)S)->locked_rate.channels; off++, i++, dp++) {
                 ((SndPacketSubmitFrameView *)dp)->fields.channel_data[0] = base + *off;
-                off++;
-                i++;
-                dp++;
-            } while (i < ((SndStream *)S)->locked_rate.channels);
+            }
         }
     }
 
@@ -590,12 +574,12 @@ void iSNDstreamservice(void)
     iSNDenteraudio();
     slot = 0;
     p    = sndss;
-    do {
+    for (; slot < 1; slot++, p++) {
         int S = *p;
         if (S && ((SndStream *)S)->current_count) {                /* curReqCount != 0 */
             if ((((int)(((volatile SndStream *)S)->state) << 24) >> 24) == 2) {  /* needs restart */
                 if (0 < SNDPKTPLAY_framesoutstanding(((SndStream *)S)->packet_player))
-                    goto next;
+                    continue;
                 ((SndStream *)S)->locked_rate = ((SndStream *)S)->current_rate;
                 SNDPKTPLAY_stop(((SndStream *)S)->packet_player);
                 ((SndStream *)S)->start_result = SNDPKTPLAY_start(((SndStream *)S)->packet_player, &((SndStream *)S)->locked_rate,
@@ -608,7 +592,7 @@ void iSNDstreamservice(void)
                 if ((((int)(((volatile SndStream *)S)->state) << 24) >> 24) == 1) {
                     n = SNDPKTPLAY_submitspace(((SndStream *)S)->packet_player);
                     if (!n)
-                        goto next;
+                        continue;
                     r = 0;
                 } else {
                     n = 10;
@@ -626,9 +610,7 @@ void iSNDstreamservice(void)
                 } while (n > 0);
             }
         }
-    next:
-        slot++; p++;
-    } while (slot < 1);
+    }
     iSNDleaveaudio();
 }
 /* near-miss floor (37->26->18->14 diffs, ours 88 / oracle 90 insns; real fixes kept per verify-or-revert

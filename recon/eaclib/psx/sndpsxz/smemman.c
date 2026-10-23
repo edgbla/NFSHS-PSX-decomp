@@ -286,7 +286,7 @@ int iSNDmalloc(int size)
 
     i = 0;
     if (count >= 0x80)
-        goto fail;
+        return 0;
     size += 3;
     size >>= 2;
     if (!count) {
@@ -295,13 +295,13 @@ int iSNDmalloc(int size)
         iSNDmemconstrain(&block, &available);
         if (size <= available)
             goto commit;
-        goto fail;
+        return 0;
     }
     if (i < *(unsigned short *)(base + 4)) {
         tab = base + 0xc;
         prev = (unsigned short *)(base + 8);
         mm = base;
-        do {
+        for (; i < *(unsigned short *)(mm + 4); i++, j = 0) {
             /* the byte offset goes through the MULTIPLY-SET `j` so gcc loop.c never sees a giv
              * (keeps the oracle's per-iteration sll+addu, no strength-reduced walking pointer);
              * index term FIRST in the adds (commutative-order lever). */
@@ -345,13 +345,11 @@ int iSNDmalloc(int size)
                 }
                 goto commit;
             }
-            i++;
             /* DEAD-SET CARRIER (W35 lever): `j` is now single-set in the loop once the shift
              * counter moved to `k`, which would let loop.c classify it as a giv and strength-
              * reduce the per-iteration sll+addu into a walking pointer.  This dead store keeps
              * set_in_loop != 1 (loop.c counts it) and flow deletes it for free. */
-            j = 0;
-        } while (i < *(unsigned short *)(mm + 4));
+        }
     }
     {
         /* post-loop tail: fresh block-locals re-materialize the FUSED sndmm+8 symbol (oracle

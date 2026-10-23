@@ -51,7 +51,9 @@ int SNDmemlargestunused(int *out)
             prevt = &((struct SndSpuMemoryStateView *)base)->memory.boundary.view.virtual_previous;
             q = base;
             tbl = ((struct SndSpuMemoryStateView *)q)->entries;
-            do {
+            n = count;
+            for (; i < n;
+                 n = ((struct SndSpuMemoryStateView *)q)->memory.alloc_count, tbl++, i++) {
                 if (!i) {
                     gap = tbl->block - 0x41;
                     if (best < gap)
@@ -75,12 +77,7 @@ int SNDmemlargestunused(int *out)
                         *out = end;
                     }
                 }
-                /* MATCH: fresh count re-read loaded FIRST, i++ LAST (statement order chosen so the
-                 * scheduler puts addiu i in the load delay and tbl++ in the branch delay slot). */
-                n = ((struct SndSpuMemoryStateView *)q)->memory.alloc_count;
-                tbl++;
-                i++;
-            } while (i < n);
+            }
         }
         /* post-loop tail: also reached from the guard-skip path, where no base register is live --
          * the direct global expressions make gcc re-materialize the fused %hi/%lo(sndpd+0x51C)

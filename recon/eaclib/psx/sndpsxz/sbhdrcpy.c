@@ -120,7 +120,7 @@
  * hoisted init restores the rank and returns to exactly 10, so the hoist is a no-op, not a win). */
 int SNDbankheadercopy(void *dst, int bankId)
 {
-    register int id;
+    int id;
     unsigned char *dest = (unsigned char *)dst;
     struct SNDGlobals *base = &sndgs;
     int size;
@@ -178,7 +178,8 @@ initialized:
             src12 = bankData;
             dst20 = dest;
             src20 = bankData;
-        do {
+        for (; i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count;
+             dst12 += 4, src12 += 4, dst20 += 4, src20 += 4, i++) {
             if (((struct SndBankDataHeaderPrefix *)bankData)->type == type4) {
                 int sp = ((struct SndBankPatchOffset20CursorView *)src20)->relative_offset;
                 if (sp)
@@ -188,12 +189,7 @@ initialized:
                 if (sp)
                     ((struct SndBankPatchOffset12CursorView *)dst12)->relative_offset = (int)dest + (sp - (int)bankData);
             }
-            dst12 += 4;
-            src12 += 4;
-            dst20 += 4;
-            src20 += 4;
-            i++;
-        } while (i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count);
+        }
         }
     }
         ((struct SndBankTableEntry *)(id * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = dest;

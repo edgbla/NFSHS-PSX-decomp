@@ -336,8 +336,7 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
         *out = DAT_80136dec[0] | (signed char)sndchanreserved[0];
         result = (signed char)sndchanreserved[0];
         i = 0;
-        if (reserved > 0) {
-            do {
+        for (; i < reserved; i++) {
                 unsigned int owner;
                 ch = ((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[i] * (int)sizeof(SndChannel);
                 owner = ((SndChannel *)(unsigned int)ch)->owner_tag;
@@ -357,9 +356,7 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                 ((SndChannel *)(unsigned int)ch)->state = 1;
                 ((SndChannel *)(unsigned int)ch)->allocation_tick = ((struct SndGlobalServerStateView *)sndgs)->tick_count;          /* timestamp */
                 ((SndChannel *)(unsigned int)ch)->age = (char)a2;             /* voice flag byte */
-                i++;
-            } while (i < reserved);
-        }
+            }
         /* link the secondary channels to the primary */
         ((SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[0] * (int)sizeof(SndChannel)))->owner_tag = *out;
         for (i = 1; i < reserved; i++) {
@@ -545,7 +542,7 @@ void iSNDfreechan(int chan)
              * folds them together and loses the copy. */
             limit = ((struct SndGlobalServerStateView *)base)->channel_count;
             scan = (unsigned char *)pool;
-            do {
+            for (; slot < limit; slot++, scan += sizeof(SndChannel)) {
                 /* MATCH (w50-a7): OPACITY FENCE REPLACES THE volatile SCAN READS.  The four reads
                  * used to be `volatile` purely to stop loop.c re-anchoring the address givs onto the
                  * LAST one (scan+0x36), which turned retail's single positive-displacement walker
@@ -571,9 +568,7 @@ void iSNDfreechan(int chan)
                     ((SndChannel *)scan)->state &&
                     (count++, ((SndChannel *)scan)->playback_fx.playback.group_flag))
                     partner = slot;
-                slot++;
-                scan += sizeof(SndChannel);
-            } while (slot < limit);
+            }
         }
 
         gs = (unsigned char *)sndgs;
@@ -644,14 +639,11 @@ int iSNDgetchan(unsigned int tag)
     struct SndGlobalServerStateView *base;
     int ch;   /* signed -- oracle compares via slt (both operands non-negative so behavior is unchanged) */
     if ((int)tag < 0)
-        goto invalid;
+        return -8;
     base = (struct SndGlobalServerStateView *)sndgs;   /* materialize bare &sndgs first (no offset folded into %lo) */
     ch = tag & 0x1f;
-    if (ch < base->channel_count)
-        goto valid_range;
-invalid:
-    return -8;
-valid_range:
+    if (ch >= base->channel_count)
+        return -8;
     {
         int *slot = (int *)(base->play_records + ch * (int)sizeof(SndChannel));
         if (!((SndChannel *)slot)->state || ((SndChannel *)slot)->owner_tag != tag)

@@ -237,8 +237,6 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
      * and sinks `sw allocOut,0(ppp)` to the bottom; the oracle keeps the written order and leaves
      * that delay slot unfilled.  Making ONLY the first or only the two end stores volatile is not
      * enough (132 / 119) -- the run has to be ordered as a whole. */
-    do {                             /* MATCH: w44 depth wrapper = zero-insn REF INFLATOR on
-                                      * `ppp`, restoring its rank over the now-10-ref `gp`. */
     ((volatile PacketPlayerHeader *)(unsigned int)ppp)->voice_id = allocOut;
     ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index = 0;
     ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames = 0;
@@ -246,7 +244,6 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
     ((volatile PacketPlayerHeader *)(unsigned int)ppp)->submit_sequence = 0;
     ((volatile PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes = 0;
     ((volatile PacketPlayerHeader *)(unsigned int)ppp)->last_channel = (short)0xffff;
-    } while (0);
     dur = note * sizeof(SndChannel);         /* MATCH: the note*stride chain must ISSUE
                                                    * BEFORE the lwl/lwr pair (retail); once the
                                                    * note fences below lengthen note's range,
@@ -649,12 +646,8 @@ int iSNDpacketget(int p, int idx, int *out)
         ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index + 1;
         ((PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes = ((PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes + fr->size;
         ((volatile PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes = ((PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes - fr->size;
-        if (((int)((unsigned)((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) < ((int)((unsigned)((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16))              /* MATCH: raw <<16, no sra (compare-only);
-                                                        * goto-skip form (not `>=`) avoids an xori */
-            goto rd_ok;
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index = 0;
-    rd_ok:
-        ;
+        if (!(((int)((unsigned)((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) < ((int)((unsigned)((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16)))
+            ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index = 0;
     }
     return fr->channel[idx];
 }
