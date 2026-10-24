@@ -1,10 +1,10 @@
-/* snd_globals.h -- typed overlay of the sound-bank fields in the shared sndgs state block.
- * bank_table is a SndBankTableEntry array base. Do not combine with sdata.h's generic `int sndgs[]`
- * view in the same translation unit. */
+/* snd_globals.h -- typed overlay of the shared sndgs state block. `play_records` and `bank_table`
+ * are typed array bases. Do not combine with sdata.h's generic `int sndgs[]` view in one TU. */
 #ifndef _SNDPSXZ_SND_GLOBALS_H_
 #define _SNDPSXZ_SND_GLOBALS_H_
 
 struct SndBankTableEntry;
+struct SndChannel;
 
 struct SNDGlobals {
     char pad0[0x0c];
@@ -14,7 +14,7 @@ struct SNDGlobals {
     char pad12[0x2a];
     signed char initialized;
     char pad3d[0x57];
-    int play_records;
+    struct SndChannel *play_records;
     struct SndBankTableEntry *bank_table; /* +0x98 */
 };
 

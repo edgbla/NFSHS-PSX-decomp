@@ -44,29 +44,29 @@ extern int timerhz[]; /* hardware tick rate */
  * Verified byte-for-byte: 71 instructions. */
 void iSNDserver(void)
 {
-    char *p;
-    char *g;
+    struct SndGlobalServerStateView *p;
+    struct SndGlobalServerStateView *g;
     unsigned int target;
 
-    p = (char *)sndgs;
-    if (!((struct SndGlobalServerStateView *)p)->in_server) {           /* not already inside the server */
-        if (((struct SndGlobalServerStateView *)p)->audio_lock_depth) {       /* audio locked -- defer */
-            ((struct SndGlobalServerStateView *)p)->deferred_requests.s = ((struct SndGlobalServerStateView *)p)->deferred_requests.s + 1;   /* run it later, on leaveaudio */
+    p = (struct SndGlobalServerStateView *)sndgs;
+    if (!p->in_server) {           /* not already inside the server */
+        if (p->audio_lock_depth) {       /* audio locked -- defer */
+            p->deferred_requests.s = p->deferred_requests.s + 1;   /* run it later, on leaveaudio */
             return;
         }
-        ((struct SndGlobalServerStateView *)p)->in_server = 1;
-        if (timerhz[0] != (((int)(((struct SndGlobalServerStateView *)p)->timer_hz_cache.u) << 16) >> 16)) {
-            ((struct SndGlobalServerStateView *)p)->timer_hz_cache.s = (short)timerhz[0];
-            *(volatile int *)&((struct SndGlobalServerStateView *)p)->tick_count = 0;
-            *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks = 0;
+        p->in_server = 1;
+        if (timerhz[0] != (((int)(p->timer_hz_cache.u) << 16) >> 16)) {
+            p->timer_hz_cache.s = (short)timerhz[0];
+            *(volatile int *)&p->tick_count = 0;
+            *(volatile int *)&p->real_ticks = 0;
         }
-        *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks = *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks + 1;
-        target = *(volatile int *)&((struct SndGlobalServerStateView *)p)->real_ticks * 100 / (unsigned int)timerhz[0];
-        if (((struct SndGlobalServerStateView *)p)->tick_count <= target) {
+        *(volatile int *)&p->real_ticks = *(volatile int *)&p->real_ticks + 1;
+        target = *(volatile int *)&p->real_ticks * 100 / (unsigned int)timerhz[0];
+        if (p->tick_count <= target) {
             g = p;
             do {
-                ((struct SndGlobalServerStateView *)g)->server_callback();
-            } while (((struct SndGlobalServerStateView *)g)->tick_count <= target);
+                g->server_callback();
+            } while (g->tick_count <= target);
         }
         { volatile char *q = (volatile char *)sndgs; ((volatile struct SndGlobalServerStateView *)q)->in_server = 0; }
     }
@@ -111,7 +111,7 @@ void iSND100hzserver(void)
         globalBase = channelBase;
         chanIdx = i;
         do {
-            p = (SndChannel *)((unsigned char *)(unsigned int)globalBase->play_records + chanIdx);
+            p = (SndChannel *)((unsigned char *)globalBase->play_records + chanIdx);
             if (p->state == 1 && -1 < (int)p->owner_tag) { /* held, valid tag */
                 if (p->pitch_lfo_table) {                                 /* pitch LFO active */
                     unsigned char phase = p->pitch_lfo_phase + 1;
@@ -191,16 +191,16 @@ next_chan:
 /* iSNDenteraudio @0x800EA534 : take the audio re-entrancy lock (mutex + depth++). */
 void iSNDenteraudio(void)
 {
-    char *g;
+    struct SndGlobalServerStateView *g;
     SNDI_mutexlock();
-    g = (char *)sndgs;   /* materialize &sndgs (lui+addiu) AFTER the call so it lands in a caller-saved reg */
-    ((struct SndGlobalServerStateView *)g)->audio_lock_depth = ((struct SndGlobalServerStateView *)g)->audio_lock_depth + 1;
+    g = (struct SndGlobalServerStateView *)sndgs;   /* materialize &sndgs (lui+addiu) AFTER the call so it lands in a caller-saved reg */
+    g->audio_lock_depth = g->audio_lock_depth + 1;
 }
 
 /* iSNDleaveaudio @0x800EA56C : release the audio lock; at depth 0, flush any servers deferred while held. */
 void iSNDleaveaudio(void)
 {
-    char *g = (char *)sndgs;      /* held across the call (oracle: callee-saved $s0) */
+    struct SndGlobalServerStateView *g = (struct SndGlobalServerStateView *)sndgs;      /* held across the call (oracle: callee-saved $s0) */
     ((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth =
         ((volatile struct SndGlobalServerStateView *)g)->audio_lock_depth - 1;
     SNDI_mutexunlock();
@@ -221,11 +221,9 @@ short *iSNDserveradd100hzclient(void (*cb)(void))
 {
     /* Keep the raw count as the scaled index; do not fold the 0x13-slot prefix into it. The field
      * expression below is a true array member yet retains the retail +0x4c store displacement. */
-    char *base = (char *)sndgs;
-    ((struct SndGlobalServerStateView *)base)->client_100hz_callbacks[
-        (signed char)((struct SndGlobalServerStateView *)base)->client_100hz_count.s] = cb;
-    ((struct SndGlobalServerStateView *)base)->client_100hz_count.u =
-        ((struct SndGlobalServerStateView *)base)->client_100hz_count.u + 1;
+    struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
+    base->client_100hz_callbacks[(signed char)base->client_100hz_count.s] = cb;
+    base->client_100hz_count.u = base->client_100hz_count.u + 1;
     return (short *)sndgs;
 }
 

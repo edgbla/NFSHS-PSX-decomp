@@ -192,10 +192,10 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
     int note, allocOut, dur, r;
     SndChannel *ch;
     int rateb2;
-    int gsp;                                      /* &sndgs, held in a callee-saved reg across
+    struct SndGlobalServerStateView *gsp;         /* &sndgs, held in a callee-saved reg across
                                                     * enteraudio/allocchan: the enable guard and the
                                                     * 0x25 pool-base lookup share the SAME
-                                                    * materialized base in the oracle ($s3). */
+                                                    * materialized state pointer in the oracle ($s3). */
     int gp;                                       /* the packet-play length (oracle redefines the
                                                     * very register that held the sndgs base right
                                                     * after `lw v1,0x94(s3)`). */
@@ -217,8 +217,8 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
      * live_length, the length allocno stops out-ranking `note`, and both fences become
      * unnecessary.  PASS 187/187 with ZERO devices.  (Register-level fidelity is unchanged:
      * gcc still hands both roles $s3 -- the source-level split is invisible in the output.) */
-    gsp = (int)sndgs;
-    if (!((struct SndGlobalServerStateView *)(unsigned int)gsp)->initialized)
+    gsp = (struct SndGlobalServerStateView *)sndgs;
+    if (!gsp->initialized)
         return -10;
     rateb2 = rate->channels;                         /* MATCH: evaluated before the ppp lookup/
                                                     * enteraudio -- oracle hoists this arg early */
@@ -249,7 +249,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
                                                    * note fences below lengthen note's range,
                                                    * sched1 no longer hoists it on its own. */
     ppp->rate = *rate; /* unaligned rate-word copy */
-    ch = (SndChannel *)((unsigned char *)(unsigned int)((struct SndGlobalServerStateView *)(unsigned int)gsp)->play_records + dur);       /* MATCH: AFTER the unaligned copy -- the oracle's
+    ch = (SndChannel *)((unsigned char *)gsp->play_records + dur);       /* MATCH: AFTER the unaligned copy -- the oracle's
                                                     * `lw v1,0x94(s3)` sits between the swl/swr pair
                                                     * and the params[0xb] test, with the pool-base
                                                     * add filling the test's beqz delay slot (sched1

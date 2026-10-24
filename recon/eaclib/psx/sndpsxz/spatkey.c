@@ -28,7 +28,8 @@
  *   cursor (init -1).  Returns 1 while voices remain, 0 when exhausted. */
 int iSNDpatchkey(int chan, int tag)
 {
-    SndChannel *pbase = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
+    SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+    SndChannel *pbase = &pool[chan];
     char grp;
     grp = pbase->group_id;
     if (grp) {
@@ -37,7 +38,8 @@ int iSNDpatchkey(int chan, int tag)
         if (i + 1 < ((struct SndGlobalServerStateView *)sndgs)->channel_count) {
             struct SndGlobalServerStateView *gs = (struct SndGlobalServerStateView *)sndgs;
             for (; *(int *)tag < gs->channel_count; *(int *)tag = *(int *)tag + 1) {
-                SndChannel *p = &((SndChannel *)(unsigned int)gs->play_records)[*(int *)tag];
+                SndChannel *pool = gs->play_records;
+                SndChannel *p = &pool[*(int *)tag];
                 if (p->group_id == grp && p->state == 1 && -1 < (int)p->owner_tag)
                     return 1;
             }

@@ -23,7 +23,8 @@ int SNDmastervol(int vol)
     chan = 0;
     if (((struct SndGlobalServerStateView *)sndgs)->channel_count) {
         do {
-            SndChannel *slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
+            SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+            SndChannel *slot = &pool[chan];
             if (slot->state == 1 && -1 < (int)slot->owner_tag) {
                 iSNDcalcvol(chan);
                 iSNDvol(chan, slot->volume);

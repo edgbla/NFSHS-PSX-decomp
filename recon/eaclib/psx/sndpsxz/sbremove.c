@@ -52,7 +52,7 @@ int cSNDbankremove(int bankId, int recurse)
     if (iSNDvalidbank(bankId))
         return -8;
     {
-        int data = (int)(unsigned int)base->bank_table[bankId].data_block;
+        struct SndBankDataHeaderPrefix *data = base->bank_table[bankId].data_block;
         int off;
         unsigned char *entry;
         struct SNDGlobals *base2;
@@ -61,7 +61,8 @@ int cSNDbankremove(int bankId, int recurse)
             struct SNDGlobals *loopbase = base;
             off = 0;
             do {
-                SndChannel *slot = (SndChannel *)(unsigned int)(loopbase->play_records + off);
+                /* `off` is a byte displacement; convert the legacy base before adding it. */
+                SndChannel *slot = (SndChannel *)(off + (unsigned char *)loopbase->play_records);
                 if (slot->start_marker == bankId)
                     SNDstop((int)slot->owner_tag);
                 off += sizeof(SndChannel);
@@ -75,7 +76,7 @@ int cSNDbankremove(int bankId, int recurse)
             iSNDplatformfree((int)(unsigned int)((struct SndBankTableEntry *)entry)->platform_block);
             sndgs.bank_table[bankId].platform_allocated.u = 0;
         } else
-            iSNDremovepatches(bankId, ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->patch_count);
+            iSNDremovepatches(bankId, data->patch_count);
         sndgs.bank_table[bankId].data_block = 0;
         sndgs.bank_table[bankId].load_state.u = 0;
     }

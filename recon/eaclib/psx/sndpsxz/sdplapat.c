@@ -85,7 +85,8 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     ((volatile SndPacketVoiceState *)slot)->initial_pitch.vs = (short)(rate * 0x17c7 >> 0x10);
     if (1 < (unsigned char)((volatile SndPacketVoiceState *)slot)->channel_count) { /* arm linked voice */
         unsigned char *voiceBase = sndpd;
-        ((SndPacketVoiceState *)slot)->link_index.vu = ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[voice].linked_tag_view.linked_channels[0];
+        SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+        ((SndPacketVoiceState *)slot)->link_index.vu = pool[voice].linked_tag_view.linked_channels[0];
         /* MATCH: keep the linked-row base in these field expressions. Hoisting a typed
          * `voiceTable` local changed the address/displacement schedule (15 diffs, 172 vs 171). */
         ((SndPacketVoiceState *)(voiceBase + 0xd8))[

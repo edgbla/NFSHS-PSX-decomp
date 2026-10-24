@@ -23,7 +23,7 @@ void SNDstopall(void)
         off = i;
         do {
             i++;
-            record = (SndChannel *)(unsigned int)(off + gs->play_records);
+            record = (SndChannel *)(unsigned int)(off + (unsigned int)gs->play_records);
             SNDstop(record->owner_tag);
             off += sizeof(SndChannel);
         } while (i < gs->channel_count);

@@ -103,7 +103,8 @@ __asm__("\t.globl\tsndpd\n\t.globl\tD_801479F0\n\t.globl\tDAT_801479f0\n\t.globl
  *   (+0x50) and final (+0x44) volume curves.  Caches the result at +0x2D and returns it. */
 void iSNDcalcvol(int chan)
 {
-    SndChannel  *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
+    SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+    SndChannel *v = &pool[chan];
     int          n = v->patch_volume * v->autovol_position.halves.high *
                      v->portamento_position.halves.high * ((struct SndGlobalServerStateView *)sndgs)->master_volume;
     /* VOID (W31): oracle exits `jr ra; nop` with nothing computed into $v0 -- the cached byte at
@@ -125,10 +126,10 @@ void iSNDcalcvol(int chan)
 /* iSNDpsxkeyon @0x800FF140 : strobe the SPU key-on register for `mask` (24 voices). */
 int iSNDpsxkeyon(int mask)
 {
-    int *base = (int *)sndpd;
+    struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
     int r;
-    *(volatile short *)((int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base + 0x188) = (short)mask;
-    r = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+    *(volatile short *)((int)base->registers.control_base + 0x188) = (short)mask;
+    r = (int)base->registers.control_base;
     *(volatile short *)(r + 0x18a) = (short)(mask >> 0x10);
     return r;
 }
@@ -136,10 +137,10 @@ int iSNDpsxkeyon(int mask)
 /* iSNDpsxkeyoff @0x800FF168 : strobe the SPU key-off register for `mask`. */
 int iSNDpsxkeyoff(int mask)
 {
-    int *base = (int *)sndpd;
+    struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
     int r;
-    *(volatile short *)((int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base + 0x18c) = (short)mask;
-    r = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+    *(volatile short *)((int)base->registers.control_base + 0x18c) = (short)mask;
+    r = (int)base->registers.control_base;
     *(volatile short *)(r + 0x18e) = (short)(mask >> 0x10);
     return r;
 }
@@ -147,12 +148,12 @@ int iSNDpsxkeyoff(int mask)
 /* iSNDpsxeffecton @0x800FF190 : enable reverb on the `mask` voices (OR into the SPU echo-on register). */
 unsigned int iSNDpsxeffecton(int mask)
 {
-    int *base = (int *)sndpd;
+    struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
     unsigned int r;
-    int          c0 = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+    int          c0 = (int)base->registers.control_base;
     *(volatile unsigned short *)(c0 + 0x198) = *(volatile unsigned short *)(c0 + 0x198) | (unsigned short)mask;
     {
-        int c1 = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+        int c1 = (int)base->registers.control_base;
         r = *(volatile unsigned short *)(c1 + 0x19a) | (mask >> 0x10);
         *(volatile short *)(c1 + 0x19a) = (short)r;
     }
@@ -162,12 +163,12 @@ unsigned int iSNDpsxeffecton(int mask)
 /* iSNDpsxeffectoff @0x800FF1D0 : disable reverb on the `mask` voices. */
 unsigned int iSNDpsxeffectoff(int mask)
 {
-    int *base = (int *)sndpd;
+    struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
     unsigned int r;
-    int          c0 = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+    int          c0 = (int)base->registers.control_base;
     *(volatile unsigned short *)(c0 + 0x198) = *(volatile unsigned short *)(c0 + 0x198) & ~(unsigned short)mask;
     {
-        int c1 = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+        int c1 = (int)base->registers.control_base;
         r = *(volatile unsigned short *)(c1 + 0x19a) & ~(mask >> 0x10);
         *(volatile short *)(c1 + 0x19a) = (short)r;
     }
@@ -177,10 +178,10 @@ unsigned int iSNDpsxeffectoff(int mask)
 /* iSNDpsxeffectvol @0x800FF210 : set the SPU reverb (echo) L/R output volume. */
 int iSNDpsxeffectvol(int left, int right)
 {
-    int *base = (int *)sndpd;
+    struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
     int r;
-    *(volatile short *)((int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base + 0x184) = (short)left;
-    r = (int)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+    *(volatile short *)((int)base->registers.control_base + 0x184) = (short)left;
+    r = (int)base->registers.control_base;
     *(volatile short *)(r + 0x186) = (short)right;
     return r;
 }

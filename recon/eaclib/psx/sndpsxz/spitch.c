@@ -28,7 +28,8 @@ int SNDpitchmult(unsigned int tag, unsigned int mult)
             /* MATCH: keeping this value live only through iSNDcalcpitch selects a0 for the
              * multiply and lets the pitch-multiplier store fill that call's delay slot. */
             int note = cur[0];
-            SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[note];
+            SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+            SndChannel *v = &pool[note];
             if (v->base_pitch == mult)
                 break;
             v->base_pitch = (short)mult;

@@ -116,7 +116,7 @@ top:
         goto done;
     count = gs->channel_count;
     key   = DAT_801371cc;
-    slot  = (SndChannel *)(unsigned int)gs->play_records;
+    slot  = gs->play_records;
 loop:                                             /* goto-formed: no LOOP notes -> no giv anchoring */
     if (slot->state) {
         if (slot->group_id == key)
@@ -174,7 +174,8 @@ int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *
     if (chan < 0)
         return chan;
     {
-        slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan];
+        SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+        slot = &pool[chan];
         slot->pan_scale = vol->pan_scale.ubyte;
         sv = vol->base_detune.uhalf;
         slot->base_detune = sv;
@@ -365,17 +366,18 @@ int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
     if (nStarted == 1) {                   /* single voice: no key group */
         ch = iSNDgetchan(started[0]);
         if (ch > -1) {
-            slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[ch];
+            SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+            slot = &pool[ch];
             slot->group_id = 0;
             slot->playback_fx.playback.group_flag = 0;
         }
     } else {                               /* join the started voices into the key group */
         for (i = 0; i < nStarted; i++) {
-            char *gs = (char *)sndgs;      /* in-body: loop-invariant-HOISTED after the entry blez,
-                                            * into a callee-saved reg (held ACROSS the getchan calls) */
+            struct SndGlobalServerStateView *gs = (struct SndGlobalServerStateView *)sndgs; /* in-body: loop-invariant-HOISTED after the entry blez,
+                                                                                             * into a callee-saved reg (held ACROSS the getchan calls) */
             ch = iSNDgetchan(started[i]);
             if (ch > -1) {
-                slot = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)gs)->play_records)[ch];
+                slot = &(gs->play_records)[ch];
                 slot->group_id = (unsigned char)key;
                 slot->playback_fx.playback.group_flag = 0;
             }

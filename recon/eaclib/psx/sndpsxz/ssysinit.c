@@ -34,7 +34,7 @@
  * at all -- they are fixed offsets INSIDE this block, which is why nothing ever defined them:
  *      D_80147871   = sndgs + 0x11   (the channel count byte; sdpacket.c)
  *      D_80147898   = sndgs + 0x38   (SNDSYS_setopts' opts[14] destination; this TU)
- *      DAT_801478f4 = sndgs + 0x94   (= sndgs[0x25], the channel-pool pointer; salloc.c)
+ *      DAT_801478f4 = sndgs + 0x94   (= sndgs[0x25], the SndChannel * pool base; salloc.c)
  * They are emitted as extra LABELS at their exact offsets rather than as `sym = sndgs+N`
  * assignments, because ASPSX 2.77 (the production assembler) has no symbol-assignment form
  * (catalog 15E) -- a second label is the only dual-legal spelling.  This also retires 3 of the
@@ -95,6 +95,7 @@ int SNDSYS_init(void *membase, int memsize)
 {
     unsigned int nchan;
     int          rv;
+    SndChannel  *pool;
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
 
     if (base->initialized)
@@ -107,9 +108,9 @@ int SNDSYS_init(void *membase, int memsize)
         SNDSYS_setopts((SNDSYSOPTS *)base);
         nchan = ((SNDSYSOPTS *)base)->set.inputvoices;
     }
-    base->play_records = (int)(unsigned int)iSNDmalloc(nchan * sizeof(SndChannel));   /* channel pool; int address field is a separate pending migration */
-    memset((unsigned char *)(unsigned int)base->play_records, 0,
-           ((SNDSYSOPTS *)base)->set.inputvoices * sizeof(SndChannel));
+    pool = iSNDmalloc(nchan * sizeof(SndChannel));
+    base->play_records = pool;                       /* allocated channel-array base */
+    memset(pool, 0, ((SNDSYSOPTS *)base)->set.inputvoices * sizeof(SndChannel));
     base->bank_table = iSNDmalloc(
         ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry)); /* bank table base */
     memset(base->bank_table, 0,

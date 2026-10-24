@@ -458,9 +458,9 @@ int iSNDstreamparsechunk(SndStream *S, unsigned char *chunk)
  *   has run low relative to the data rate -- prevents starving the player on a slow disc. */
 int iSNDstreamisheld(SndStream *S)
 {
-    int req = (int)(unsigned int)S->requests + (((int)(((volatile SndStream *)S)->parse_index) << 24) >> 24) * (int)sizeof(SndStreamReq);
+    SndStreamReq *req = S->requests + (signed char)((volatile SndStream *)S)->parse_index;
 
-    if (!((SndStreamReq *)req)->data_rate)                              /* data rate unknown -> not held */
+    if (!req->data_rate)                              /* data rate unknown -> not held */
         return 0;
     if (((volatile SndStreamReq *)req)->hold_threshold < 0)  /* held threshold negative -> held */
         return 1;
@@ -476,10 +476,10 @@ int iSNDstreamisheld(SndStream *S)
         /* MATCH (disasm-v4 trace, 9->0 diffs): keep the clear-threshold block physically before
          * the state check.  The true comparison branches forward to `check_state`; state==2 then
          * branches backward into the shared clear block, while state!=2 falls through with 1. */
-        if (avail * 1000 / ((SndStreamReq *)req)->data_rate < thresh)
+        if (avail * 1000 / req->data_rate < thresh)
             goto check_state;
 clear_threshold:
-        ((SndStreamReq *)req)->hold_threshold = 0;
+        req->hold_threshold = 0;
         return 0;
 check_state:
         if (STREAM_state(S->stream_handle) == 2)
@@ -511,12 +511,12 @@ void iSNDstreamhotroddatachunks(void)
                 goto next;
         } while (0);
         {
-            int req = (int)(unsigned int)S->requests + (((int)(((volatile SndStream *)S)->parse_index) << 24) >> 24) * (int)sizeof(SndStreamReq);
-            if (!((SndStreamReq *)req)->num_chunks)                          /* numChunks -- MATCH: split guards,
+            SndStreamReq *req = S->requests + (signed char)((volatile SndStream *)S)->parse_index;
+            if (!req->num_chunks)                          /* numChunks -- MATCH: split guards,
                         * not an `&&` (oracle branches per-condition straight to `next`, not via a
                         * combined boolean -- same &&-chain->goto lever as the rest of this fn). */
                 goto next;
-            if (!((SndStreamReq *)req)->submitted)                          /* submitted */
+            if (!req->submitted)                          /* submitted */
                 goto next;
             {
                 int avail = ((volatile SndStreamReq *)req)->num_chunks - ((volatile SndStreamReq *)req)->submitted; /* MATCH: volatile -- oracle RELOADS

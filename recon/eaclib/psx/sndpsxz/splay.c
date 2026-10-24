@@ -29,19 +29,20 @@ int SNDplay(struct SNDPLAYOPTS *info)
  * in-range test's branch inverted (7-diff residual) even though they're semantically identical. */
 int cSNDplay(struct SNDPLAYOPTS *info, int recurse)
 {
-    int patch, bank, pp;
+    int patch, pp;
+    struct SndBankDataHeaderPrefix *bank;
     (void)recurse;
     if (iSNDvalidbank((signed char)info->bhandle) < 0)
         return -8;
     patch = info->patnum;
-    bank = (int)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->bank_table[(signed char)info->bhandle].data_block;
+    bank = ((struct SndGlobalServerStateView *)sndgs)->bank_table[(signed char)info->bhandle].data_block;
     if (patch < 0)
         return -8;
-    if (!(patch < ((struct SndBankDataHeaderPrefix *)(unsigned int)bank)->patch_count))
+    if (!(patch < bank->patch_count))
         return -8;
-    if (((struct SndBankDataHeaderPrefix *)(unsigned int)bank)->type == 4)
-        pp = ((struct SndBankPatchTable20Prefix *)(unsigned int)bank)->first_relative_patch[patch];
+    if (bank->type == 4)
+        pp = ((struct SndBankPatchTable20Prefix *)bank)->first_relative_patch[patch];
     else
-        pp = ((struct SndBankPatchTable12Prefix *)(unsigned int)bank)->first_relative_patch[patch];
+        pp = ((struct SndBankPatchTable12Prefix *)bank)->first_relative_patch[patch];
     return iSNDplaytaggedpatch(pp, info);
 }

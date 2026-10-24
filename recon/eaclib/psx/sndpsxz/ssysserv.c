@@ -18,10 +18,9 @@
 short *iSNDserveraddclient(void (*cb)(void))
 {
     /* Keep the raw count as the scaled index; folding the 0x19-slot prefix into it adds an instruction. */
-    char *base = (char *)sndgs;
-    ((struct SndGlobalServerStateView *)base)->service_callbacks[
-        (signed char)((struct SndGlobalServerStateView *)base)->service_client_count.u] = cb;
-    ((struct SndGlobalServerStateView *)base)->service_client_count.u = ((struct SndGlobalServerStateView *)base)->service_client_count.u + 1;
+    struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
+    base->service_callbacks[(signed char)base->service_client_count.u] = cb;
+    base->service_client_count.u = base->service_client_count.u + 1;
     return (short *)sndgs;
 }
 

@@ -1009,8 +1009,8 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
          * guard load volatile keeps it out of the preceding block. */
         voice->initial_pitch.vs = *hdr * 0x17c7 >> 0x10;   /* DAT_80147a0a, vt */
         if (1 < ((volatile SndPacketVoiceState *)voice)->channel_count) {       /* arm the linked partner voice */
-            voice->link_index.vu =
-                ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[note].linked_tag_view.linked_channels[0];
+            SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+            voice->link_index.vu = pool[note].linked_tag_view.linked_channels[0];
             ((SndPacketVoiceState *)(base2 + 0xD8))[
                 voice->link_index.vs].link_flag = 1; /* DAT_80147a11 */
             ((SndPacketVoiceState *)(base2 + 0xD8))[

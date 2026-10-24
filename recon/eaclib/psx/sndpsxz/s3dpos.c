@@ -24,12 +24,14 @@ int iSNDplatform3dpos(int chan, int x, int y)
     slot->volume_angle = (short)x;
     if (slot->play_state != 2)
         return 0;
-    if (slot->route == 1)
-        iSNDatodlrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
-                    &outL, &outR, (signed char)slot->pan_left_cache, (signed char)slot->pan_right_cache);
-    else if (!slot->route)
-        iSNDatolrv(x, ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[chan].volume,
-                   &outL, &outR);
+    if (slot->route == 1) {
+        SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+        iSNDatodlrv(x, pool[chan].volume, &outL, &outR,
+                    (signed char)slot->pan_left_cache, (signed char)slot->pan_right_cache);
+    } else if (!slot->route) {
+        SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+        iSNDatolrv(x, pool[chan].volume, &outL, &outR);
+    }
     slot->pan_left_cache = (unsigned char)outL;
     slot->pan_right_cache = (unsigned char)outR;
     iSNDsetvol(chan, outL, outR);

@@ -10,6 +10,7 @@
 int SNDgetvol(unsigned int tag)
 {
     int ch;
+    SndChannel *pool;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     iSNDenteraudio();
@@ -19,5 +20,6 @@ int SNDgetvol(unsigned int tag)
         return -8;
     }
     iSNDleaveaudio();                               /* oracle: leaveaudio BEFORE reading the +0x2d vol */
-    return ((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[ch].volume; /* signed cached-volume load */
+    pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+    return pool[ch].volume;                         /* signed cached-volume load */
 }

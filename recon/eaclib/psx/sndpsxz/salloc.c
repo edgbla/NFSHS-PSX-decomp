@@ -60,7 +60,7 @@
  * branch-local `gv = (struct SndGlobalServerStateView *)(unsigned int)sndgs` assignments preserve
  * the separate base-address materialization needed by iSNDfreechan (110/110 exact). */
 signed char sndchanreserved[4] __attribute__((section(".bss"))) = { 0 };
-extern int  DAT_801478f4[];
+extern struct SndChannel *DAT_801478f4[];
 /* The primary declaration is an unsized array so `DAT_801478f4` decays naturally to the pointer
  * used by iSNDfreechan. This replaces the former second `__asm__` array view; `&DAT_801478f4`
  * (scalar-address form) was tested and changed the exact address/codegen shape (7 diffs). */
@@ -264,7 +264,8 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                     do {
                         one = 1;
                         if (priority & one << c) {
-                            ch = (SndChannel *)(unsigned int)(gs->play_records + off);
+                            /* `off` is a byte offset; cast the legacy pool-base value before adding it. */
+                            ch = (SndChannel *)(off + (unsigned char *)gs->play_records);
                             if (!ch->state &&
                                 !(iSNDischanreserved(c, reserved))) {
                                 v = ch->allocation_tick;
@@ -297,7 +298,8 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                     do {
                         if ((priority & (1 << c)) &&
                             !(iSNDischanreserved(c, reserved))) {
-                            ch = (SndChannel *)(unsigned int)(gs->play_records + off);
+                            /* `off` remains a byte displacement here, not a record index. */
+                            ch = (SndChannel *)(off + (unsigned char *)gs->play_records);
                             if (ch->age < 0x65) {
                                 /* MATCH: `age` is an int -- the oracle re-loads the byte with a
                                  * bare `lbu` and compares with no `andi ..,255` re-mask; a u_char
@@ -333,15 +335,15 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
         i = 0;
         for (; i < reserved; i++) {
                 unsigned int owner;
-                ch = (SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[i] * (int)sizeof(SndChannel));
+                ch = &(((struct SndGlobalServerStateView *)sndgs)->play_records)[(signed char)sndchanreserved[i]];
                 owner = ch->owner_tag;
                 if (ch->state == 1) {      /* currently held -> stop it */
                     if ((int)owner < 0)
-                        owner = ((SndChannel *)(unsigned int)(ch->linked_primary * (int)sizeof(SndChannel) + ((struct SndGlobalServerStateView *)sndgs)->play_records))->owner_tag;
+                        owner = (((struct SndGlobalServerStateView *)sndgs)->play_records)[ch->linked_primary].owner_tag;
                     SNDstop(owner);
                     if (SNDover(owner) != 1) {              /* refused -> roll back */
                         while (i = i - 1, -1 < i) {
-                            ch = (SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[i] * (int)sizeof(SndChannel));
+                            ch = &(((struct SndGlobalServerStateView *)sndgs)->play_records)[(signed char)sndchanreserved[i]];
                             ch->state = 0;
                         }
                         result = -9;
@@ -353,12 +355,12 @@ int iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *
                 ch->age = (char)a2;             /* voice flag byte */
             }
         /* link the secondary channels to the primary */
-        ((SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[0] * (int)sizeof(SndChannel)))->owner_tag = *out;
+        (((struct SndGlobalServerStateView *)sndgs)->play_records)[(signed char)sndchanreserved[0]].owner_tag = *out;
         for (i = 1; i < reserved; i++) {
-            ((SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)sndgs)->play_records + (signed char)sndchanreserved[0] * (int)sizeof(SndChannel)))->linked_tag_view.linked_channels[i - 1] =
+            (((struct SndGlobalServerStateView *)sndgs)->play_records)[(signed char)sndchanreserved[0]].linked_tag_view.linked_channels[i - 1] =
                 sndchanreserved[i];
-            ((SndChannel *)(unsigned int)((signed char)sndchanreserved[i] * (int)sizeof(SndChannel) + ((struct SndGlobalServerStateView *)sndgs)->play_records))->owner_tag = 0xffffffff;
-            ((SndChannel *)(unsigned int)((signed char)sndchanreserved[i] * (int)sizeof(SndChannel) + ((struct SndGlobalServerStateView *)sndgs)->play_records))->linked_primary =
+            (((struct SndGlobalServerStateView *)sndgs)->play_records)[(signed char)sndchanreserved[i]].owner_tag = 0xffffffff;
+            (((struct SndGlobalServerStateView *)sndgs)->play_records)[(signed char)sndchanreserved[i]].linked_primary =
                 (signed char)sndchanreserved[0];
         }
     }
@@ -485,9 +487,10 @@ done:
       superseded by per-arm `gv = (unsigned char *)sndgs` assignments -- pure C; the aliasless form is exact.]
    3. A fence on `partner` between its two users restored retail's SECOND `partner*100` scale
       chain that cse had merged away (9 -> 6).  [Since removed; the dp view alone keeps it.]
-   4. The primary declaration is now `extern int DAT_801478f4[]`; natural array decay
-      (`int *dp = DAT_801478f4;`) preserves the exact join-block address shape without a second
-      asm-label declaration. The `&scalar` alternative was tested separately and differs by 7 diffs.
+   4. At that stage the alias used `extern int DAT_801478f4[]`; natural array decay preserved the
+      exact join-block address shape without a second asm-label declaration. The 2026-10-24 consumer-graph
+      pass below upgrades the alias to `struct SndChannel *[]`, with its byte-address arithmetic kept
+      explicit at the one exact-sensitive lookup. The `&scalar` alternative had differed by 7 diffs.
    RESIDUAL 2 = ONE instruction's sched1 issue POSITION: retail interleaves `lw $v1,0x94($t1)`
    INTO the chan*100 scale chain (sll,addu,sll,addu | lw | sll | addu) while ours issues it first.
    Byte-identical instruction, different slot -- and the IDENTICAL shape 60 insns earlier (block 1,
@@ -511,13 +514,13 @@ void iSNDfreechan(int chan)
      * store-by-store member spelling (including the tail arm) is exact: 110 instructions.
      * SEMANTIC TYPE PASS (2026-10-24): `base`/`gs`/`gv` are state-view pointers; `pool`/`poolv`,
      * `slot`, `scan`, and `partnerSlot` are SndChannel pointers. `partnerOffset` remains an int
-     * byte displacement. Since play_records and its DAT alias are still int-shaped in the overlays,
-     * pointer casts stay at that field boundary; the two direct partner-store sums retain the exact
-     * scalar sum spelling (the equivalent byte-pointer add reverses addu operands). */
+     * byte displacement. Both overlay `play_records` fields and the DAT alias now have SndChannel *
+     * storage types. The two stores still materialize the exact 32-bit byte-address sum via a localized
+     * pointer-to-unsigned conversion; native byte-pointer addition reverses the oracle's addu operands. */
     unsigned int group;
     int count = 0;
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)(unsigned int)sndgs;
-    SndChannel *pool = (SndChannel *)(unsigned int)base->play_records;
+    SndChannel *pool = base->play_records;
     int partner = -1;
     /* SEMANTIC TYPE PASS (2026-10-24): the earlier exact form reused one int `slot` for
      * both a channel-record address and the scan index. Keep those roles separate: `slot`
@@ -592,8 +595,8 @@ void iSNDfreechan(int chan)
                 chan != partner && count == 2) {
                 slot->state = 0;
                 slot->allocation_tick = gs->tick_count;
-                ((SndChannel *)(unsigned int)(partnerOffset + gs->play_records))->state = 0;
-                ((SndChannel *)(unsigned int)(partnerOffset + gs->play_records))->allocation_tick = gs->tick_count;
+                ((SndChannel *)(unsigned int)(partnerOffset + (unsigned int)gs->play_records))->state = 0;
+                ((SndChannel *)(unsigned int)(partnerOffset + (unsigned int)gs->play_records))->allocation_tick = gs->tick_count;
                 return;
             }
 
@@ -609,10 +612,12 @@ void iSNDfreechan(int chan)
                  * re-fold sndgs+0x44 into one %lo pair, and reorg produces exactly retail's split la.
                  * Falsified: single assignment in the tail (folds), `X | (X & 3)` absorption on gv
                  * (combine folds, 5 diffs), single assignment before the test (la hoisted into t0, 8). */
-                int *dp = DAT_801478f4;
+                SndChannel **dp = DAT_801478f4;
                 SndChannel *partnerSlot;
                 struct SndGlobalServerStateView *gv;
-                partnerSlot = (SndChannel *)(unsigned int)(partner * (int)sizeof(SndChannel) + *dp);
+                /* Keep `partner * 100` as a scalar byte offset; convert the pointer base only for
+                 * this machine-address sum so the oracle's addu operand order is retained. */
+                partnerSlot = (SndChannel *)(unsigned int)(partner * (int)sizeof(SndChannel) + (int)(unsigned int)*dp);
                 if (partnerSlot->state == 1) {
                     gv = (struct SndGlobalServerStateView *)(unsigned int)sndgs;
                     if (chan == partner) {
@@ -645,7 +650,8 @@ int iSNDgetchan(unsigned int tag)
     if (ch >= base->channel_count)
         return -8;
     {
-        SndChannel *slot = (SndChannel *)(unsigned int)(base->play_records + ch * (int)sizeof(SndChannel));
+        SndChannel *pool = base->play_records;
+        SndChannel *slot = pool + ch;
         if (!slot->state || slot->owner_tag != tag)
             ch = 0xfffffff8;
         return ch;

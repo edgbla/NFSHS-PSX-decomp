@@ -21,7 +21,8 @@ int iSNDunsafebend(unsigned int tag, unsigned int chan)
     if (chanIdx > -1) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, (int)cur)) {
-            SndChannel *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[cur[0]];
+            SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+            SndChannel *v = &pool[cur[0]];
             if (v->bend == (int)chan)   /* signed +0x2f detune read (lb) */
                 return 0;
             if (!v->envelope_detune_depth)

@@ -59,7 +59,8 @@ int iSNDdetunetolinear(int detune)
  *   +0x62. */
 int iSNDcalcpitch(int note)
 {
-    SndChannel  *v = &((SndChannel *)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->play_records)[note];
+    SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+    SndChannel *v = &pool[note];
     int          pitch;
     int          c;                               /* envelope byte; the per-load (signed char) casts emit `lb`
                                                    * (sign-extend once), and `int c` avoids re-extending on use */
