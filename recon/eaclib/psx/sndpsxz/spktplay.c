@@ -28,15 +28,12 @@
  */
 
                 /* @0x80148574 -- one-slot player pointer array */
-/* W65-A6 DATA-MAT: `sndpps` was extern-only tree-wide (22 reloc-referenced undefined sites);
- * spktplay.obj is its sole referencer.  Retail: .bss @0x80148574, size 4 (= sndpp @0x80148578
- * - 0x80148574); VA > t_addr+t_size (0x8013E000) => pure zero-init BSS.
- * DEVICE = file-scope asm .bss definition.  A C tentative definition is WRONG here twice over:
- * 4 <= the TU's -G4, so (a) maspsx routes the `.comm` to `.section .sbss` with NO `.globl`
- * (LOCAL symbol -- fixes nothing at link) and (b) cc1 would switch this TU to gp-relative
- * addressing, while the oracle has ZERO `%gp_rel(sndpps)` sites (grep asm/nonmatchings) i.e.
- * retail addressed it absolutely.  Keeping the C view `extern` is byte-neutral by
- * construction; 13/13 PASS unchanged.  Receipts: scratchpad/w65a6/RECEIPTS.md */
+/* W65-A6 DATA-MAT: `sndpps` is the one-slot player pointer table at .bss @0x80148574, size 4
+ * (next symbol sndpp @0x80148578).  Keep its explicit C definition in `.bss` rather than a
+ * tentative definition: with -G4, a `.comm` would be routed to `.sbss` and/or gp-relative, while
+ * retail has no `%gp_rel(sndpps)` references.  The representation is now PacketPlayerHeader *[1];
+ * this preserves the 4-byte slot and absolute addressing.  The table has one owner/consumer TU.
+ * Receipts: scratchpad/w65a6/RECEIPTS.md */
 #include "salloc.h"
 #include "sclcptch.h"
 #include "sdpacket.h"
@@ -56,7 +53,8 @@
 #include "sserver.h"
 #include "../../../shared/SNDPLAYOPTS.h"
 
-int sndpps[1] __attribute__((section(".bss"))) = { 0 };
+struct PacketPlayerHeader;
+struct PacketPlayerHeader *sndpps[1] __attribute__((section(".bss"))) = { 0 };
                   /* (signed char)sndgs[0xf]=init, sndgs[0x25]=channel pool base */
 /* HEADER WISH: the oracle actually loads this global from D_80147900 (SNDPKTPLAY_start @0x80102C34,
  * iSNDplaytaggedtimbre @0x801020D8 -- same "rate * ch-field * ch-field, magic-const mult, dur"
@@ -77,7 +75,7 @@ int sndpps[1] __attribute__((section(".bss"))) = { 0 };
 typedef struct PacketFrame {
     int sequence;
     int size;
-    int channel[4];
+    unsigned char *channel[4];
 } PacketFrame;
 typedef char PacketFrame_size_check[(sizeof(PacketFrame) == 0x18) ? 1 : -1];
 
@@ -87,11 +85,11 @@ typedef char PacketFrame_size_check[(sizeof(PacketFrame) == 0x18) ? 1 : -1];
 typedef struct PacketFramePrefix {
     int sequence;
     int size;
-    int channel[2];
+    unsigned char *channel[2];
 } PacketFramePrefix;
 
 typedef struct PacketFrameTail {
-    int channel[2];
+    unsigned char *channel[2];
 } PacketFrameTail;
 
 /* Fixed 0x28-byte player header. The variable-length PacketFrame ring starts
@@ -106,7 +104,7 @@ typedef struct PacketPlayerHeader {
     int pending_bytes;                    /* +0x10 */
     int consumed_bytes;                   /* +0x14 */
     void *mem_base;                       /* +0x18 */
-    void (*release_cb)(int);              /* +0x1C */
+    void (*release_cb)(unsigned char *);    /* +0x1C */
     void (*notify_cb)(int, unsigned int);  /* +0x20 */
     SNDSAMPLEFORMAT rate;                 /* +0x24..+0x27 */
 } PacketPlayerHeader;
@@ -143,11 +141,12 @@ int SNDPKTPLAY_overhead(int n)
  *       both offset and ring-size, overhead()'s results discarded" reconstruction was a genuine bug.
  *   (3) `mem` is DEAD after the offset add (lever #14 in-place mutate): reassigned in place to become
  *       `ppp` and used directly for every subsequent field store; the pre-offset value is saved to
- *       `savedmem` (oracle's `$s0`) before the reassignment for the +0x18 store. */
-int SNDPKTPLAY_create(void *mem, int memsize, void (*relcb)(int),
+ *       `savedmem` as `void *` (oracle's `$s0`) before the reassignment for the +0x18 `mem_base` store. */
+int SNDPKTPLAY_create(void *mem, int memsize, void (*relcb)(unsigned char *),
                       void (*notifycb)(int, unsigned int))
 {
-    int slot, off, savedmem;
+    int slot, off;
+    void *savedmem;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     for (slot = 0; slot < 1; slot++) {
@@ -161,11 +160,11 @@ found:
         do { } while (0);
         return -6;
     }
-    savedmem = (int)(unsigned int)mem;
+    savedmem = mem;
     mem = (unsigned char *)mem + iSNDplatformpacketoverhead();
     memsize = memsize - iSNDplatformpacketoverhead();
-    sndpps[slot] = (int)(unsigned int)mem;
-    ((PacketPlayerHeader *)mem)->mem_base = (void *)(unsigned int)savedmem; /* puVar4[6] */
+    sndpps[slot] = mem;
+    ((PacketPlayerHeader *)mem)->mem_base = savedmem; /* original player-allocation base */
     ((PacketPlayerHeader *)mem)->release_cb = relcb;    /* puVar4[7] */
     ((PacketPlayerHeader *)mem)->notify_cb = notifycb;  /* puVar4[8] */
     ((volatile PacketPlayerHeader *)mem)->ring_size =
@@ -189,7 +188,8 @@ found:
 int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hdr,
                      struct SNDPLAYOPTS *params)
 {
-    int ppp, note, allocOut, dur, r;
+    PacketPlayerHeader *ppp;
+    int note, allocOut, dur, r;
     SndChannel *ch;
     int rateb2;
     int gsp;                                      /* &sndgs, held in a callee-saved reg across
@@ -237,18 +237,18 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
      * and sinks `sw allocOut,0(ppp)` to the bottom; the oracle keeps the written order and leaves
      * that delay slot unfilled.  Making ONLY the first or only the two end stores volatile is not
      * enough (132 / 119) -- the run has to be ordered as a whole. */
-    ((volatile PacketPlayerHeader *)(unsigned int)ppp)->voice_id = allocOut;
-    ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index = 0;
-    ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames = 0;
-    ((volatile PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes = 0;
-    ((volatile PacketPlayerHeader *)(unsigned int)ppp)->submit_sequence = 0;
-    ((volatile PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes = 0;
-    ((volatile PacketPlayerHeader *)(unsigned int)ppp)->last_channel = (short)0xffff;
+    ((volatile PacketPlayerHeader *)ppp)->voice_id = allocOut;
+    ((volatile PacketPlayerHeader *)ppp)->read_index = 0;
+    ((volatile PacketPlayerHeader *)ppp)->outstanding_frames = 0;
+    ((volatile PacketPlayerHeader *)ppp)->pending_bytes = 0;
+    ((volatile PacketPlayerHeader *)ppp)->submit_sequence = 0;
+    ((volatile PacketPlayerHeader *)ppp)->consumed_bytes = 0;
+    ((volatile PacketPlayerHeader *)ppp)->last_channel = (short)0xffff;
     dur = note * sizeof(SndChannel);         /* MATCH: the note*stride chain must ISSUE
                                                    * BEFORE the lwl/lwr pair (retail); once the
                                                    * note fences below lengthen note's range,
                                                    * sched1 no longer hoists it on its own. */
-    ((PacketPlayerHeader *)(unsigned int)ppp)->rate = *rate; /* unaligned rate-word copy */
+    ppp->rate = *rate; /* unaligned rate-word copy */
     ch = (SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)(unsigned int)gsp)->play_records + dur);       /* MATCH: AFTER the unaligned copy -- the oracle's
                                                     * `lw v1,0x94(s3)` sits between the swl/swr pair
                                                     * and the params[0xb] test, with the pool-base
@@ -338,7 +338,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
         return r;
     }
     iSNDleaveaudio();
-    return ((PacketPlayerHeader *)(unsigned int)ppp)->voice_id;
+    return ppp->voice_id;
 }
 /* Exact match (187 instructions). Player header, sample format, patch attributes, play options and channel
  * descriptor use PacketPlayerHeader, SNDSAMPLEFORMAT, SndPatchAttributes, SNDPLAYOPTS and SndChannel members. */
@@ -382,12 +382,13 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
  * without the colour.  Do not re-run the order sweep. */
 int SNDPKTPLAY_submit(int p, void *frame)
 {
-    int ppp, slot;
+    PacketPlayerHeader *ppp;
+    unsigned char *slot;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     ppp = sndpps[p];
     iSNDenteraudio();
-    if ((((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames) << 16) >> 16) < (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16) >> 16) - 1)                    /* MATCH: positive (room-available) test
+    if ((((int)(((volatile PacketPlayerHeader *)ppp)->outstanding_frames) << 16) >> 16) < (((int)(((volatile PacketPlayerHeader *)ppp)->ring_size) << 16) >> 16) - 1)                    /* MATCH: positive (room-available) test
                                                              * branches AWAY to `room`; the FALLTHROUGH
                                                              * is the error path with its own explicit
                                                              * jump to `leave` -- oracle's exact
@@ -403,46 +404,47 @@ int SNDPKTPLAY_submit(int p, void *frame)
     goto leave;
 room:
     {
-        int idx = (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) >> 16) + (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames) << 16) >> 16);            /* (read + count) wrapped */
-        if ((((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16) >> 16) <= idx)
-            idx -= (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16) >> 16);
+        int idx = (((int)(((volatile PacketPlayerHeader *)ppp)->read_index) << 16) >> 16) + (((int)(((volatile PacketPlayerHeader *)ppp)->outstanding_frames) << 16) >> 16);            /* (read + count) wrapped */
+        if ((((int)(((volatile PacketPlayerHeader *)ppp)->ring_size) << 16) >> 16) <= idx)
+            idx -= (((int)(((volatile PacketPlayerHeader *)ppp)->ring_size) << 16) >> 16);
         {
             int off = idx * sizeof(PacketFrame) + sizeof(PacketPlayerHeader);
-            slot = ppp + off;
+            slot = (unsigned char *)ppp + off;
         }
-        ((PacketFrame *)(unsigned int)slot)->size = ((SndPacketSubmitFrameView *)frame)->fields.data_size;                /* size */
-        ((PacketFrame *)(unsigned int)slot)->sequence = ((PacketPlayerHeader *)(unsigned int)ppp)->submit_sequence;                         /* sequence */
-        if (((PacketPlayerHeader *)(unsigned int)ppp)->rate.channels) {                         /* copy the per-channel pointers */
-            int j, src;
+        ((PacketFrame *)slot)->size = ((SndPacketSubmitFrameView *)frame)->fields.data_size;                /* size */
+        ((PacketFrame *)slot)->sequence = ppp->submit_sequence;                         /* sequence */
+        if (ppp->rate.channels) {                         /* copy the per-channel pointers */
+            int j;
+            unsigned char *src;
             do { j = 0; } while (0);              /* MATCH: zero-insn REF INFLATOR on j (see
                                                      * the header receipt) -- j must be born
                                                      * FIRST for reorg's delay-slot steal AND
                                                      * still out-rank src in allocno_compare. */
-            src = (int)(unsigned int)frame;
+            src = (unsigned char *)frame;
             do {                                          /* MATCH: walks `slot` itself in place
                                                              * (lever #14) -- `frame` stays intact
                                                              * (re-read below), `slot`/a0 is dead
                                                              * after the loop. */
-                ((PacketFrame *)(unsigned int)slot)->channel[0] = *(int *)(src + 0xc);
+                ((PacketFrame *)slot)->channel[0] = *(unsigned char **)(src + 0xc);
                 src += 4;
                 j++;
                 slot += 4;
-            } while (j < ((PacketPlayerHeader *)(unsigned int)ppp)->rate.channels);
+            } while (j < ppp->rate.channels);
         }
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames + 1;                /* count++ (plain lhu, no shift) */
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes = ((PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes + ((SndPacketSubmitFrameView *)frame)->fields.data_size;  /* bytes pending += size */
-        frame = (void *)(unsigned int)((volatile PacketPlayerHeader *)(unsigned int)ppp)->submit_sequence;               /* MATCH: reuse `frame` (dead after the
+        ((volatile PacketPlayerHeader *)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)ppp)->outstanding_frames + 1;                /* count++ (plain lhu, no shift) */
+        ((volatile PacketPlayerHeader *)ppp)->pending_bytes = ppp->pending_bytes + ((SndPacketSubmitFrameView *)frame)->fields.data_size;  /* bytes pending += size */
+        frame = (void *)(unsigned int)((volatile PacketPlayerHeader *)ppp)->submit_sequence;               /* MATCH: reuse `frame` (dead after the
                                                              * loop) as `seq` -- oracle's `lw s1,4(s0)`
                                                              * right here, same register as the param. */
-        ((PacketPlayerHeader *)(unsigned int)ppp)->submit_sequence = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->submit_sequence + 1;      /* sequence++ */
+        ppp->submit_sequence = ((volatile PacketPlayerHeader *)ppp)->submit_sequence + 1;      /* sequence++ */
     }
 leave:
     iSNDleaveaudio();
     return (int)(unsigned int)frame;
 }
 /* Exact match (93 instructions). Preserve `frame` as the reused result carrier, the explicit goto
- * branch polarity, and the block-local channel-copy induction variables. Header counters/bytes now use
- * PacketPlayerHeader members; the variable ring-slot address remains explicit integer arithmetic. */
+ * branch polarity, and the block-local channel-copy induction variables. The header table and local
+ * player base are now PacketPlayerHeader pointers; `slot` is a byte pointer into the variable ring. */
 
 /* SNDPKTPLAY_submitspace @0x80102E70 : free frame slots in the ring. */
 int SNDPKTPLAY_submitspace(int p)
@@ -450,21 +452,21 @@ int SNDPKTPLAY_submitspace(int p)
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     {
-        PacketPlayerHeader *base = (PacketPlayerHeader *)(unsigned int)sndpps[p];
+        PacketPlayerHeader *base = sndpps[p];
         /* MATCH: volatile forces the oracle's lhu+sll16+sra16 shape -- a plain `(short)` load
          * collapses to a single `lh` (still correct, but byte-mismatched). */
         int a = ((int)(((volatile PacketPlayerHeader *)base)->ring_size) << 16) >> 16;
         int b = ((int)(((volatile PacketPlayerHeader *)base)->outstanding_frames) << 16) >> 16;
         return a - b - 1;
-        /* The one-slot table entry is cast to the private header only after loading its 32-bit base;
-         * volatile member reads retain the oracle's lhu+sll16+sra16 sign-extension sequence. */
+        /* The one-slot table already has type PacketPlayerHeader *; volatile member reads retain
+         * the oracle's lhu+sll16+sra16 sign-extension sequence. */
     }
 }
 
 /* SNDPKTPLAY_unsafeframesoutstanding @0x80102EC4 : bytes still to be played (no critical section). */
 int SNDPKTPLAY_unsafeframesoutstanding(int p)
 {
-    PacketPlayerHeader *ppp = (PacketPlayerHeader *)(unsigned int)sndpps[p];
+    PacketPlayerHeader *ppp = sndpps[p];
     return ppp->pending_bytes + ppp->consumed_bytes;
 }
 
@@ -504,7 +506,9 @@ int SNDPKTPLAY_framesoutstanding(int p)
  *   and KEEP is the oracle's explicit two-`bnez`-to-the-same-label branch target. */
 int SNDPKTPLAY_purge(int p, int lo, int hi)
 {
-    int   ppp, i, wrptr, wr, rd, total, rdoff;
+    PacketPlayerHeader *ppp;
+    int i, wr, rd, total, rdoff;
+    unsigned char *wrptr;
 
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
@@ -517,28 +521,33 @@ int SNDPKTPLAY_purge(int p, int lo, int hi)
                                                       * s0..s7/fp permutation (9 live-across-a-call
                                                       * locals -> every callee-saved reg is used). */
     iSNDenteraudio();
-    wr    = (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) >> 16);                          /* write (compaction) index -- READ FIRST: the
+    wr    = (((int)(((volatile PacketPlayerHeader *)ppp)->read_index) << 16) >> 16);                          /* write (compaction) index -- READ FIRST: the
                                                       * earlier def gives `wr` the LONGER live range
                                                       * (55 vs rd's 51), which drops its allocno
                                                       * priority below `rd`'s.  Retail's weaker CSE
                                                       * keeps BOTH identical lhu's; their ASSIGNMENT
                                                       * ORDER is the live-length lever. */
-    rd    = (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) >> 16);                          /* read index (2nd identical volatile read) */
-    total = (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames) << 16) >> 16);                          /* frames to scan            */
+    rd    = (((int)(((volatile PacketPlayerHeader *)ppp)->read_index) << 16) >> 16);                          /* read index (2nd identical volatile read) */
+    total = (((int)(((volatile PacketPlayerHeader *)ppp)->outstanding_frames) << 16) >> 16);                          /* frames to scan            */
     if (total > 0) {
         rdoff = rd * sizeof(PacketFrame) + sizeof(PacketPlayerHeader);
-        wrptr = wr * sizeof(PacketFrame) + ppp;
+        /* Keep `wrptr` a byte pointer.  The unsigned 32-bit base+offset intermediate preserves the
+         * oracle's operand order; direct typed-pointer addition differed only by swapping the two
+         * commutative `addu` operands (2 exact-ASM diffs). */
+        wrptr = (unsigned char *)(wr * sizeof(PacketFrame) + (unsigned int)ppp);
         /* GOTO loop (W31, same finding as sbdload): a natural do/while gets loop notes and gcc
          * strength-reduces the 0x28..0x3C store addresses onto a REBASED anchor (wrptr+0x3C-held
          * base, negative displacements); the oracle keeps the raw wrptr/rdoff IVs and recomputes
          * src = ppp+rdoff each iteration.  No loop notes -> no SR -> source IVs survive. */
 purge_next: {
-            int *fr = (int *)(ppp + rdoff);
-            if (lo <= fr[0] && fr[0] <= hi) {      /* remove (branch-away, oracle fallthrough) */
-                ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames - 1;  /* plain lhu, no shift (no compare) */
-                ((volatile PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes = ((PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes - fr[1];
-                if (((PacketPlayerHeader *)(unsigned int)ppp)->release_cb)
-                    ((PacketPlayerHeader *)(unsigned int)ppp)->release_cb(fr[2]);
+            /* rdoff is a byte offset from the player header base; materialize the typed frame pointer
+             * only after forming that machine-address sum. */
+            PacketFrame *fr = (PacketFrame *)((unsigned int)ppp + rdoff);
+            if (lo <= fr->sequence && fr->sequence <= hi) {      /* remove (branch-away, oracle fallthrough) */
+                ((volatile PacketPlayerHeader *)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)ppp)->outstanding_frames - 1;  /* plain lhu, no shift (no compare) */
+                ((volatile PacketPlayerHeader *)ppp)->pending_bytes = ppp->pending_bytes - fr->size;
+                if (ppp->release_cb)
+                    ppp->release_cb(fr->channel[0]);
             } else {                               /* keep -> move down (oracle branch target) */
                 /* The 0x18-byte ring copy, written as the TWO movstrsi batches gcc would emit for a
                  * single 24-byte struct assignment anyway (load-4/store-4 then load-2/store-2 in
@@ -547,17 +556,17 @@ purge_next: {
                  * wrptr's allocno priority (12/40 = .300) above rd's (14/51 = .2745) and pins it to
                  * the oracle's $s1.  Do NOT re-merge into one assignment (reverts to 32 diffs). */
                 *(PacketFramePrefix *)(wrptr + sizeof(PacketPlayerHeader)) = *(PacketFramePrefix *)fr;
-                *(PacketFrameTail *)(wrptr + sizeof(PacketPlayerHeader) + sizeof(PacketFramePrefix)) = *(PacketFrameTail *)(fr + 4);
+                *(PacketFrameTail *)(wrptr + sizeof(PacketPlayerHeader) + sizeof(PacketFramePrefix)) = *(PacketFrameTail *)((unsigned char *)fr + sizeof(PacketFramePrefix));
                 wrptr += sizeof(PacketFrame);
                 wr++;
-                if ((((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16) >> 16) <= wr) {
-                    wrptr = ppp;
+                if ((((int)(((volatile PacketPlayerHeader *)ppp)->ring_size) << 16) >> 16) <= wr) {
+wrptr = (unsigned char *)ppp;
                     wr = 0;
                 }
             }
             rdoff += sizeof(PacketFrame);
             rd++;
-            if ((((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16) >> 16) <= rd) {
+            if ((((int)(((volatile PacketPlayerHeader *)ppp)->ring_size) << 16) >> 16) <= rd) {
                 rdoff = sizeof(PacketPlayerHeader);
                 rd = 0;
             }
@@ -580,13 +589,13 @@ int SNDPKTPLAY_stop(int p)
     PacketPlayerHeader *ppp;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
-    ppp = (PacketPlayerHeader *)(unsigned int)sndpps[p];
+    ppp = sndpps[p];
     iSNDenteraudio();
     SNDstop(ppp->voice_id);
     SNDPKTPLAY_purge(p, 0, 0x7fffffff);
     if (ppp->release_cb &&
         -1 < (int)((unsigned)(unsigned short)((volatile PacketPlayerHeader *)ppp)->last_channel << 0x10)) {
-        ppp->release_cb(((PacketFrame *)(unsigned int)((int)(unsigned int)ppp +
+        ppp->release_cb(((PacketFrame *)((unsigned char *)ppp +
                            ((volatile PacketPlayerHeader *)ppp)->last_channel * sizeof(PacketFrame) +
                            sizeof(PacketPlayerHeader)))->channel[0]);
     }
@@ -608,46 +617,46 @@ int SNDPKTPLAY_destroy(int p)
 /* iSNDpacketget @0x80103248 : platform pull -- hand out the next sample pointer for channel `idx` of the
  *   head frame, advancing the ring (and firing the release callback) once the last channel is taken.
  *   Writes the frame size to *out.  Returns the channel's sample pointer (0 if none). */
-int iSNDpacketget(int p, int idx, int *out)
+unsigned char *iSNDpacketget(int p, int idx, int *out)
 {
-    int   ppp = sndpps[p];
+    PacketPlayerHeader *ppp = sndpps[p];
     short m;
     PacketFrame *fr;
 
-    if (idx + 1 == ((PacketPlayerHeader *)(unsigned int)ppp)->rate.channels &&
-        -1 < (int)((unsigned)((unsigned short)((volatile PacketPlayerHeader *)(unsigned int)ppp)->last_channel) << 0x10)) {
-        m = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->last_channel;
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->last_channel = (short)0xffff;
+    if (idx + 1 == ppp->rate.channels &&
+        -1 < (int)((unsigned)((unsigned short)((volatile PacketPlayerHeader *)ppp)->last_channel) << 0x10)) {
+        m = ((volatile PacketPlayerHeader *)ppp)->last_channel;
+        ((volatile PacketPlayerHeader *)ppp)->last_channel = (short)0xffff;
         {
-            void (*cb)(int);
+            void (*cb)(unsigned char *);
             /* MATCH: compute the completed PacketFrame address before fetching the callback
              * pointer.  The oracle schedules the +0x1c load late, after the independent index
              * arithmetic, and forms the final entry base in the branch delay slot. */
-            fr = ((PacketFrame *)(ppp + sizeof(PacketPlayerHeader))) + m;
-            cb = ((PacketPlayerHeader *)(unsigned int)ppp)->release_cb;
+            fr = (PacketFrame *)((unsigned char *)ppp + sizeof(PacketPlayerHeader)) + m;
+            cb = ppp->release_cb;
             if (cb)
                 cb(fr->channel[0]);
         }
     }
-    if (!((PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames)                           /* MATCH: direct `return 0` (oracle's v0=0
+    if (!ppp->outstanding_frames)                           /* MATCH: direct `return 0` (oracle's v0=0
                                                         * lands in the beqz's delay slot -- the
                                                         * epilogue label IS the return), not a
                                                         * fall-through `fr=0`. */
         return 0;
-    fr = ((PacketFrame *)(ppp + sizeof(PacketPlayerHeader))) + (((int)(((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) >> 16);
+    fr = (PacketFrame *)((unsigned char *)ppp + sizeof(PacketPlayerHeader)) + (((int)(((volatile PacketPlayerHeader *)ppp)->read_index) << 16) >> 16);
     *out = fr->size;
-    if (idx + 1 == ((PacketPlayerHeader *)(unsigned int)ppp)->rate.channels) {
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->last_channel = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index;              /* MATCH: volatile -- two 0xa reads separated
+    if (idx + 1 == ppp->rate.channels) {
+        ((volatile PacketPlayerHeader *)ppp)->last_channel = ((volatile PacketPlayerHeader *)ppp)->read_index;              /* MATCH: volatile -- two 0xa reads separated
                                                         * by the 0xe store must NOT be hoisted/CSE'd
                                                         * together (oracle keeps them apart). */
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->outstanding_frames - 1;          /* MATCH: volatile -- forces this store to act
+        ((volatile PacketPlayerHeader *)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)ppp)->outstanding_frames - 1;          /* MATCH: volatile -- forces this store to act
                                                         * as an ordering barrier so the SECOND 0xa
                                                         * read (below) doesn't float ahead of it. */
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index = ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index + 1;
-        ((PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes = ((PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes + fr->size;
-        ((volatile PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes = ((PacketPlayerHeader *)(unsigned int)ppp)->pending_bytes - fr->size;
-        if (!(((int)((unsigned)((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index) << 16) < ((int)((unsigned)((volatile PacketPlayerHeader *)(unsigned int)ppp)->ring_size) << 16)))
-            ((volatile PacketPlayerHeader *)(unsigned int)ppp)->read_index = 0;
+        ((volatile PacketPlayerHeader *)ppp)->read_index = ((volatile PacketPlayerHeader *)ppp)->read_index + 1;
+        ppp->consumed_bytes = ppp->consumed_bytes + fr->size;
+        ((volatile PacketPlayerHeader *)ppp)->pending_bytes = ppp->pending_bytes - fr->size;
+        if (!(((int)((unsigned)((volatile PacketPlayerHeader *)ppp)->read_index) << 16) < ((int)((unsigned)((volatile PacketPlayerHeader *)ppp)->ring_size) << 16)))
+            ((volatile PacketPlayerHeader *)ppp)->read_index = 0;
     }
     return fr->channel[idx];
 }
@@ -661,15 +670,15 @@ int iSNDpacketget(int p, int idx, int *out)
  *   credit `bytes` back and call the notify callback. */
 void iSNDpacketfreeframes(int p, int idx, int bytes)
 {
-    int          ppp = sndpps[p];
-    unsigned int v = ((PacketPlayerHeader *)(unsigned int)ppp)->rate.channels;
+    PacketPlayerHeader *ppp = sndpps[p];
+    unsigned int v = ppp->rate.channels;
     do {
         if (idx + 1 == v) {
-            v = ((PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes - bytes;
-            ((volatile PacketPlayerHeader *)(unsigned int)ppp)->consumed_bytes = (int)v;   /* Volatile preserves the async-touched field store and its
+            v = ppp->consumed_bytes - bytes;
+            ((volatile PacketPlayerHeader *)ppp)->consumed_bytes = (int)v;   /* Volatile preserves the async-touched field store and its
                                                                                              * position before the callback guard. */
-            if (((PacketPlayerHeader *)(unsigned int)ppp)->notify_cb)
-                ((PacketPlayerHeader *)(unsigned int)ppp)->notify_cb(p, bytes);
+            if (ppp->notify_cb)
+                ppp->notify_cb(p, bytes);
             /* The typed notify callback receives the original player index and consumed byte count. */
         }
         return;

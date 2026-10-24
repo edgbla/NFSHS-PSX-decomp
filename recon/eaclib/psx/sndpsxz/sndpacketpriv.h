@@ -26,7 +26,7 @@ typedef union SndPacketSubmitFrameView {
         int word_00;
         int data_size;       /* +0x04 */
         int word_08;
-        int channel_data[5]; /* +0x0C; variable-length channel pointer list */
+        unsigned char *channel_data[5]; /* +0x0C; variable-length sample-pointer list */
     } fields;
 } SndPacketSubmitFrameView;
 typedef char SndPacketSubmitFrameView_size_check[(sizeof(SndPacketSubmitFrameView) == 0x20) ? 1 : -1];
@@ -75,9 +75,9 @@ struct SndPacketPlayerContextPrefix {
     int serve_position;               /* +0x18 */
     int last_new_position;            /* +0x1C */
     int dma_handle;                   /* +0x20 */
-    int channel_frame_data0;          /* +0x24 */
+    unsigned char *channel_frame_data0; /* +0x24: next sample-byte address */
     int channel_frame_data1;          /* +0x28 */
-    int frame_size_table;             /* +0x2C */
+    unsigned short *frame_size_table; /* +0x2C: per-chunk 16-bit frame-byte counters */
     SndPacketContextHalfword channel_frame_stride;   /* +0x30 */
     SndPacketContextHalfword source_frame_offset;    /* +0x32 */
     SndPacketContextHalfword source_frame_remaining; /* +0x34 */
@@ -91,8 +91,8 @@ struct SndPacketPlayerContextPrefix {
     unsigned char block_shift;        /* +0x43 */
     SndPacketContextHalfword block_bytes;             /* +0x44 */
     SndPacketContextHalfword frames_per_block;        /* +0x46 */
-    int channel_buffer0;              /* +0x48 */
-    int channel_buffer1;              /* +0x4C */
+    unsigned char *channel_buffer0;   /* +0x48: channel RAM buffer */
+    unsigned char *channel_buffer1;   /* +0x4C: second channel RAM buffer */
 };
 typedef struct SndPacketPlayerContextPrefix SndPacketPlayerContextPrefix;
 typedef char SndPacketPlayerContextPrefix_size_check[(sizeof(struct SndPacketPlayerContextPrefix) == 0x50) ? 1 : -1];

@@ -1,12 +1,12 @@
 /* eaclib/psx/sndpsxz/sdma.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.  *** 6/6 PASS ***
  *   Source obj : nfs4\eaclib\psx\sdma.obj ; archive C:\nfs4\EACLIB\PSX\SNDPSXZ.LIB (xlsx col11)
- *   6 fns @[0x8010A880 .. 0x8010AE6C].  RAM->SPU DMA queue -- up to 10 pending transfers serviced by
+ *   6 fns @[0x8010A880 .. 0x8010AE6C]. RAM->SPU DMA queue -- up to 10 pending transfers serviced by
  *   priority, driven from the SPU IRQ / per-tick service.  Ghidra nfs4-f.exe.c (sdma) + disasm-v3 for the
- *   args Ghidra dropped: iSNDdmqueue is 5-ARG (dst_spu,src_ram,len,prio,flag) and iSNDdmqueuesplit forwards
- *   (dst,src,chunk,prio,0) advancing both dst+src per 4 KB chunk (Ghidra showed only the 1-arg call).
+ *   args Ghidra dropped: iSNDdmqueue is 5-ARG (ram_source,spu_address,len,prio,flag) and iSNDdmqueuesplit forwards
+ *   (ram_source,spu_address,chunk,prio,0), advancing both addresses per 4 KB chunk (Ghidra showed only the 1-arg call).
  *
  *   DMA QUEUE entry (DAT_80147928, 0x14 stride, 10 slots):
- *     +0x00 handle(int, 0==free)  +0x04 dst_spu(int)  +0x08 src_ram>>3(u16)  +0x0a len/64(u8)
+ *     +0x00 handle(int, 0==free)  +0x04 RAM source pointer  +0x08 SPU address>>3(u16)  +0x0a len/64(u8)
  *     +0x0b priority(u8)  +0x0c flag(u8)  +0x10 deadline(int, = sndgs[0x11]+0xf)
  *   State: DAT_80147920 handle counter, DAT_80147924 in-flight count, DAT_80147925 active slot,
  *          DAT_80147926 busy flag, DAT_80147919 pre-load guard (shared with sdpacket).
@@ -21,8 +21,8 @@
 
 struct SNDDmaEntry {
     volatile int handle;             /* +0x00: 0 marks a free slot */
-    int dstSpu;                       /* +0x04: SPU destination */
-    unsigned short srcHi;             /* +0x08: RAM source address divided by eight */
+    const unsigned char *ram_source;  /* +0x04: main-RAM source address loaded into DMA4 MADR */
+    unsigned short spu_address_8;     /* +0x08: SPU transfer address divided by eight */
     unsigned char len64;              /* +0x0A: transfer length in 64-byte units */
     volatile unsigned char priority;  /* +0x0B */
     unsigned char flag;               /* +0x0C: call the preload hook before transfer */
@@ -138,13 +138,13 @@ void iSNDdmtransfer(void)
         volatile unsigned int *dpcr;
         activeEntry->deadline = *(volatile int *)(gsAddr + 0x44) + 0xf;
         ctrl = *(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.control_base;
-        *(volatile unsigned short *)(ctrl + 0x1a6) = activeEntry->srcHi;
+        *(volatile unsigned short *)(ctrl + 0x1a6) = activeEntry->spu_address_8;
         ctrl = *(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.control_base;
         *(volatile unsigned short *)(ctrl + 0x1aa) =
             *(volatile unsigned short *)(ctrl + 0x1aa) & 0xffcf | 0x20;
         dpcr = ((struct SndSpuRegisterBasesStateView *)hwBase)->registers.address_4fc;
         *dpcr = *dpcr & 0xf0ffffff | 0x20000000;
-        *(volatile unsigned int *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_madr) = activeEntry->dstSpu;
+        *(volatile unsigned int *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_madr) = (unsigned int)activeEntry->ram_source;
         *(volatile unsigned int *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_bcr) =
             (unsigned int)activeEntry->len64 << 0x10 | 0x10;
         *(volatile unsigned int *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_chcr) = 0x1000201;
@@ -250,11 +250,12 @@ void iSNDdmservice(void)
 }
 
 /* iSNDdmqueue @0x8010ACA0 : enqueue a RAM->SPU transfer (len rounded to 64 bytes), returning its handle (or
- *   0 if the 10-slot queue is full).  The five arguments are full ABI words; the queue stores only the
- *   low bytes of prio/flag. Reusing the saved Status value and walking sndpd+0x10 fixes the earlier
+ *   0 if the 10-slot queue is full). Arg1 is the RAM byte-source pointer; arg2 is the SPU byte address
+ *   stored in address/8 units. The five arguments are full ABI words; the queue stores only the low
+ *   bytes of prio/flag. Reusing the saved Status value and walking sndpd+0x10 fixes the earlier
  *   critical-section and split-storage bugs. Snapshotting the new handle before the verified interrupt-mask
  *   sequence preserves the oracle's load and all three COP0 hazard slots (39->28 detailed diffs). */
-int iSNDdmqueue(int dst_spu, unsigned int src_ram, int len, int prio, int flag)
+int iSNDdmqueue(const unsigned char *ram_source, unsigned int spu_address, int len, int prio, int flag)
 {
     int queuedFlag = flag;
     int i;
@@ -301,9 +302,9 @@ scan:
     if (!ent->handle) {
         ((struct SndDmaQueueStateView *)pd)->in_flight_count.v = ((struct SndDmaQueueStateView *)pd)->in_flight_count.v + 1;
         handleSnapshot = ((struct SndDmaQueueStateView *)pd)->next_handle;
-        ent->dstSpu = dst_spu;
+        ent->ram_source = ram_source;
         ent->handle = handleSnapshot;
-        ent->srcHi = (unsigned short)(src_ram >> 3);
+        ent->spu_address_8 = (unsigned short)(spu_address >> 3);
         ent->len64 = (unsigned char)(len >> 6);
         ent->priority = (unsigned char)prio;
         ent->flag = (unsigned char)queuedFlag;
@@ -321,9 +322,10 @@ scan:
 }
 
 /* iSNDdmqueuesplit @0x8010AD94 : enqueue a large transfer as 4 KB chunks, draining the queue when it backs
- *   up (>3 in flight).  Returns the last chunk's handle. MATCH (54/54): signed queue depth, strict
- *   4 KB chunk selection, raw integer priority and the pre-tested service loop all follow the oracle. */
-int iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio)
+ *   up (>3 in flight). The RAM source advances bytewise; the SPU address remains a scalar device address.
+ *   Returns the last chunk's handle. MATCH (54/54): signed queue depth, strict 4 KB chunk selection,
+ *   raw integer priority and the pre-tested service loop all follow the oracle. */
+int iSNDdmqueuesplit(const unsigned char *ram_source, unsigned int spu_address, int len, int prio)
 {
     int r = 0, chunk;
     if (len > 0) {
@@ -339,10 +341,10 @@ int iSNDdmqueuesplit(int dst_spu, unsigned int src_ram, int len, int prio)
                     break;
                 iSNDdmservice();
             }
-            r = iSNDdmqueue(dst_spu, src_ram, chunk, prio, 0);
-            dst_spu += chunk;
+            r = iSNDdmqueue(ram_source, spu_address, chunk, prio, 0);
+            ram_source += chunk;
             len -= chunk;
-            src_ram += chunk;
+            spu_address += chunk;
             if (len <= 0)
                 return r;
         }

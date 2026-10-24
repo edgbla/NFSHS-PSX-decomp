@@ -393,7 +393,9 @@ unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count)
         span = wrapped - byteoff;                       /* bytes to next block boundary */
         if (count < (int)span) /* Keep signed compare; dropping this cast selects sltu (2 diffs). */
             span = count;
-        fcnt = (unsigned short *)(q * 2 + ctx->frame_size_table);
+        /* `frame_size_table` is a halfword-table pointer. Keep this target's exact base+byte-offset
+         * schedule: direct pointer indexing changed 12 operand/register uses (same 86 instructions). */
+        fcnt = (unsigned short *)(q * 2 + (unsigned int)ctx->frame_size_table);
         taken = span;
         /* MATCH: read `*fcnt` directly at each use (no separately-named `n` local) -- oracle keeps
          * the raw `lhu` value in ONE register across both the compare and the later subtraction with
@@ -543,7 +545,9 @@ int iSNDfillspuwithpackets(int p, int chunk)
                                                    * this fn use `lh`/`lhu` per their own oracle site. */
         pp->spu_buffer_offset.s = 0;
         pp->spu_bytes_remaining.s = pp->block_bytes.s;
-        *(short *)(chunk * 2 + pp->frame_size_table) = 0;
+        /* Keep an unsigned machine-address intermediate for the 16-bit table address: natural
+         * pointer indexing reordered four register uses in this function. */
+        *(short *)(chunk * 2 + (unsigned int)pp->frame_size_table) = 0;
     }
     if (!pp->write_position) {                     /* fresh start -> silence all SPU channels */
         /* MATCH: oracle materializes `i=0` in the count-check BRANCH'S DELAY SLOT (`beqz
@@ -605,7 +609,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                                 /* MATCH: read *(int*)(ch+0x48) via LOAD DISPLACEMENT off the bare
                                  * `ch` (oracle: `lw v0,72(s1)`) -- a separate `cbuf` pointer var
                                  * folds the +0x48 into the address before the load (0-displacement). */
-                                int chval = ((SndPacketPlayerContextPrefix *)ch)->channel_buffer0;
+                                unsigned char *chval = ((SndPacketPlayerContextPrefix *)ch)->channel_buffer0;
                                 ch += 4;
                                 /* BUG FIX: len=rem (pp+0x3c), not 0 -- oracle loads `lhu a1,0x3C(s2)`
                                  * as the 2nd arg right before this call. */
@@ -625,7 +629,9 @@ int iSNDfillspuwithpackets(int p, int chunk)
                             do {
                                 *(char *)(((volatile SndPacketPlayerContextPrefix *)ech)->channel_buffer0 + 1) = endFlag;
                                 i++;
-                                *(char *)(pp->block_bytes.u + ((volatile SndPacketPlayerContextPrefix *)ech)->channel_buffer0 - 0xf) = endFlag;
+                                /* Machine-address intermediate preserves retail load-register order;
+                                 * direct pointer arithmetic produced 8 diffs across the flag loops. */
+                                *(char *)(pp->block_bytes.u + (unsigned int)((volatile SndPacketPlayerContextPrefix *)ech)->channel_buffer0 - 0xf) = endFlag;
                                 ech += 4;
                             } while (i < ((volatile SndPacketVoiceState *)voice)->channel_count);
                         }
@@ -653,7 +659,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                 take = pp->source_frame_remaining.u;
             else
                 take = pp->spu_bytes_remaining.u;
-            ringp = (short *)(chunk * 2 + pp->frame_size_table);
+            ringp = (short *)(chunk * 2 + (unsigned int)pp->frame_size_table);
             *ringp = *ringp + (short)((int)((unsigned)take * 7) >> 2);
             i = 0;
             if (((volatile SndPacketVoiceState *)voice)->channel_count) {
@@ -718,8 +724,9 @@ queue_dma:
             unsigned char *lch = (unsigned char *)pp;
             do {
                 {
+                    /* Same exact-preserving machine-address sum as the earlier end-flag loop. */
                     volatile unsigned char *eb = (volatile unsigned char *)
-                        (pp->block_bytes.u + ((SndPacketPlayerContextPrefix *)lch)->channel_buffer0 - 0xf);
+                        (pp->block_bytes.u + (unsigned int)((SndPacketPlayerContextPrefix *)lch)->channel_buffer0 - 0xf);
                     unsigned char ev = *eb;
                     lch += 4;
                     *eb = ev | 1;
@@ -864,7 +871,7 @@ int iSNDplatformpacketplaycreate(int p, int *mem)
                                          * element +4 by displacement TWICE. */
     ((struct SndDriverHookStateView *)base)->hooks.voice_done = iSNDpsxpacketstop;
     ctx->active_note = -1;
-    ctx->frame_size_table = (int)(mem + 0x414);
+    ctx->frame_size_table = (unsigned short *)(mem + 0x414);
     ctx->spu_address = iSNDpsxmalloc(limitsBase[4]);   /* DAT_801234e4 == sndpsxlimits[4] (+0x10/4) */
     ctx->spu_size = limitsBase[4];
     if (!ctx->spu_address)
@@ -947,10 +954,10 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
      * and only the char*-pointer spelling makes cc1 keep the parenthesized association. */
     {
         int ch = voice->channel_count;
-        ctx->channel_buffer0 = (int)(pp + 0x14);
+        ctx->channel_buffer0 = (unsigned char *)(pp + 0x14);
         ctx->block_shift = 0xd - ch;
         ctx->channel_buffer1 =
-            (int)((char *)pp + (ctx->block_bytes.u + 0x50));
+            (unsigned char *)pp + (ctx->block_bytes.u + 0x50);
         blockSamps = ctx->spu_size >> ctx->block_shift;
     }
     ctx->frame_count = blockSamps;

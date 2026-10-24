@@ -147,7 +147,8 @@ found:
         *spuField = scan->spu;
         goto checked;
 resolve:
-        dma = iSNDdmqueuesplit(bank + offset, (unsigned int)buf, blocks, 1);
+        /* `bank` is still an integer-valued base at this API boundary; the DMA source itself is bytes. */
+        dma = iSNDdmqueuesplit((const unsigned char *)(unsigned int)(bank + offset), (unsigned int)buf, blocks, 1);
         *spuField = buf;
         *(int *)(idx * 8 + patch) = offset;
         *(int *)(idx * 8 + patch + 4) = buf;

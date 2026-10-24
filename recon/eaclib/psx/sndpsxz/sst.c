@@ -151,12 +151,12 @@ void iSNDstreamremoverequest(unsigned int reqid)
 /* iSNDstreamreleasecallback @0x800E8D90 : SNDPKTPLAY release hook -- a finished sample buffer carries a
  *   back-pointer to its chunk 4 bytes ahead; the chunk's first word holds the request id whose low byte
  *   is the stream slot.  Free the chunk back to that stream's ring. */
-void iSNDstreamreleasecallback(int sample)
+void iSNDstreamreleasecallback(unsigned char *sample)
 {
-    int chunk = *(int *)(sample - 4);
-    int slot  = *(unsigned char *)chunk;
+    unsigned char *chunk = *(unsigned char **)(sample - 4);
+    int slot  = *chunk;
     SndStream *S = sndss[slot];
-    STREAM_release(S->stream_handle, (void *)(unsigned int)chunk);
+    STREAM_release(S->stream_handle, chunk);
     /* MATCH (17/17): the true sndss[] declaration fills the chunk-load delay slot with its address. */
 }
 
@@ -263,7 +263,7 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
     int step;
     SndPacketSubmitFrameView desc;
     int i;
-    int flatPtr;
+    unsigned char *flatPtr;
 
     desc.fields.data_size = ((SndStreamChunkHeaderPrefix *)chunk)->value.data_size;                     /* stash datalen in an unused desc slot --
                                                            * gcc doesn't naturally spill a plain local
@@ -274,11 +274,11 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
 
     step = 0;
     if (!S->locked_header.attributes.use3dpos) {                              /* flat: every channel reads chunk+0x10 */
-        int flatBase;
+        unsigned char *flatBase;
         /* The one-trip wrapper is instruction-free, but gives gcc's flow pass the retail
          * reference weight for flatBase; this fixes its preheader/IV allocation (13 -> 9). */
         do {
-            flatBase = (int)(unsigned int)(chunk + 0x10);
+            flatBase = chunk + 0x10;
         } while (0);
         i = step;
         if (i < S->locked_rate.channels) {
@@ -293,14 +293,14 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
                                                            * oracle's `v1=sp+0x10` sits AFTER the
                                                            * numCh!=0 guard, not hoisted to fn scope. */
             do {
-                ((SndPacketSubmitFrameView *)dp)->fields.channel_data[0] = flatPtr + flatBase - flatBase;   /* zero-net use extends flatBase into loop */
+                ((SndPacketSubmitFrameView *)dp)->fields.channel_data[0] = (unsigned char *)(unsigned int)((int)(unsigned int)flatPtr + (int)(unsigned int)flatBase - (int)(unsigned int)flatBase);   /* zero-net use extends flatBase into loop */
                 flatPtr += step;
                 dp++;
             } while (S->locked_rate.channels > ++i);
         }
     } else {                                             /* interleaved: per-channel offset table */
         int *off = (int *)(chunk + 0x10);
-        int base = (int)off + S->locked_rate.channels * 4;
+        unsigned char *base = (unsigned char *)off + S->locked_rate.channels * 4;
         i = 0;
         if (i < S->locked_rate.channels) {
             int *dp = desc.words;
@@ -314,7 +314,7 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
     desc.fields.data_size = ((desc.fields.data_size + 0x1b) / 0x1c) * 0x1c;          /* round up to 0x1C -- reload of the spill */
     {
         SndStreamReq *req = S->requests + (signed char)((volatile SndStream *)S)->parse_index;
-        *(int *)(flatPtr - 4) = (int)(unsigned int)chunk;                   /* back-ptr just before the first sample */
+        *(unsigned char **)(flatPtr - 4) = chunk;                   /* back-ptr just before the first sample */
         *(int *)chunk = req->request_id;                      /* request id -> chunk[0] */
         ((volatile SndStreamReq *)req)->remaining_bytes = ((volatile SndStreamReq *)req)->remaining_bytes + desc.fields.data_size;       /* remaining += */
         ((volatile SndStreamReq *)req)->submitted = ((volatile SndStreamReq *)req)->submitted + 1;             /* submitted++ */

@@ -7,7 +7,7 @@ struct SndStream;
 extern int iSNDstreamdestroyall(void); /* @0x800E8C14 */
 extern struct SndStream *iSNDstreamgetstreamptr(int idx); /* @0x800E8C48 */ /* sst */
 extern void iSNDstreamremoverequest(unsigned int reqid); /* @0x800E8C64 */
-extern void iSNDstreamreleasecallback(int sample); /* @0x800E8D90 */
+extern void iSNDstreamreleasecallback(unsigned char *sample); /* @0x800E8D90 */
 extern void iSNDstreamnotifycallback(int handle, unsigned int bytes); /* @0x800E8DD4 */
 extern int iSNDstreamparseheader(struct SndStream *S, unsigned char *data); /* @0x800E8E9C */
 extern int iSNDstreamparsenumchunks(struct SndStream *S, unsigned char *data); /* @0x800E9044 */

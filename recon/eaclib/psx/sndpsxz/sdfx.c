@@ -175,7 +175,7 @@ unsigned int iSNDpsxfxinit(int mode)
         int h;
         int chunk = 0x10000 - work;
         if (chunk > 0x20) chunk = 0x20;
-        h = iSNDdmqueue((int)scratch, work << 3, chunk << 3, 1, 0);
+        h = iSNDdmqueue(scratch, work << 3, chunk << 3, 1, 0);
         work += 0x20;
         do { } while (!(iSNDdmcomplete(h)));
     }

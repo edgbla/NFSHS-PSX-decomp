@@ -524,7 +524,7 @@ int iSNDinit(void)
     *(volatile unsigned short *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)latched)->registers.control_base + 0x1aa) = 0xc000;
     DMACallback(ch, callback);               /* install the real DMA4 (SPU) callback */
     wr_sr(sr);
-    iSNDdmqueue((int)&sndpdsafeloop, 0x1000, 0x10, 1, 0);     /* clear first SPU page */
+    iSNDdmqueue(sndpdsafeloop, 0x1000, 0x10, 1, 0);     /* clear first SPU page */
 
     i = 0;
     gs = (unsigned char *)sndgs;
