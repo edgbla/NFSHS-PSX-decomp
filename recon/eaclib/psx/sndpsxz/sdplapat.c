@@ -28,7 +28,7 @@ extern unsigned char DAT_801479f0;   /* voice-table byte base; retained for exac
  * (4) link_index.vs preserves both the signed -1 sentinel and signed volatile linked-row index.
  * The persistent typed-pointer alias was tested and rejected
  * (95 diffs / 176 instructions); per-access typed views retain the exact 171-instruction match. */
-int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
+int iSNDplatformplay(unsigned char *chan, int voice, int level, int pitch, int a5, int fx,
                             int volAngle, int pitchOffset)
 {
     int           *sampleData = 0;         /* 0x8a tag -> sample-header ptr */
@@ -38,7 +38,7 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     int           loopVal = 0;             /* 0x85 tag */
     unsigned int  id;
     int           val;
-    int           *ptr;
+    unsigned char *ptr;
     (void)a5;
     (void)pitchOffset;
 
@@ -53,9 +53,9 @@ int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
     ((volatile SndPacketVoiceState *)slot)->link_index.vs = -1;
     ((SndPacketVoiceState *)slot)->route = 0;
     ((volatile SndPacketVoiceState *)slot)->channel_count = 1;
-    while (iSNDgettag(&chan, &id, &val, (int *)&ptr) && id != 0xfe) {
+    while (iSNDgettag(&chan, &id, &val, &ptr) && id != 0xfe) {
         if (id == 0x8a) {
-            sampleData = ptr;
+            sampleData = (int *)ptr;
             continue;
         }
         if (id == 0x85) {

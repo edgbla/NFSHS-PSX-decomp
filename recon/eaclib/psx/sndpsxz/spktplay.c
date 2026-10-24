@@ -155,7 +155,7 @@ int SNDPKTPLAY_create(void *mem, int memsize, void (*relcb)(unsigned char *),
     }
     return -9;
 found:
-    off = iSNDplatformpacketplaycreate(slot, (int *)mem);
+    off = iSNDplatformpacketplaycreate(slot, (SndPacketPlayerContextPrefix *)mem);
     if (off < 0) {
         do { } while (0);
         return -6;

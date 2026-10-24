@@ -29,7 +29,8 @@ int SNDplay(struct SNDPLAYOPTS *info)
  * in-range test's branch inverted (7-diff residual) even though they're semantically identical. */
 int cSNDplay(struct SNDPLAYOPTS *info, int recurse)
 {
-    int patch, pp;
+    int patch;
+    struct SndTaggedPatchRecordPrefixView *pp;
     struct SndBankDataHeaderPrefix *bank;
     (void)recurse;
     if (iSNDvalidbank((signed char)info->bhandle) < 0)

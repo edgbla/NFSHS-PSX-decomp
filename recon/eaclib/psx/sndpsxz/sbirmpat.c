@@ -16,11 +16,11 @@
 
 /* iSNDbankremovepat @0x800FE5B4 : free patch `patch_idx` of bank `bank` (its tagged SPU data), clearing the
  *   patch pointer (+0x14 for bank type 4, else +0xc).  Returns 0 / -8. */
-int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
+int iSNDbankremovepat(int bank, int patch_idx, struct SNDRemoveEntry *scratch)
 {
     struct SndBankDataHeaderPrefix *data = ((struct SndGlobalServerStateView *)sndgs)->bank_table[bank].data_block;
     struct SndBankDataHeaderPrefix *base = data->type == 4 ? data : 0;
-    int pp;
+    struct SndTaggedPatchRecordPrefixView *pp;
 
     if (iSNDvalidbank(bank))
         return -8;

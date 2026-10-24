@@ -26,6 +26,14 @@
 #include "snd_state.h"
 #include "srandom.h"
 #include "srrange.h"
+
+struct SndTagScanState {
+    unsigned char *cursor;
+    unsigned int id;
+    int value;
+    unsigned char *data;
+};
+typedef char SndTagScanState_size_check[(sizeof(struct SndTagScanState) == 0x10) ? 1 : -1];
 #include "sserver.h"
 #include "sstop.h"
 #include "stagpat.h"
@@ -66,20 +74,20 @@ unsigned char *iSNDresettimbre(struct SndTimbre *t, struct SndTimbre *buf)
     t->pan_range.word = 0;
     t->base_detune.word = 0;
     t->base_detune_range.word = 0;
-    t->final_volume_curve.word = 0;
+    t->final_volume_curve.byte_pointer = 0;
     t->playback_factor.word = 0;
-    t->pan_curve.word = 0;
-    t->detune_curve.word = 0;
+    t->pan_curve.sbyte_pointer = 0;
+    t->detune_curve.sbyte_pointer = 0;
     t->portamento_initial.word = 0x7f;
-    t->velocity_curve.word = 0;
+    t->velocity_curve.sbyte_pointer = 0;
     t->velocity_phase_limit.word = 0;
     t->velocity_phase_seed.word = 0;
-    t->pitch_lfo_table.word = 0;
+    t->pitch_lfo_table.sbyte_pointer = 0;
     t->lfo_phase_limit.word = 0;
     t->pitch_lfo_seed.word = 0;
     t->pitch_lfo_depth.word = 0;
     t->pan_scale.word = 1;
-    t->envelope_sweep_table.word = (int)snddefaultenvelope;
+    t->envelope_sweep_table.byte_pointer = (unsigned char *)snddefaultenvelope;
     return (unsigned char *)snddefaultenvelope;
 }
 
@@ -87,13 +95,13 @@ unsigned char *iSNDresettimbre(struct SndTimbre *t, struct SndTimbre *buf)
  *   (sum the envelope / volume / pitch fields). */
 void iSNDresolveheader(struct SndTimbre *hdr, struct SndTimbre *out)
 {
-    hdr->final_volume_curve.word = out->final_volume_curve.word + hdr->final_volume_curve.word;
-    hdr->pan_curve.word = out->pan_curve.word + hdr->pan_curve.word;
-    hdr->detune_curve.word = out->detune_curve.word + hdr->detune_curve.word;
-    hdr->velocity_curve.word = out->velocity_curve.word + hdr->velocity_curve.word;
-    hdr->pitch_lfo_table.word = out->pitch_lfo_table.word + hdr->pitch_lfo_table.word;
-    if (hdr->envelope_sweep_table.word)
-        hdr->envelope_sweep_table.word = out->envelope_sweep_table.word + hdr->envelope_sweep_table.word;
+    hdr->final_volume_curve.byte_pointer = out->final_volume_curve.byte_pointer + hdr->final_volume_curve.word;
+    hdr->pan_curve.sbyte_pointer = out->pan_curve.sbyte_pointer + hdr->pan_curve.word;
+    hdr->detune_curve.sbyte_pointer = out->detune_curve.sbyte_pointer + hdr->detune_curve.word;
+    hdr->velocity_curve.sbyte_pointer = out->velocity_curve.sbyte_pointer + hdr->velocity_curve.word;
+    hdr->pitch_lfo_table.sbyte_pointer = out->pitch_lfo_table.sbyte_pointer + hdr->pitch_lfo_table.word;
+    if (hdr->envelope_sweep_table.byte_pointer)
+        hdr->envelope_sweep_table.byte_pointer = out->envelope_sweep_table.byte_pointer + hdr->envelope_sweep_table.word;
 }
 
 /* iSNDfindfreekey @0x80101BFC : advance the rolling key-group counter (DAT_801371cc) to a value not
@@ -145,7 +153,7 @@ done:
  *   restores the detune table/scaling path, both PRNG return uses, all four stack arguments, and the
  *   success/failure return contract. MATCH (320/320): modeling the one-word platform-rate storage as
  *   an array element makes gcc split its address materialization around the independent byte load. */
-int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *vol, struct SndTimbre *header,
+int iSNDplaytaggedtimbre(unsigned char *timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *vol, struct SndTimbre *header,
                                     int baseNote, int velScale, int pitchOff)
 {
     int b7  = (signed char)tag->pan;
@@ -155,7 +163,8 @@ int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *
     unsigned int  out;
     int           chan, detune, pan, sw, s28, num, active, tmp;
     SndChannel   *slot;
-    int           field28, field4c, field54, field5c;
+    int           field28, field4c;
+    signed char  *field54, *field5c;
     int           playOffset, playResult;
     int           playLevel, playPitch, playTag;
     unsigned int  sv;
@@ -185,10 +194,10 @@ int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *
             slot->base_detune = sv + pitchOff;
         if (vol->base_detune_range.word)
             slot->base_detune = (unsigned short)slot->base_detune + randrange(vol->base_detune_range.word);
-        slot->final_volume_curve = vol->final_volume_curve.word;
-        field54 = vol->pan_curve.word;
+        slot->final_volume_curve = vol->final_volume_curve.byte_pointer;
+        field54 = vol->pan_curve.sbyte_pointer;
         slot->pan_curve = field54;
-        field5c = vol->detune_curve.word;
+        field5c = vol->detune_curve.sbyte_pointer;
         slot->autovol_position.word = b8 << 0x10;
         slot->detune_curve = field5c;
         active = slot->pan_scale;
@@ -202,7 +211,7 @@ int iSNDplaytaggedtimbre(int timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *
         else if (b7 > 0x7f)
             b7 = 0x7f;
         if (slot->pan_curve)
-            b7 = *(signed char *)(slot->pan_curve + b7);
+            b7 = slot->pan_curve[b7];
         pan = vol->pan.word;
         if (vol->pan_range.word)
             pan += randrange(vol->pan_range.word);
@@ -217,20 +226,20 @@ pan_low:
         field28 = vol->envelope_detune.word;
         slot->bend = b9;
         slot->envelope_detune_depth = (short)(field28 * 100);
-        slot->sweep_table = (SndSweepSegment *)(unsigned int)vol->envelope_sweep_table.word;
+        slot->sweep_table = (SndSweepSegment *)vol->envelope_sweep_table.byte_pointer;
         slot->portamento_position.word = vol->portamento_initial.word << 0x10;
         slot->sweep_index = 0;
         slot->sweep_count = vol->sweep_count.ubyte;
         slot->control32 = vol->control32.ubyte;
-        sw = ((SndSweepSegment *)(unsigned int)slot->sweep_table)->duration;
+        sw = slot->sweep_table->duration;
         slot->sweep_countdown = sw;
         if (sw < 0)
             slot->sweep_countdown = 0x7fffffff;
         s28 = slot->sweep_countdown;
-        num = ((SndSweepSegment *)(unsigned int)slot->sweep_table)->target_pitch * 0x10000 - slot->portamento_position.word;
+        num = slot->sweep_table->target_pitch * 0x10000 - slot->portamento_position.word;
         slot->portamento_step = num / s28;
-        slot->velocity_curve = vol->velocity_curve.word;
-        slot->pitch_lfo_table = vol->pitch_lfo_table.word;
+        slot->velocity_curve = vol->velocity_curve.sbyte_pointer;
+        slot->pitch_lfo_table = vol->pitch_lfo_table.sbyte_pointer;
         slot->velocity_phase_limit = vol->velocity_phase_limit.ubyte;
         slot->lfo_phase_limit = vol->lfo_phase_limit.ubyte;
         slot->pitch_lfo_depth = (unsigned short)vol->pitch_lfo_depth.ubyte;
@@ -294,16 +303,16 @@ pan_low:
  *     7-arg call: (timbreData, tag, &builtTimbre, &header, note, vel, pitchOff). pitchOff ($s6) is the
  *     CAPTURED randrange() result of the last 0x24 field tag (0 until one is seen); the group key ($fp)
  *     is the CAPTURED iSNDfindfreekey() return.  BYTE-MATCHES the oracle (verify_asm PASS, 216 insns). */
-int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
+int iSNDplaytaggedpatch(struct SndTaggedPatchRecordPrefixView *bank, struct SNDPLAYOPTS *tag)
 {
     union SndTimbreBufferView bt;                /* built timbre    @sp+0x20  */
     union SndTimbreBufferView hdr;               /* override header @sp+0xB8  */
     int           started[12];             /* started voices  @sp+0x150 */
-    int           cursor;                  /* tag-stream cursor @sp+0x180 (&cursor -> gettag) */
+    unsigned char *cursor;                 /* tag-stream cursor @sp+0x180 (&cursor -> gettag) */
     unsigned int  g0;                      /* gettag out: tag id  @sp+0x184 (3 SCALARS, not an array */
     int           g1;                      /*             value 1 @sp+0x188  -- an array would land   */
-    int           g2;                      /*             value 2 @sp+0x18C  BELOW cursor, +8 frame)  */
-    int           timbreData = 0;          /* s5: last 0xfd sample-data ptr */
+    unsigned char *g2;                     /*             data address @sp+0x18C  BELOW cursor, +8 frame)  */
+    unsigned char *timbreData = 0;         /* s5: last 0xfd sample-data ptr */
     int           ret        = -9;         /* s4: launch result / return value */
     int           nStarted   = 0;          /* s2 */
     SndChannel   *slot       = 0;          /* s3: last written voice slot (shared single/multi) */
@@ -317,8 +326,8 @@ int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
         return -8;
     note = (signed char)tag->keynum;
     vel  = (signed char)tag->velocity;
-    cursor = bank;                         /* stored (addressable) then overwritten -- both sw in oracle */
-    cursor = (((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2) ? (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte : (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
+    cursor = (unsigned char *)bank;        /* stored (addressable) then overwritten -- both sw in oracle */
+    cursor = (bank->flags & 2) ? &((struct SndTaggedPatchStream8PrefixView *)bank)->first_tag_byte : &((struct SndTaggedPatchStream4PrefixView *)bank)->first_tag_byte;
 
     iSNDresetpatch(&bt.fields);
     iSNDresettimbre(&bt.fields, &hdr.fields);
@@ -347,7 +356,7 @@ int iSNDplaytaggedpatch(int bank, struct SNDPLAYOPTS *tag)
         if (id < 0x26) {                   /* field tag -> set timbre[idx] + parallel header[idx] */
             val = g1;
             bt.tag_words[id]  = val;
-            hdr.tag_words[id] = g2;
+            hdr.tag_data[id] = g2;
             if (id == 0x24)
                 pitchOff = randrange(val); /* s6: fed to every later launch as arg 7 */
         }
@@ -396,39 +405,39 @@ fail:
 
 /* iSNDresolvetaggedpatch @0x801024EC : walk a bank's tag stream and resolve its SPU sample data (tag 0xfd
  *   = platform resolve), marking the bank resolved (+3 |= 1).  Returns -1 / resolve result. */
-int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
+int iSNDresolvetaggedpatch(struct SndTaggedPatchRecordPrefixView *bank, const unsigned char *bankData, struct SNDResolveEntry *scratch)
 {
-    unsigned int state[4];
+    struct SndTagScanState state;
     int r = -1;
-    state[0] = bank;
-    if (((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2)
-        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
+    state.cursor = (unsigned char *)bank;
+    if (bank->flags & 2)
+        state.cursor = &((struct SndTaggedPatchStream8PrefixView *)bank)->first_tag_byte;
     else
-        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
-    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3])) {
-        if (state[1] == 0xfd)
-            r = iSNDplatformresolve(state[0], patch_idx, scratch);
+        state.cursor = &((struct SndTaggedPatchStream4PrefixView *)bank)->first_tag_byte;
+    while (iSNDgettag(&state.cursor, &state.id, &state.value, &state.data)) {
+        if (state.id == 0xfd)
+            r = iSNDplatformresolve(state.cursor, bankData, scratch);
     }
     if (r > -1)
-        ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags = ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags | 1;
+        bank->flags = bank->flags | 1;
     return r;
 }
 
 /* iSNDremovetaggedpatch @0x801025C0 : walk a bank's tag stream and release its resolved SPU data (tag 0xfd
  *   = platform remove), clearing the resolved flag (+3 &= ~1). */
-int iSNDremovetaggedpatch(int bank, int *patch_idx)
+int iSNDremovetaggedpatch(struct SndTaggedPatchRecordPrefixView *bank, struct SNDRemoveEntry *patch)
 {
-    unsigned int state[4];
-    state[0] = bank;
-    if (((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 2)
-        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream8PrefixView *)(unsigned int)bank)->first_tag_byte;
+    struct SndTagScanState state;
+    state.cursor = (unsigned char *)bank;
+    if (bank->flags & 2)
+        state.cursor = &((struct SndTaggedPatchStream8PrefixView *)bank)->first_tag_byte;
     else
-        state[0] = (int)(unsigned int)&((struct SndTaggedPatchStream4PrefixView *)(unsigned int)bank)->first_tag_byte;
-    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3])) {
-        if (state[1] == 0xfd)
-            iSNDplatformremove(state[0], patch_idx);
+        state.cursor = &((struct SndTaggedPatchStream4PrefixView *)bank)->first_tag_byte;
+    while (iSNDgettag(&state.cursor, &state.id, &state.value, &state.data)) {
+        if (state.id == 0xfd)
+            iSNDplatformremove(state.cursor, patch);
     }
-    ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags = ((struct SndTaggedPatchRecordPrefixView *)(unsigned int)bank)->flags & 0xfe;
+    bank->flags = bank->flags & 0xfe;
     return 0;
 }
 

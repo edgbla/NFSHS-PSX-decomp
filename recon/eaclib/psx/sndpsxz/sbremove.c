@@ -12,17 +12,18 @@
 #include "sndchpriv.h"
 #include "sndbankpriv.h"
 #include "sndbankhdrpriv.h"
+#include "sdresolv.h"
 
 /* iSNDremovepatches @0x800E65F8 : release each of a bank's `count` resolved patches (de-dup via a local
  *   scratch table seeded to -1). */
 int iSNDremovepatches(int bank, int count)
 {
-    int scratch[512];
-    int *p;
+    struct SNDRemoveEntry scratch[256];
+    struct SNDRemoveEntry *p;
     int i;
     int neg1 = -1;
-    for (i = 0xFF, p = &scratch[510]; i >= 0; i--, p -= 2) {
-        *p = neg1;
+    for (i = 0xFF, p = &scratch[255]; i >= 0; i--, p--) {
+        p->spu_address = neg1;
     }
     for (i = 0; i < count; i++)
         iSNDbankremovepat(bank, i, scratch);

@@ -11,16 +11,16 @@
 #include "sgettag.h"
 
 /* iSNDgettag @0x8010BD50 : returns 1 while a tag was read, 0 at end of stream (id 0xff). */
-int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr)
+int iSNDgettag(unsigned char **cursor, unsigned int *outId, int *outVal, unsigned char **outPtr)
 {
     unsigned char  id;
-    int            at;
+    unsigned char *at;
     unsigned int   len;
     int            r;
 
-    while (*(unsigned char *)*cursor == 0xfc)    /* skip 0xfc padding tags */
+    while (**cursor == 0xfc)    /* skip 0xfc padding tags */
         *cursor = *cursor + 1;
-    id = *(unsigned char *)*cursor;
+    id = **cursor;
     *outId = id;
     if (id == 0xff)
         return 0;                               /* end of stream */
@@ -34,16 +34,16 @@ marker:
     return 1;                                   /* marker tag (no data) */
 
 data_tag:
-    len = *(unsigned char *)(at + 1);
+    len = *(at + 1);
     if (len == 0xff) {                          /* extended 4-byte length */
         *cursor = at + 2;
-        len = iSNDgetdata((unsigned char *)(at + 2), 4);
+        len = iSNDgetdata(at + 2, 4);
         *cursor = *cursor + 3;
     }
     *cursor = *cursor + 1;
     *outPtr = *cursor;
     if (len < 5) {
-        r = iSNDgetdata((unsigned char *)*cursor, len);
+        r = iSNDgetdata(*cursor, len);
         *outVal = r;
     }
     *cursor = *cursor + len;

@@ -859,19 +859,19 @@ int iSNDplatformcalcdatarate(SNDSAMPLEFORMAT *sample_format)
 
 /* iSNDplatformpacketplaycreate @0x8010421C : allocate a player's SPU context, install the voice-done hook,
  *   register the ctx in DAT_80147e10[p].  Returns 0 / -9 on malloc failure. */
-int iSNDplatformpacketplaycreate(int p, int *mem)
+int iSNDplatformpacketplaycreate(int p, struct SndPacketPlayerContextPrefix *mem)
 {
     /* MATCH: materialize the BARE &sndpd once and keep it live ACROSS the malloc call (oracle: `s2`,
      * a callee-saved reg). The typed voice_done slot store before the call and indexed player-context
      * store after it both use this cached base, matching the oracle's sndpd-relative addressing. */
     unsigned char *base = sndpd;
-    SndPacketPlayerContextPrefix *ctx = (SndPacketPlayerContextPrefix *)mem;
+    SndPacketPlayerContextPrefix *ctx = mem;
     const int *limitsBase = sndpsxlimits;   /* MATCH: materialize the owner array base ONCE (oracle's
                                          * callee-saved reg, kept live across the call) and read
                                          * element +4 by displacement TWICE. */
     ((struct SndDriverHookStateView *)base)->hooks.voice_done = iSNDpsxpacketstop;
     ctx->active_note = -1;
-    ctx->frame_size_table = (unsigned short *)(mem + 0x414);
+    ctx->frame_size_table = (unsigned short *)((unsigned char *)mem + 0x1050);
     ctx->spu_address = iSNDpsxmalloc(limitsBase[4]);   /* DAT_801234e4 == sndpsxlimits[4] (+0x10/4) */
     ctx->spu_size = limitsBase[4];
     if (!ctx->spu_address)
@@ -896,7 +896,7 @@ void iSNDplatformpacketplaydestroy(int p)
  *   table, derive the SPU block geometry from the player ctx, prime two buffers via iSNDfillspuwithpackets,
  *   install the serve + IRQ hooks, set initial pitch, and key the voice.  9-arg (Ghidra dropped a3..a9); `a9` is passed but unused here. */
 int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
-                                      int pitch, int a6, int fxlevel, unsigned short *hdr, int a9)
+                                      int pitch, int a6, int fxlevel, SNDSAMPLEFORMAT *hdr, int a9)
 {
     /* MATCH: same base-sharing lever as iSNDfillspuwithpackets/iSNDpacketgetirq -- ONE bare &sndpd
      * (oracle: v1) feeds BOTH the DAT_80147e10[p] load (base+p*4, +0x4F8 as the LOAD DISPLACEMENT,
@@ -924,7 +924,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
     voice->link_flag = 0;                              /* DAT_80147a11 = linkflag */
     voice->link_index.vs = -1; /* DAT_80147a10: signed link index, -1 means unlinked. */
     voice->route = 0;                              /* DAT_80147a0e = route */
-    ((volatile SndPacketVoiceState *)voice)->channel_count = hdr[1]; /* DAT_80147a0f = channel count; keep the typed volatile byte store across the setup boundary. */
+    ((volatile SndPacketVoiceState *)voice)->channel_count = ((unsigned short *)hdr)[1]; /* packed +2 sample-format halfword; byte store takes channel count */
     ((volatile SndPacketVoiceState *)voice)->loop_length_param = 0; /* DAT_801479f4 -- MATCH: keep this volatile member store before chunkBytes setup. */
     ((volatile SndPacketVoiceState *)voice)->volume_angle = volAngle; /* DAT_80147a08; volatile halfword store preserves the setup schedule. */
     ((volatile SndPacketVoiceState *)voice)->level = level; /* DAT_80147a12; volatile member byte store preserves the setup order. */
@@ -1007,7 +1007,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
          * above the store (it can prove the two constant offsets off `voice` do not overlap) and fills
          * the slot, costing an insn.  Marking the store volatile pins the load after it; marking the
          * guard load volatile keeps it out of the preceding block. */
-        voice->initial_pitch.vs = *hdr * 0x17c7 >> 0x10;   /* DAT_80147a0a, vt */
+        voice->initial_pitch.vs = hdr->samplerate * 0x17c7 >> 0x10;   /* DAT_80147a0a, vt */
         if (1 < ((volatile SndPacketVoiceState *)voice)->channel_count) {       /* arm the linked partner voice */
             SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
             voice->link_index.vu = pool[note].linked_tag_view.linked_channels[0];

@@ -41,28 +41,34 @@ typedef char SndTaggedPatchStream8PrefixView_size_check[(sizeof(struct SndTagged
 /* The two serialized variants place the relative patch-pointer list at different offsets. */
 struct SndBankPatchTable12Prefix {
     struct SndBankDataHeaderPrefix header;
-    int first_relative_patch[1];     /* +0x0C; followed by patch_count entries */
+    struct SndTaggedPatchRecordPrefixView *first_relative_patch[1]; /* +0x0C; patch_count entries */
 };
 typedef char SndBankPatchTable12Prefix_size_check[(sizeof(struct SndBankPatchTable12Prefix) == 0x10) ? 1 : -1];
 
 struct SndBankPatchTable20Prefix {
     struct SndBankDataHeaderPrefix header;
     unsigned char opaque_0C_13[8];
-    int first_relative_patch[1];     /* +0x14; followed by patch_count entries */
+    struct SndTaggedPatchRecordPrefixView *first_relative_patch[1]; /* +0x14; patch_count entries */
 };
 typedef char SndBankPatchTable20Prefix_size_check[(sizeof(struct SndBankPatchTable20Prefix) == 0x18) ? 1 : -1];
 
 /* Exact-displacement views for loops that carry a cursor across patch entries while keeping
  * the serialized table base folded into the +0x0C/+0x14 load/store displacement. */
+union SndBankPatchRelocationValue {
+    int file_offset;                                      /* before bank relocation */
+    struct SndTaggedPatchRecordPrefixView *record;        /* after bank relocation */
+};
+typedef char SndBankPatchRelocationValue_size_check[(sizeof(union SndBankPatchRelocationValue) == 4) ? 1 : -1];
+
 struct SndBankPatchOffset12CursorView {
     unsigned char opaque_000_00B[0x0C];
-    int relative_offset;
+    union SndBankPatchRelocationValue relative_offset;
 };
 typedef char SndBankPatchOffset12CursorView_size_check[(sizeof(struct SndBankPatchOffset12CursorView) == 0x10) ? 1 : -1];
 
 struct SndBankPatchOffset20CursorView {
     unsigned char opaque_000_013[0x14];
-    int relative_offset;
+    union SndBankPatchRelocationValue relative_offset;
 };
 typedef char SndBankPatchOffset20CursorView_size_check[(sizeof(struct SndBankPatchOffset20CursorView) == 0x18) ? 1 : -1];
 

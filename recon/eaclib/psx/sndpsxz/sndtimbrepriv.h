@@ -1,5 +1,5 @@
-/* Private 0x98-byte tag-built timbre/override record. The word overlay reflects the
- * parser's id-indexed int slots; narrow byte/halfword views preserve access width. */
+/* Private 0x98-byte tag-built timbre/override record. `fields` is the resolved typed view; `tag_words`
+ * holds scalar values while `tag_data` holds the corresponding parser payload addresses. */
 #ifndef _SNDPSXZ_SNDTIMBREPRIV_H_
 #define _SNDPSXZ_SNDTIMBREPRIV_H_
 
@@ -8,6 +8,8 @@ union SndTimbreWordView {
     unsigned int uword;
     unsigned short uhalf;
     unsigned char ubyte;
+    unsigned char *byte_pointer;
+    signed char *sbyte_pointer;
 };
 typedef char SndTimbreWordView_size_check[(sizeof(union SndTimbreWordView) == 4) ? 1 : -1];
 
@@ -56,6 +58,7 @@ typedef char SndTimbre_size_check[(sizeof(struct SndTimbre) == 0x98) ? 1 : -1];
 union SndTimbreBufferView {
     struct SndTimbre fields;
     int tag_words[0x26];
+    unsigned char *tag_data[0x26];
 };
 typedef char SndTimbreBufferView_size_check[(sizeof(union SndTimbreBufferView) == 0x98) ? 1 : -1];
 

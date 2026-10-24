@@ -18,11 +18,6 @@
 #include "sgettag.h"
 #include "sdmemman.h"
 
-struct SNDResolveEntry {
-    int offset;
-    int spu;
-};
-
 /* iSNDplatformresolve @0x8010B75C : load a patch's sample into SPU RAM (unless already resolved), recording
  *   the SPU address in the 0x8a field and the resolve table.  Returns 7 / -6 (out of SPU memory).
  *
@@ -82,17 +77,18 @@ struct SNDResolveEntry {
  *   3. STATEMENT ORDER `scan = cur + 1;` BEFORE `idx++;` -- independent-chain issue order is fixed
  *      by luid (catalog w43); with `idx++` first the two tail addiu's come out swapped (4 diffs).
  */
-int iSNDplatformresolve(int cursor, int bank, int patch)
+int iSNDplatformresolve(unsigned char *cursor, const unsigned char *bankData, struct SNDResolveEntry *patch)
 {
     unsigned int  id;
-    int           val, ptr;
+    int           val;
+    unsigned char *ptr;
     int           size = 0;
     int           count = 1;
     int           offset = size;
     int          *spuField = (int *)size; /* the 0x8a field that receives the SPU address */
     int           idx = size;
     int           blocks, scale, buf, dma;
-    int          *e;
+    struct SNDResolveEntry *e;
     struct SNDResolveEntry *scan;
     struct SNDResolveEntry *cur;
     int           end;
@@ -104,11 +100,11 @@ int iSNDplatformresolve(int cursor, int bank, int patch)
         else if (id == 0x82) count    = val;
         else if (id == 0x85) size     = val;
     }
-    if (bank) {
-        e = (int *)(idx * 8 + patch);               /* find an existing resolve for this offset */
-        if (*(int *)e != -1) {
+    if (bankData) {
+        e = (struct SNDResolveEntry *)(idx * 8 + (unsigned int)patch); /* find an existing resolve for this offset; exact register order */
+        if (e->offset != -1) {
             end = -1;
-            scan = (struct SNDResolveEntry *)e;
+            scan = e;
             do {
                 /* MATCH (W86-D1 2026-09-02 -- PURE C, replaces the former zero-insn identity
                  * fence).  `cur = scan;` is a plain register copy, so cse.c's `make_regs_eqv`
@@ -147,11 +143,10 @@ found:
         *spuField = scan->spu;
         goto checked;
 resolve:
-        /* `bank` is still an integer-valued base at this API boundary; the DMA source itself is bytes. */
-        dma = iSNDdmqueuesplit((const unsigned char *)(unsigned int)(bank + offset), (unsigned int)buf, blocks, 1);
+        dma = iSNDdmqueuesplit(bankData + offset, (unsigned int)buf, blocks, 1);
         *spuField = buf;
-        *(int *)(idx * 8 + patch) = offset;
-        *(int *)(idx * 8 + patch + 4) = buf;
+        patch[idx].offset = offset;
+        patch[idx].spu = buf;
         do { } while (!(iSNDdmcomplete(dma)));
     }
     return 7;
@@ -159,10 +154,11 @@ resolve:
 
 /* iSNDplatformremove @0x8010B958 : release a patch's resolved SPU data -- record it in the remove table and
  *   free the SPU block. */
-int iSNDplatformremove(int cursor, int *patch)
+int iSNDplatformremove(unsigned char *cursor, struct SNDRemoveEntry *patch)
 {
     unsigned int  id;
-    int           val, ptr;
+    int           val;
+    unsigned char *ptr;
     int          *spuField = 0;
     int           i;
 
@@ -171,14 +167,14 @@ int iSNDplatformremove(int cursor, int *patch)
             spuField = (int *)ptr;
     }
     i = 0;
-    if (*patch != -1) {
+    if (patch[0].spu_address != -1) {
         do {
-            if (patch[i * 2] == *spuField)    /* already removed */
+            if (patch[i].spu_address == *spuField)    /* already removed */
                 return 0;
             i++;
-        } while (patch[i * 2] != -1);
+        } while (patch[i].spu_address != -1);
     }
-    patch[i * 2] = *spuField;
+    patch[i].spu_address = *spuField;
     if (*spuField)
         iSNDpsxfree((void *)*spuField);
     return 0;

@@ -24,23 +24,25 @@ int SNDattributessetdef(SndPatchAttributeBlock *attr)
 
 /* iSNDpatchtohdr @0x801035E4 : build the `SNDSAMPLEFORMAT` output (`format`, default word 0x5622) + attribute block (`attr`)
  *   + extra word (`extraOut`) from the sample's tag stream (after its 4- or 8-byte prefix per flags bit 1). */
-int iSNDpatchtohdr(short *sampleData, SNDSAMPLEFORMAT *format, SndPatchAttributeBlock *attr, int *extraOut)
+int iSNDpatchtohdr(unsigned char *sampleData, SNDSAMPLEFORMAT *format, SndPatchAttributeBlock *attr, int *extraOut)
 {
-    short *cursor;
-    int    id, val, ptr;
+    unsigned char *cursor;
+    unsigned int id;
+    int val;
+    unsigned char *ptr;
     SNDattributessetdef(attr);
     /* oracle stores sampleData as a default (`sw s0`), computes s0+8 in the bnez delay slot, s0+4 on
      * fall-through -> a 3-way init + if/else, NOT `x=s0+8; if(!flag)x=s0+4`. */
     cursor = sampleData;
-    if ((*((unsigned char *)sampleData + 3) & 2) != 0)
-        cursor = sampleData + 4;
+    if ((sampleData[3] & 2) != 0)
+        cursor = sampleData + 8;
     else
-        cursor = sampleData + 2;
+        cursor = sampleData + 4;
     format->samplerate = 0x5622;
     format->channels = 1;
     format->samplerep = 5;
     *extraOut = 0;
-    while (iSNDgettag((int *)&cursor, &id, &val, &ptr)) {
+    while (iSNDgettag(&cursor, &id, &val, &ptr)) {
         if (id == 0x80)      attr->use3dpos = (unsigned char)val;
         else if (id == 0x82) format->channels    = (unsigned char)val;
         else if (id == 0x84) format->samplerate = (unsigned short)val;

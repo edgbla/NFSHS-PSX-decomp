@@ -201,7 +201,7 @@ int iSNDstreamparseheader(SndStream *S, unsigned char *data)
     SndStreamReq *req = S->requests + (signed char)((volatile SndStream *)S)->parse_index;
     int outsize;
 
-    iSNDpatchtohdr((short *)(data + 0xc), &S->current_rate, &S->current_header.attributes, &outsize);
+    iSNDpatchtohdr(data + 0xc, &S->current_rate, &S->current_header.attributes, &outsize);
     ((volatile SndStreamReq *)req)->total_size = outsize;
     STREAM_release(S->stream_handle, data);
     ((volatile SndStreamReq *)req)->total_size = ((((volatile SndStreamReq *)req)->total_size + 0x1b) / 0x1c) * 0x1c;    /* round up to 0x1C */

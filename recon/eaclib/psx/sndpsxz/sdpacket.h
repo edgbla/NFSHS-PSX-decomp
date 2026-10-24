@@ -1,6 +1,8 @@
 #ifndef _SNDPSXZ_SDPACKET_H_
 #define _SNDPSXZ_SDPACKET_H_
 
+struct SndPacketPlayerContextPrefix;
+
 extern void iSNDpacketgetirq(void);
 extern void iSNDpacketsetirq(void);
 extern void iSNDpacketirqcallback(void);
@@ -11,9 +13,9 @@ extern void iSNDpacketserve(void);
 extern int iSNDplatformpacketoverhead(void); /* @0x801041B8; sdpacket */
 struct SNDSAMPLEFORMAT;
 extern int iSNDplatformcalcdatarate(struct SNDSAMPLEFORMAT *sample_format);
-extern int iSNDplatformpacketplaycreate(int p, int *mem); /* @0x8010421C; sdpacket */
+extern int iSNDplatformpacketplaycreate(int p, struct SndPacketPlayerContextPrefix *mem); /* @0x8010421C; sdpacket */
 extern void iSNDplatformpacketplaydestroy(int p); /* @0x801042C0; sdpacket */
-extern int iSNDplatformpacketplay(int p, int note, int volAngle, int level, int pitch, int a6, int fxlevel, unsigned short *hdr, int a9); /* @0x80104304; caller ABI has 9 words, final a9 is unused */
+extern int iSNDplatformpacketplay(int p, int note, int volAngle, int level, int pitch, int a6, int fxlevel, struct SNDSAMPLEFORMAT *hdr, int a9); /* @0x80104304; caller ABI has 9 words, final a9 is unused */
 extern void iSNDpsxpacketstop(void *parg);
 
 extern int sndpp[];

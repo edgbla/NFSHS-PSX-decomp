@@ -181,13 +181,15 @@ initialized:
         for (; i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count;
              dst12 += 4, src12 += 4, dst20 += 4, src20 += 4, i++) {
             if (((struct SndBankDataHeaderPrefix *)bankData)->type == type4) {
-                int sp = ((struct SndBankPatchOffset20CursorView *)src20)->relative_offset;
+                struct SndTaggedPatchRecordPrefixView *sp = ((struct SndBankPatchTable20Prefix *)src20)->first_relative_patch[0];
                 if (sp)
-                    ((struct SndBankPatchOffset20CursorView *)dst20)->relative_offset = (int)dest + (sp - (int)origin);
+                    ((struct SndBankPatchTable20Prefix *)dst20)->first_relative_patch[0] =
+                        (struct SndTaggedPatchRecordPrefixView *)(dest + ((unsigned char *)sp - origin));
             } else {
-                int sp = ((struct SndBankPatchOffset12CursorView *)src12)->relative_offset;
+                struct SndTaggedPatchRecordPrefixView *sp = ((struct SndBankPatchTable12Prefix *)src12)->first_relative_patch[0];
                 if (sp)
-                    ((struct SndBankPatchOffset12CursorView *)dst12)->relative_offset = (int)dest + (sp - (int)bankData);
+                    ((struct SndBankPatchTable12Prefix *)dst12)->first_relative_patch[0] =
+                        (struct SndTaggedPatchRecordPrefixView *)(dest + ((unsigned char *)sp - bankData));
             }
         }
         }
