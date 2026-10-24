@@ -111,12 +111,12 @@ void SNDSTRM_setpriority(...);   /* (int handle, int prio, int n) */
 int SNDSTRM_status(int tag, struct SNDSTREAMSTATUS *status);   /* (int handle, SNDSTREAMSTATUS *status) */
 int SNDSTRM_vol(...);   /* (int handle, int vol) */
 int SNDSYS_getopts(...);   /* (void * outOpts) */
-void SNDSYS_init(...);   /* (void *, int, int) */
+int SNDSYS_init(void *membase, int memsize);   /* (void *membase, int memsize) */
 void SNDSYS_restore(...);   /* (int arg0) */
 int SNDSYS_setopts(...);   /* (void * newOpts) */
 int SNDSYS_vectortoreal(...);   /* (void) */
 void SNDautovol(...);   /* (void *, int, int) */
-int SNDbankadd(...);   /* (void *, void *) */
+int SNDbankadd(int *bank_out, void *bank_data);   /* (int *bank_out, void *bank_data) */
 void SNDbankheadercopy(...);   /* (void *, int) */
 int SNDbankheadersize(...);   /* (int) */
 int SNDbankremove(...);   /* (int) */

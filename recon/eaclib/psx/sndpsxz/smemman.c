@@ -63,7 +63,7 @@ void iSNDmemconstrain(int *block, int *size)
 }
 
 /* iSNDmeminit @0x801061D4 : (re)initialise the pool over `memsize` bytes at `membase`. */
-int *iSNDmeminit(int membase, int memsize)
+SNDMemState *iSNDmeminit(void *membase, int memsize)
 {
     char *mm;
     sndmm.base = membase;
@@ -71,7 +71,7 @@ int *iSNDmeminit(int membase, int memsize)
     *(short *)(mm + 4) = 0;
     *(short *)(mm + 6) = (short)(memsize >> 2);
     *(int *)(mm + 8) = 0;
-    return (int *)mm;
+    return (SNDMemState *)mm;
 }
 
 /* iSNDmemrestore @0x801061F4 : return pool utilisation percent = high_water*100/poolsize.
@@ -264,7 +264,7 @@ unsigned int iSNDmemrestore(void)
  *   temps that cse folded, so they never crossed it).
  *   Next angle: a zero-insn dial that lowers whatever pseudo currently occupies $v0 in that block
  *   rather than lengthening `j` (i.e. reach the fresh dest without paying for j's live range). */
-int iSNDmalloc(int size)
+void *iSNDmalloc(int size)
 {
     /* MATCH (w31-a2, from the raw oracle -- same shape family as iSNDpsxmalloc but with THREE
      * separate iSNDmemconstrain call sites (gcc merges none of them: the empty arm and the
@@ -395,7 +395,7 @@ commit:
         int off = i << 2;
         unsigned char *tabsym = (unsigned char *)&sndmm + 0xc;
         unsigned char *cb;
-        int addr;
+        unsigned char *addr;
         entry = (unsigned short *)(off + (int)tabsym);
         entry[1] = (unsigned short)size;
         entry[0] = (unsigned short)block;
@@ -404,7 +404,7 @@ commit:
         entry = (unsigned short *)(tabsym - 0xc);
         cb = (unsigned char *)entry;
         *(unsigned short *)(cb + 4) += 1;
-        addr = *(int *)(tabsym - 0xc) + block * 4;
+        addr = *(unsigned char **)(tabsym - 0xc) + block * 4;
         if (*(int *)(cb + 8) < block + size)
             *(int *)(cb + 8) = block + size;
         return addr;

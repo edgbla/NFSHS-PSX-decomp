@@ -87,8 +87,8 @@ void iSND100hzserver(void)
     int *g;
     int i;
     int chanIdx;
-    int *channelBase;
-    int *globalBase;
+    struct SndGlobalServerStateView *channelBase;
+    struct SndGlobalServerStateView *globalBase;
     SndChannel *p;
     int dirty;
 
@@ -97,21 +97,21 @@ void iSND100hzserver(void)
     i = 0;
     iSNDserve();
     if (0 < ((struct SndGlobalServerStateView *)g)->client_100hz_count.s) { /* run the 100 Hz client callbacks */
-        int *clientBase = g;
+        struct SndGlobalServerStateView *clientBase = (struct SndGlobalServerStateView *)(unsigned int)g;
         do {
             ((struct SndServer100HzClientCursorView *)g)->callback();
             g++;
             i++;
-        } while (i < ((struct SndGlobalServerStateView *)clientBase)->client_100hz_count.s);
+        } while (i < clientBase->client_100hz_count.s);
     }
 
-    channelBase = sndgs;
+    channelBase = (struct SndGlobalServerStateView *)(unsigned int)sndgs;
     i = 0;
-    if (((struct SndGlobalServerStateView *)channelBase)->channel_count) { /* over every channel */
+    if (channelBase->channel_count) { /* over every channel */
         globalBase = channelBase;
         chanIdx = i;
         do {
-            p = (SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)globalBase)->play_records + chanIdx);
+            p = (SndChannel *)((unsigned char *)(unsigned int)globalBase->play_records + chanIdx);
             if (p->state == 1 && -1 < (int)p->owner_tag) { /* held, valid tag */
                 if (p->pitch_lfo_table) {                                 /* pitch LFO active */
                     unsigned char phase = p->pitch_lfo_phase + 1;
@@ -184,7 +184,7 @@ void iSND100hzserver(void)
 next_chan:
             chanIdx += sizeof(SndChannel);
             i++;
-        } while (i < ((struct SndGlobalServerStateView *)globalBase)->channel_count);
+        } while (i < globalBase->channel_count);
     }
 }
 

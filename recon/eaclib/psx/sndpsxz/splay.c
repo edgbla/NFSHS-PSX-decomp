@@ -34,7 +34,7 @@ int cSNDplay(struct SNDPLAYOPTS *info, int recurse)
     if (iSNDvalidbank((signed char)info->bhandle) < 0)
         return -8;
     patch = info->patnum;
-    bank = (int)(unsigned int)((struct SndBankTableEntry *)((signed char)info->bhandle * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block;
+    bank = (int)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->bank_table[(signed char)info->bhandle].data_block;
     if (patch < 0)
         return -8;
     if (!(patch < ((struct SndBankDataHeaderPrefix *)(unsigned int)bank)->patch_count))

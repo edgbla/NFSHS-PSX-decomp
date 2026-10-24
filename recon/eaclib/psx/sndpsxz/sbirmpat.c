@@ -18,7 +18,7 @@
  *   patch pointer (+0x14 for bank type 4, else +0xc).  Returns 0 / -8. */
 int iSNDbankremovepat(int bank, int patch_idx, int *scratch)
 {
-    int data = (int)(unsigned int)((struct SndBankTableEntry *)(bank * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table))->data_block;
+    int data = (int)(unsigned int)((struct SndGlobalServerStateView *)sndgs)->bank_table[bank].data_block;
     int base = ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->type == 4 ? data : 0;
     int pp;
 

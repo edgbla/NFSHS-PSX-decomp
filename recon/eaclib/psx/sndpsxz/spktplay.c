@@ -249,7 +249,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
                                                    * note fences below lengthen note's range,
                                                    * sched1 no longer hoists it on its own. */
     ppp->rate = *rate; /* unaligned rate-word copy */
-    ch = (SndChannel *)(unsigned int)(((struct SndGlobalServerStateView *)(unsigned int)gsp)->play_records + dur);       /* MATCH: AFTER the unaligned copy -- the oracle's
+    ch = (SndChannel *)((unsigned char *)(unsigned int)((struct SndGlobalServerStateView *)(unsigned int)gsp)->play_records + dur);       /* MATCH: AFTER the unaligned copy -- the oracle's
                                                     * `lw v1,0x94(s3)` sits between the swl/swr pair
                                                     * and the params[0xb] test, with the pool-base
                                                     * add filling the test's beqz delay slot (sched1

@@ -16,7 +16,9 @@ int iSNDvalidbank(int bank_id)
     struct SndBankTableEntry *bank;
     if (bank_id < 0 || ((struct SndGlobalServerStateView *)sndgs)->bank_count <= bank_id)
         return -8;
-    bank = (struct SndBankTableEntry *)(bank_id * sizeof(struct SndBankTableEntry) + ((struct SndGlobalServerStateView *)sndgs)->bank_table);
+    /* Keep the pointer field typed; the 32-bit sum is only the exact retail byte-address schedule. */
+    bank = (struct SndBankTableEntry *)(bank_id * sizeof(struct SndBankTableEntry) +
+        (unsigned int)((struct SndGlobalServerStateView *)sndgs)->bank_table);
     if (!bank->data_block)
         return -8;
     if (bank->load_state.s)

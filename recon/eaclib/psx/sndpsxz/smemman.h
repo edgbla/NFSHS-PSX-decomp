@@ -6,7 +6,7 @@ typedef struct SndMemEnt {
 } SndMemEnt;
 
 typedef struct SNDMemState {
-    int            base;
+    unsigned char *base;             /* +0x00: pool byte-address base */
     unsigned short count;
     unsigned short poolWords;
     int            highWater;
@@ -16,8 +16,8 @@ typedef struct SNDMemState {
 extern SNDMemState sndmm;
 
 extern void iSNDmemconstrain(int *block, int *size); /* @0x801061A8 */
-extern int *iSNDmeminit(int membase, int memsize); /* @0x801061D4 */
+extern SNDMemState *iSNDmeminit(void *membase, int memsize); /* @0x801061D4 */
 extern unsigned int iSNDmemrestore(void); /* @0x801061F4 */
-extern int iSNDmalloc(int size); /* @0x80106238 */
+extern void *iSNDmalloc(int size); /* @0x80106238 */
 
 #endif /* _SNDPSXZ_SMEMMAN_H_ */

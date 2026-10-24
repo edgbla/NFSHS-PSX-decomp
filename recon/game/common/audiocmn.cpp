@@ -311,7 +311,7 @@ void AudioCmn_LoadAsyncSfx(int bank,int patch,void *pbank,int size)
             return;
           }
         }
-        check = SNDbankadd(&s->handle,(int)pbank);
+        check = SNDbankadd(&s->handle,pbank);
         /* MATCH P902: native SLD 572 groups success and header allocation. */
         if ((check == 7) && ((s->header = (char *)reservememadr("SFXHDR",SNDbankheadersize(s->handle),0x10)) != 0)) {
           SNDbankheadercopy(s->header,(u_char *)s->handle);

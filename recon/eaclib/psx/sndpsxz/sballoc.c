@@ -16,7 +16,7 @@ int iSNDbankalloc(void)
     unsigned short rawcount = ((struct SndGlobalServerStateView *)sndgs)->bank_count;
     if (rawcount) {
         int n = rawcount;               /* cache the bank count in a reg (oracle a1), reuse it */
-        struct SndBankTableEntry *e = (struct SndBankTableEntry *)((struct SndGlobalServerStateView *)sndgs)->bank_table;   /* table base -- loaded INSIDE the guard, matching the oracle's
+        struct SndBankTableEntry *e = ((struct SndGlobalServerStateView *)sndgs)->bank_table;   /* table base -- loaded INSIDE the guard, matching the oracle's
                                         * deferred `lw a0,0x98(v0)` (ours hoisted it above the count's
                                         * `beqz` when it was a function-scope init). */
         do {

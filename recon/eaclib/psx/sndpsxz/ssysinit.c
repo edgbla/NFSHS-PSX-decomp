@@ -91,7 +91,7 @@ int SNDSYS_setopts(SNDSYSOPTS *opts)
  *   allocator, default the options, allocate the channel + bank tables, install the 100 Hz server, and
  *   start the SPU (iSNDinit). MATCH (79/79): returns the platform status on failure after cleanup,
  *   otherwise zero; no-op with zero when already up. */
-int SNDSYS_init(int membase, int memsize)
+int SNDSYS_init(void *membase, int memsize)
 {
     unsigned int nchan;
     int          rv;
@@ -107,12 +107,12 @@ int SNDSYS_init(int membase, int memsize)
         SNDSYS_setopts((SNDSYSOPTS *)base);
         nchan = ((SNDSYSOPTS *)base)->set.inputvoices;
     }
-    base->play_records = iSNDmalloc(nchan * sizeof(SndChannel));   /* channel pool */
+    base->play_records = (int)(unsigned int)iSNDmalloc(nchan * sizeof(SndChannel));   /* channel pool; int address field is a separate pending migration */
     memset((unsigned char *)(unsigned int)base->play_records, 0,
            ((SNDSYSOPTS *)base)->set.inputvoices * sizeof(SndChannel));
     base->bank_table = iSNDmalloc(
-        ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry)); /* bank table */
-    memset((unsigned char *)(unsigned int)base->bank_table, 0,
+        ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry)); /* bank table base */
+    memset(base->bank_table, 0,
            ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry));
     if (!base->server_callback)
         base->server_callback = (int)iSND100hzserver;

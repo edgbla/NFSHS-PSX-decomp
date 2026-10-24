@@ -15,6 +15,8 @@ union SndServerClientCountView {
 typedef char SndServerClientCountView_size_check[(sizeof(union SndServerClientCountView) == 1) ? 1 : -1];
 
 /* sndgs overlay assembled from output-capability initialization, snd_globals.h, and server/client call sites. */
+struct SndBankTableEntry;
+
 struct SndGlobalServerStateView {
     unsigned short sample_rate_00;                /* +0x00; defaulted to 44.1 kHz */
     unsigned short sample_rate_02;                /* +0x02; defaulted to 44.1 kHz */
@@ -41,7 +43,7 @@ struct SndGlobalServerStateView {
     void (*client_100hz_callbacks[6])(void);      /* +0x4C..+0x63 */
     void (*service_callbacks[12])(void);          /* +0x64..+0x93 */
     int play_records;                             /* +0x94 */
-    int bank_table;                               /* +0x98 */
+    struct SndBankTableEntry *bank_table;                               /* +0x98 */
     unsigned char opaque_09C_0AB[0x10];
     volatile int real_ticks;                      /* +0xAC */
     union SndServerHalfwordView timer_hz_cache;   /* +0xB0 */

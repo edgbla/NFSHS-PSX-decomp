@@ -52,7 +52,7 @@ int cSNDbankremove(int bankId, int recurse)
     if (iSNDvalidbank(bankId))
         return -8;
     {
-        int data = (int)(unsigned int)((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
+        int data = (int)(unsigned int)base->bank_table[bankId].data_block;
         int off;
         unsigned char *entry;
         struct SNDGlobals *base2;
@@ -68,15 +68,16 @@ int cSNDbankremove(int bankId, int recurse)
             } while (loopbase->channel_count > ++i);
         }
         base2 = &sndgs;
+        /* Preserve the volatile pointer load; use a 32-bit sum only for retail codegen. */
         entry = (unsigned char *)(bankId * sizeof(struct SndBankTableEntry) +
-            *(volatile int *)&base2->bank_table);
+            (unsigned int)*(struct SndBankTableEntry * volatile *)&base2->bank_table);
         if (((struct SndBankTableEntry *)entry)->platform_allocated.s) {
             iSNDplatformfree((int)(unsigned int)((struct SndBankTableEntry *)entry)->platform_block);
-            ((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->platform_allocated.u = 0;
+            sndgs.bank_table[bankId].platform_allocated.u = 0;
         } else
             iSNDremovepatches(bankId, ((struct SndBankDataHeaderPrefix *)(unsigned int)data)->patch_count);
-        ((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = 0;
-        ((struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->load_state.u = 0;
+        sndgs.bank_table[bankId].data_block = 0;
+        sndgs.bank_table[bankId].load_state.u = 0;
     }
     return 0;
 }

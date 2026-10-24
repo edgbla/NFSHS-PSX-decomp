@@ -13,9 +13,9 @@
 #include "sndserverpriv.h"
 #include "sndbankpriv.h"
 
-/* SNDbankadd @0x800E7DEC : add the bank at `bankData`, writing its slot id to *bank_out.  Returns the
+/* SNDbankadd @0x800E7DEC : add the bank at `bank_data`, writing its slot id to *bank_out.  Returns the
  *   download result, or -10 if audio is down. */
-int SNDbankadd(int *bank_out, int bankData)
+int SNDbankadd(int *bank_out, void *bank_data)
 {
     int  slot;
     struct SndBankTableEntry *e;
@@ -23,9 +23,10 @@ int SNDbankadd(int *bank_out, int bankData)
         return -10;
     slot = iSNDbankalloc();
     *bank_out = slot;
-    e = (struct SndBankTableEntry *)(((struct SndGlobalServerStateView *)sndgs)->bank_table + slot * sizeof(struct SndBankTableEntry));
-    e->data_block = (void *)(unsigned int)bankData;
-    e->platform_block = (void *)(unsigned int)bankData;
+    e = &((struct SndGlobalServerStateView *)sndgs)->bank_table[slot];
+    e->data_block = bank_data;
+    e->platform_block = bank_data;
     ((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook = SNDbankremove;
-    return iSNDdownloadbank(bankData, bankData);
+    /* The downloader's legacy integer-address API is deferred and unchanged. */
+    return iSNDdownloadbank((int)(unsigned int)bank_data, (int)(unsigned int)bank_data);
 }

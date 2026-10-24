@@ -18,7 +18,7 @@ extern "C" {
 int SND3dpos(...);
 void SNDSTRM_setpriority(...);
 void SNDautovol(...);
-int SNDbankadd(...);
+int SNDbankadd(int *bank_out, void *bank_data);
 void SNDbankheadercopy(...);
 int SNDbankheadersize(...);
 int SNDbankremove(...);

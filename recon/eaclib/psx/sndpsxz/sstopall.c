@@ -13,6 +13,7 @@
 void SNDstopall(void)
 {
     int i, off;
+    SndChannel *record;
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
     if (base->channel_count) {
         struct SndGlobalServerStateView *gs;
@@ -22,7 +23,8 @@ void SNDstopall(void)
         off = i;
         do {
             i++;
-            SNDstop(((SndChannel *)(unsigned int)(off + gs->play_records))->owner_tag);
+            record = (SndChannel *)(unsigned int)(off + gs->play_records);
+            SNDstop(record->owner_tag);
             off += sizeof(SndChannel);
         } while (i < gs->channel_count);
     }

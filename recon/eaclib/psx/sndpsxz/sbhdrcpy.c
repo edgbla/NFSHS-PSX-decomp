@@ -155,7 +155,7 @@ initialized:
         size = SNDbankheadersize(id);
         if (size < 0)
             return size;
-    memcpy(dest, (unsigned char *)((struct SndBankTableEntry *)(id * sizeof(struct SndBankTableEntry) + base->bank_table))->data_block, size);
+    memcpy(dest, (unsigned char *)base->bank_table[id].data_block, size);
     {
         int i;
         unsigned char *bankData;
@@ -169,7 +169,7 @@ initialized:
          * define `origin` before `i`.  sched1 then places i=0 in the bankData
          * pointer-load delay slot, and reorg steals origin into the count branch
          * slot, reproducing retail exactly. */
-        bankData = (unsigned char *)((struct SndBankTableEntry *)(id * sizeof(struct SndBankTableEntry) + base->bank_table))->data_block;
+        bankData = (unsigned char *)base->bank_table[id].data_block;
         origin = bankData;
         i = 0;
         if (i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count) {
@@ -192,7 +192,7 @@ initialized:
         }
         }
     }
-        ((struct SndBankTableEntry *)(id * sizeof(struct SndBankTableEntry) + sndgs.bank_table))->data_block = dest;
+        sndgs.bank_table[id].data_block = dest;
         return 0;
     }
 }

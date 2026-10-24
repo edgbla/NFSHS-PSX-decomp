@@ -32,7 +32,7 @@ extern "C" {
 }
 extern "C" {
 void   SNDautovol(...);
-int    SNDbankadd(...);
+int    SNDbankadd(int *bank_out, void *bank_data);
 void   SNDbankheadercopy(...);
 int    SNDbankheadersize(...);
 int    SNDbankremove(...);
