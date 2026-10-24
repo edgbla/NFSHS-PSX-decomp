@@ -29,7 +29,7 @@ int SNDSYS_vectortoreal(...);
 int SNDbankadd(int *bank_out, void *bank_data);
 void SNDbankheadercopy(...);
 int SNDbankheadersize(...);
-int SNDbankremove(...);
+void SNDbankremove(...);
 char *strcat(...);
 char *strcpy(...);
 }

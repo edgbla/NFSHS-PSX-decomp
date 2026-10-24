@@ -24,7 +24,7 @@ int SNDpitchmult(unsigned int tag, unsigned int mult)
     chanIdx = iSNDgetchan(tag);
     if (chanIdx > -1) {
         cur[0] = -1;
-        while (iSNDpatchkey(chanIdx, (int)cur)) {
+        while (iSNDpatchkey(chanIdx, cur)) {
             /* MATCH: keeping this value live only through iSNDcalcpitch selects a0 for the
              * multiply and lets the pitch-multiplier store fill that call's delay slot. */
             int note = cur[0];

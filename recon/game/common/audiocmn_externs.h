@@ -21,7 +21,7 @@ void SNDautovol(...);
 int SNDbankadd(int *bank_out, void *bank_data);
 void SNDbankheadercopy(...);
 int SNDbankheadersize(...);
-int SNDbankremove(...);
+void SNDbankremove(...);
 int SNDfxinitbus(...);
 int SNDfxmasterlevel(...);
 int SNDmastervol(...);

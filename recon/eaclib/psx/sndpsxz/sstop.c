@@ -20,8 +20,8 @@ int SNDstop(unsigned int tag)
     iSNDenteraudio();
     chan = iSNDgetchan(tag);
     if (chan > -1) {
-        unsigned int v = 0xffffffff;
-        while (iSNDpatchkey(chan, (int)&v))
+        int v = -1;
+        while (iSNDpatchkey(chan, &v))
             iSNDstop(v);
     }
     iSNDleaveaudio();

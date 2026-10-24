@@ -17,7 +17,7 @@ int SNDautovol(unsigned int tag, unsigned int rate, int target)
     if (ch > -1) {
         if ((int)rate < 1) rate = 1;
         cur[0] = -1;
-        while (iSNDpatchkey(ch, (int)cur)) {
+        while (iSNDpatchkey(ch, cur)) {
             SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
             SndChannel *v = &pool[cur[0]];
             int delta = target * 0x10000 - v->autovol_position.word;

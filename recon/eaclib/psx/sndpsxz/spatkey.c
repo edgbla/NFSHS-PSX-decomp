@@ -26,29 +26,29 @@
 /* iSNDpatchkey @0x800FEF4C : iterate the voices keyed to a channel group.  For a standalone channel,
  *   hands back `chan` once; for a group, walks the pool returning each held member.  `tag` points at a
  *   cursor (init -1).  Returns 1 while voices remain, 0 when exhausted. */
-int iSNDpatchkey(int chan, int tag)
+int iSNDpatchkey(int chan, int *tag)
 {
     SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
     SndChannel *pbase = &pool[chan];
     char grp;
     grp = pbase->group_id;
     if (grp) {
-        int i = *(int *)tag;
-        *(int *)tag = i + 1;
+        int i = *tag;
+        *tag = i + 1;
         if (i + 1 < ((struct SndGlobalServerStateView *)sndgs)->channel_count) {
             struct SndGlobalServerStateView *gs = (struct SndGlobalServerStateView *)sndgs;
-            for (; *(int *)tag < gs->channel_count; *(int *)tag = *(int *)tag + 1) {
+            for (; *tag < gs->channel_count; *tag = *tag + 1) {
                 SndChannel *pool = gs->play_records;
-                SndChannel *p = &pool[*(int *)tag];
+                SndChannel *p = &pool[*tag];
                 if (p->group_id == grp && p->state == 1 && -1 < (int)p->owner_tag)
                     return 1;
             }
         }
         goto no_key;
     }
-    if (*(int *)tag >= 0)
+    if (*tag >= 0)
         goto no_key;
-    *(int *)tag = chan;
+    *tag = chan;
     return 1;
 no_key:
     return 0;

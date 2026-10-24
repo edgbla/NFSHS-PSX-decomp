@@ -2,9 +2,11 @@
 #ifndef _SNDPSXZ_SNDHOOKPRIV_H_
 #define _SNDPSXZ_SNDHOOKPRIV_H_
 
+struct SndPacketVoiceState;
+
 struct SndDriverHookSlots {
     void (*user_serve)(void);   /* sndpd+0x720 */
-    void (*voice_done)(void *); /* sndpd+0x724 */
+    void (*voice_done)(struct SndPacketVoiceState *); /* sndpd+0x724 */
     void (*preload)(void);      /* sndpd+0x728 */
 };
 typedef char SndDriverHookSlots_size_check[(sizeof(struct SndDriverHookSlots) == 0x0C) ? 1 : -1];

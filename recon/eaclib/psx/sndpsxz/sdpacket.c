@@ -352,7 +352,7 @@ void iSNDpacketirqcallback(void)
 
 /* iSNDpsxzerospu @0x801039C4 : write SPU "silent loop" ADPCM (0x200 flag word + zero data) over `len`
  *   bytes at `addr`.  (Ghidra dropped the length arg as in_a1.) */
-void iSNDpsxzerospu(int *addr, int len)
+void iSNDpsxzerospu(unsigned int *addr, int len)
 {
     int i = 0;
     len >>= 2;                         /* mutate param in place -- reused as the loop bound (oracle: $a1) */
@@ -561,7 +561,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
              * jal); the previous recon passed a constant 0, silencing nothing (correctness bug). */
             /* MATCH: oracle increments `ch` in the JAL's OWN delay slot (right after the call),
              * `i` afterward -- swap the statement order from the natural i++/ch+=4. */
-            do { iSNDpsxzerospu((int *)((SndPacketPlayerContextPrefix *)ch)->channel_buffer0, 16); ch += 4; i++; }
+            do { iSNDpsxzerospu((unsigned int *)((SndPacketPlayerContextPrefix *)ch)->channel_buffer0, 16); ch += 4; i++; }
             while (i < ((volatile SndPacketVoiceState *)voice)->channel_count);
         }
         pp->spu_buffer_offset.u = pp->spu_buffer_offset.s + 0x10;
@@ -613,7 +613,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                                 ch += 4;
                                 /* BUG FIX: len=rem (pp+0x3c), not 0 -- oracle loads `lhu a1,0x3C(s2)`
                                  * as the 2nd arg right before this call. */
-                                iSNDpsxzerospu((int *)(chval + pp->spu_buffer_offset.u),
+                                iSNDpsxzerospu((unsigned int *)(chval + pp->spu_buffer_offset.u),
                                                pp->spu_bytes_remaining.u);
                                 i++;
                             } while (i < ((volatile SndPacketVoiceState *)voice)->channel_count);
@@ -1030,7 +1030,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
 
 /* iSNDpsxpacketstop @0x801046C8 : tear down a finished voice -- mark its player + voice slot idle, and if no
  *   voices remain active, drop the serve hook and point the pre-load tick back at the bare IRQ re-arm. */
-void iSNDpsxpacketstop(void *parg)
+void iSNDpsxpacketstop(struct SndPacketVoiceState *parg)
 {
     unsigned char *p = (unsigned char *)parg;   /* MATCH: real sig is void(void*) -- HOOK_voice_done;
                                                   * the oracle NEVER sets up $v0 at any epilogue (§3.2 void). Our

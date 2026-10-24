@@ -40,7 +40,7 @@ int iSNDstop(unsigned int chan)
     unsigned int mask;
 
     if ((signed char)slot->voice_done >= 0)            /* voice-done bit clear -> notify */
-        (*(void (**)(void *))(base + 0x64c))((void *)slot);
+        (*(void (**)(struct SndPacketVoiceState *))(base + 0x64c))((struct SndPacketVoiceState *)slot);
     iSNDfreechan(chan);
     slot->voice_status = 3;
     slot->play_state = 0;

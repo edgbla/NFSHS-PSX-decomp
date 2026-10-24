@@ -120,10 +120,10 @@ void SNDautovol(...);   /* (void *, int, int) */
 int SNDbankadd(int *bank_out, void *bank_data);   /* (int *bank_out, void *bank_data) */
 void SNDbankheadercopy(...);   /* (void *, int) */
 int SNDbankheadersize(...);   /* (int) */
-int SNDbankremove(...);   /* (int) */
+void SNDbankremove(...);   /* (int) */
 int SNDfxinitbus(...);   /* (int bus, int mode, int a2, int a3, int a4) */
 int SNDfxmasterlevel(...);   /* (int bus, int level) */
-int SNDgetlimits(...);   /* (int *opts) */
+int SNDgetlimits(void *opts);   /* (void *opts) */
 int SNDmastervol(...);   /* (int vol) */
 int SNDmemlargestunused(...);   /* (int *buf) */
 int SNDover(...);   /* (int) */
@@ -132,7 +132,7 @@ int SNDpitchbend(...);   /* (u_int tag, int bend) */
 int SNDpitchmult(...);   /* (int tag, u_int mult) */
 int SNDplay(...);   /* (void *) */
 void SNDplaysetdef(...);   /* (void *) */
-int SNDsetlimits(...);   /* (int *opts) */
+int SNDsetlimits(const void *opts);   /* (const void *opts) */
 int SNDstop(...);   /* (int handle) */
 int SNDtimeremaining(...);   /* (int handle) */
 void SNDvol(...);   /* (int handle, int vol) */

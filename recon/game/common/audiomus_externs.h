@@ -29,9 +29,9 @@ void SNDSTRM_setgreedystate(...);
 void SNDSTRM_setpriority(...);
 int SNDSTRM_status(int tag, struct SNDSTREAMSTATUS *status);
 int SNDSTRM_vol(...);
-int SNDgetlimits(...);
+int SNDgetlimits(void *opts);
 void SNDplaysetdef(...);
-int SNDsetlimits(...);
+int SNDsetlimits(const void *opts);
 int sprintf(...);
 unsigned int strlen(...);
 }

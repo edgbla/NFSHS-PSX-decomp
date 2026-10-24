@@ -21,7 +21,7 @@ int SND3dpos(unsigned int tag, unsigned int pos, int y)
     ch = iSNDgetchan(tag);
     if (ch > -1) {
         cur[0] = -1;
-        while (iSNDpatchkey(ch, (int)cur))
+        while (iSNDpatchkey(ch, cur))
             iSNDplatform3dpos(cur[0], pos, y);
     }
     iSNDleaveaudio();

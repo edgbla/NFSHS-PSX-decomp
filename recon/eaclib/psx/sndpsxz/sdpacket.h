@@ -2,11 +2,12 @@
 #define _SNDPSXZ_SDPACKET_H_
 
 struct SndPacketPlayerContextPrefix;
+struct SndPacketVoiceState;
 
 extern void iSNDpacketgetirq(void);
 extern void iSNDpacketsetirq(void);
 extern void iSNDpacketirqcallback(void);
-extern void iSNDpsxzerospu(int *addr, int len);
+extern void iSNDpsxzerospu(unsigned int *addr, int len);
 extern unsigned int iSNDpacketpurgeframes(int p, unsigned int byteoff, int count);
 extern int iSNDfillspuwithpackets(int p, int chunk);
 extern void iSNDpacketserve(void);
@@ -16,7 +17,7 @@ extern int iSNDplatformcalcdatarate(const struct SNDSAMPLEFORMAT *sample_format)
 extern int iSNDplatformpacketplaycreate(int p, struct SndPacketPlayerContextPrefix *mem); /* @0x8010421C; sdpacket */
 extern void iSNDplatformpacketplaydestroy(int p); /* @0x801042C0; sdpacket */
 extern int iSNDplatformpacketplay(int p, int note, int volAngle, int level, int pitch, int a6, int fxlevel, const struct SNDSAMPLEFORMAT *hdr, int a9); /* @0x80104304; caller ABI has 9 words, final a9 is unused */
-extern void iSNDpsxpacketstop(void *parg);
+extern void iSNDpsxpacketstop(struct SndPacketVoiceState *voice);
 
 extern int sndpp[];
 
