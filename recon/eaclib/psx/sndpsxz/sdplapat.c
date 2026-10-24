@@ -31,7 +31,7 @@ extern unsigned char DAT_801479f0;   /* voice-table byte base; retained for exac
 int iSNDplatformplay(unsigned char *chan, int voice, int level, int pitch, int a5, int fx,
                             int volAngle, int pitchOffset)
 {
-    int           *sampleData = 0;         /* 0x8a tag -> sample-header ptr */
+    unsigned char **sampleData = 0;        /* 0x8a tag -> SPU sample-address field */
     int           vt;
     unsigned char *slot;
     int           rate = 0x5622;           /* 0x84 tag (default) */
@@ -55,7 +55,7 @@ int iSNDplatformplay(unsigned char *chan, int voice, int level, int pitch, int a
     ((volatile SndPacketVoiceState *)slot)->channel_count = 1;
     while (iSNDgettag(&chan, &id, &val, &ptr) && id != 0xfe) {
         if (id == 0x8a) {
-            sampleData = (int *)ptr;
+            sampleData = (unsigned char **)ptr;
             continue;
         }
         if (id == 0x85) {

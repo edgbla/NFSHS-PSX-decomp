@@ -726,7 +726,7 @@ found:
                         * the tail. */
 
     if (!(iSNDstreamnumcreated())) {                   /* first stream -> register the service hook */
-        iSNDserveraddclient((int)iSNDstreamservice);
+        iSNDserveraddclient(iSNDstreamservice);
         ((struct SndGlobalLifecycleHookView *)sndgs)->stream_destroy_all_hook = iSNDstreamdestroyall;
     }
     sndss[slot] = S;

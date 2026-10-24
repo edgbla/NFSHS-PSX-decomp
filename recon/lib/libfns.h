@@ -17,6 +17,7 @@
 struct SNDSTREAMSTATUS;
 struct SNDREQUESTSTATUS;
 struct SNDPLAYOPTS;
+struct SndGlobalServerStateView;
 
 extern "C" {
 
@@ -190,7 +191,7 @@ charactertbl * getcharacter(...);   /* (int code) */
 int geti(...);   /* (void *p, int n) */
 long getm(...);   /* (void *p, int n) */
 int gettick(...);
-short * iSNDserveradd100hzclient(...);   /* (int cb) */
+struct SndGlobalServerStateView * iSNDserveradd100hzclient(...);   /* (void (*cb)(void)) */
 int iSNDserverremove100hzclient(...);   /* (int cb) */
 void iSPCH_EACseedrandom(...);   /* (int arg0) */
 void initasync(...);   /* (int reqs, int bufsize, int flag) */

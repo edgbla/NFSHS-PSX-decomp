@@ -15,13 +15,13 @@
  *   The count uses a signed view for the array index and an unsigned view for the increment-store.
  * MATCH: `service_callbacks[count]` in the full state view emits the retail sll(count*4), addu base,
  *   then `sw a0,0x64(base)` displacement sequence. */
-short *iSNDserveraddclient(void (*cb)(void))
+struct SndGlobalServerStateView *iSNDserveraddclient(void (*cb)(void))
 {
     /* Keep the raw count as the scaled index; folding the 0x19-slot prefix into it adds an instruction. */
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
     base->service_callbacks[(signed char)base->service_client_count.u] = cb;
     base->service_client_count.u = base->service_client_count.u + 1;
-    return (short *)sndgs;
+    return (struct SndGlobalServerStateView *)sndgs;
 }
 
 /* iSNDserverremoveclient @0x801047CC : unregister `cb`, compacting the list.  void -- $v0 at every

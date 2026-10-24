@@ -25,7 +25,7 @@ int SNDbankremove(...);
 int SNDfxinitbus(...);
 int SNDfxmasterlevel(...);
 int SNDmastervol(...);
-int SNDmemlargestunused(...);
+int SNDmemlargestunused(unsigned char **out);
 int SNDover(...);
 int SNDpan(...);
 int SNDpitchbend(...);

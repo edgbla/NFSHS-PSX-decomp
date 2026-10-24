@@ -340,7 +340,7 @@ void iSNDpsxmemconstrain(unsigned int *size, int *avail)
 /* iSNDpsxmalloc @0x8010A5CC : allocate `size` bytes (rounded to 64-byte blocks) of SPU local RAM, first-fit
  *   into the gaps of the sorted free-list, inserting the new {block,size} entry in order.  Returns the SPU
  *   byte address (block << 6) or 0 on failure. */
-int iSNDpsxmalloc(int size)
+unsigned char *iSNDpsxmalloc(int size)
 {
     /* MATCH: this split base lifetime plus the label-shaped scan reproduces the oracle's five saved-register
      * layout without turning the indexed table accesses into walking induction pointers.  Keep the empty path
@@ -830,7 +830,7 @@ commit:
              * home may-alias the sndpd store, so the scheduler may not hoist the load over it.
              * Naming the result BEFORE the RMW puts the load on retail's side of the store and the
              * `sll` becomes the count-load's delay filler. */
-            int result = (int)(candidateBlock << 6);
+            unsigned char *result = (unsigned char *)(candidateBlock << 6);
             ((struct SndSpuMemoryStateView *)commit_base)->memory.alloc_count =
                 ((struct SndSpuMemoryStateView *)commit_base)->memory.alloc_count + 1;
             return result;
@@ -847,19 +847,20 @@ commit:
  *   the value goes unused) -- not a behavior change for any caller. Their stale `void`/`(void*)`-arg
  *   forward decls elsewhere are harmless under C linkage (no signature-based mangling) and are OUT OF
  *   SCOPE for this file to retarget. */
-int iSNDpsxfree(int ptr)
+int iSNDpsxfree(unsigned char *ptr)
 {
     /* MATCH: same early &sndpd materialization lever as iSNDpsxmalloc/SNDmemlargestunused/iSNDpsxfxinit.
      * __builtin_memcpy on the packed slot is intentional: CC1PSX lowers it to the oracle's direct unaligned
      * word copy and avoids the extra temporary move produced by a member assignment. */
     int idx = 0;
     unsigned char *pd = sndpd;
-    ptr >>= 6;
+    int block = (int)(unsigned int)ptr;
+    block >>= 6;
     if (((struct SndSpuMemoryStateView *)pd)->memory.alloc_count) {
         unsigned char *table = (unsigned char *)((struct SndSpuMemoryStateView *)pd)->entries;
         unsigned char *base = pd;
         do {
-            if (((struct SndSpuFreeBlock *)(table + idx * 4))->block == ptr) {
+            if (((struct SndSpuFreeBlock *)(table + idx * 4))->block == block) {
                 unsigned short remaining =
                     ((struct SndSpuMemoryStateView *)base)->memory.alloc_count - 1;
                 ((struct SndSpuMemoryStateView *)base)->memory.alloc_count = remaining;

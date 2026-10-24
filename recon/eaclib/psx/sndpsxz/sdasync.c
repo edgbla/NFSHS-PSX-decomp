@@ -14,7 +14,7 @@
 #include "../../../link_stripped.h"
 
 /* iSNDplatformfree @0x800FE594 : free the SPU block at `ptr`. */
-void iSNDplatformfree(int ptr)
+void iSNDplatformfree(unsigned char *ptr)
 {
     iSNDpsxfree(ptr);
 }

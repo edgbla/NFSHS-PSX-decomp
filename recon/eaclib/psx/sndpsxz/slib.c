@@ -124,23 +124,23 @@ void iSNDcalcvol(int chan)
 }
 
 /* iSNDpsxkeyon @0x800FF140 : strobe the SPU key-on register for `mask` (24 voices). */
-int iSNDpsxkeyon(int mask)
+volatile unsigned char *iSNDpsxkeyon(int mask)
 {
     struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
-    int r;
-    *(volatile short *)((int)base->registers.control_base + 0x188) = (short)mask;
-    r = (int)base->registers.control_base;
+    volatile unsigned char *r;
+    *(volatile short *)((unsigned char *)base->registers.control_base + 0x188) = (short)mask;
+    r = (volatile unsigned char *)base->registers.control_base;
     *(volatile short *)(r + 0x18a) = (short)(mask >> 0x10);
     return r;
 }
 
 /* iSNDpsxkeyoff @0x800FF168 : strobe the SPU key-off register for `mask`. */
-int iSNDpsxkeyoff(int mask)
+volatile unsigned char *iSNDpsxkeyoff(int mask)
 {
     struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
-    int r;
-    *(volatile short *)((int)base->registers.control_base + 0x18c) = (short)mask;
-    r = (int)base->registers.control_base;
+    volatile unsigned char *r;
+    *(volatile short *)((unsigned char *)base->registers.control_base + 0x18c) = (short)mask;
+    r = (volatile unsigned char *)base->registers.control_base;
     *(volatile short *)(r + 0x18e) = (short)(mask >> 0x10);
     return r;
 }
@@ -150,10 +150,10 @@ unsigned int iSNDpsxeffecton(int mask)
 {
     struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
     unsigned int r;
-    int          c0 = (int)base->registers.control_base;
+    volatile unsigned char *c0 = (volatile unsigned char *)base->registers.control_base;
     *(volatile unsigned short *)(c0 + 0x198) = *(volatile unsigned short *)(c0 + 0x198) | (unsigned short)mask;
     {
-        int c1 = (int)base->registers.control_base;
+        volatile unsigned char *c1 = (volatile unsigned char *)base->registers.control_base;
         r = *(volatile unsigned short *)(c1 + 0x19a) | (mask >> 0x10);
         *(volatile short *)(c1 + 0x19a) = (short)r;
     }
@@ -165,10 +165,10 @@ unsigned int iSNDpsxeffectoff(int mask)
 {
     struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
     unsigned int r;
-    int          c0 = (int)base->registers.control_base;
+    volatile unsigned char *c0 = (volatile unsigned char *)base->registers.control_base;
     *(volatile unsigned short *)(c0 + 0x198) = *(volatile unsigned short *)(c0 + 0x198) & ~(unsigned short)mask;
     {
-        int c1 = (int)base->registers.control_base;
+        volatile unsigned char *c1 = (volatile unsigned char *)base->registers.control_base;
         r = *(volatile unsigned short *)(c1 + 0x19a) & ~(mask >> 0x10);
         *(volatile short *)(c1 + 0x19a) = (short)r;
     }
@@ -176,12 +176,12 @@ unsigned int iSNDpsxeffectoff(int mask)
 }
 
 /* iSNDpsxeffectvol @0x800FF210 : set the SPU reverb (echo) L/R output volume. */
-int iSNDpsxeffectvol(int left, int right)
+volatile unsigned char *iSNDpsxeffectvol(int left, int right)
 {
     struct SndSpuRegisterBasesStateView *base = (struct SndSpuRegisterBasesStateView *)sndpd;
-    int r;
-    *(volatile short *)((int)base->registers.control_base + 0x184) = (short)left;
-    r = (int)base->registers.control_base;
+    volatile unsigned char *r;
+    *(volatile short *)((unsigned char *)base->registers.control_base + 0x184) = (short)left;
+    r = (volatile unsigned char *)base->registers.control_base;
     *(volatile short *)(r + 0x186) = (short)right;
     return r;
 }
@@ -250,11 +250,11 @@ void iSNDsetvol(int chan, int left, int right)
  * materialization.  Listing the two variable stores before the constant ADSR stores gives gcc the
  * oracle's early `sra`/base-load schedule; it still emits the hardware writes in oracle order
  * (attack, sustain, pitch, address, level). */
-int iSNDsetslot(int chan, int addr, int pitch)
+int iSNDsetslot(int chan, unsigned char *addr, int pitch)
 {
     int r = DAT_80147e28[0] + chan * 0x10;
     *(short *)(r + 4)  = (short)pitch;               /* sample rate / pitch */
-    *(short *)(r + 6)  = (short)(addr >> 3);         /* SPU start address (8-byte units) */
+    *(short *)(r + 6)  = (short)((int)addr >> 3);    /* SPU start address (8-byte units) */
     *(short *)(r + 8)  = 0xf;                        /* ADSR attack */
     *(short *)(r + 10) = 5;                          /* ADSR sustain/release */
     *(short *)(r + 0xe) = 0x200;                     /* ADSR sustain level */
@@ -300,7 +300,7 @@ unsigned int iSNDstartvoice(unsigned int chan)
             a3 = a3 << 4;
         }
         iSNDsetslot(voice->link_index.vs,
-                    voice->spu_start_address + a3, pitch);
+                    (unsigned char *)((unsigned int)voice->spu_start_address + a3), pitch);
         maskLink = voice->link_index.vs;
         vte2->play_state = 2;
         vte2->voice_status = 2;
@@ -465,7 +465,7 @@ int iSNDinit(void)
     volatile unsigned int *bcr;
     volatile unsigned int *chcr;
     volatile unsigned int *dpcr;
-    unsigned int *spu;    /* runtime copy of the SPU base (0x1F801C00) */
+    unsigned char *spu;    /* runtime byte base of the SPU MMIO register banks */
     unsigned char *wait_spu;
     unsigned char *pd;
     unsigned char *latched;
@@ -473,8 +473,8 @@ int iSNDinit(void)
     unsigned char *loop_gs;
     unsigned char *loop_pd;
     unsigned char *post;
-    int postmask_spu;
-    int post_ctrl;
+    volatile unsigned char *postmask_spu;
+    volatile unsigned char *post_ctrl;
     int pitch;
     int done;
     unsigned short master;
@@ -486,7 +486,7 @@ int iSNDinit(void)
     bcr = (volatile unsigned int *)0x1f8010c4;
     chcr = (volatile unsigned int *)0x1f8010c8;
     dpcr = (volatile unsigned int *)0x1f8010f0;
-    spu = (unsigned int *)0x1f801c00;
+    spu = (unsigned char *)0x1f801c00;
     pd = sndpd;
     ((struct SndSpuMemoryStateView *)pd)->memory.engine_ver = 0x41;
     *dpcr = *dpcr | 0xb0000;
@@ -519,13 +519,13 @@ int iSNDinit(void)
     *(volatile unsigned short *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)latched)->registers.control_base + 0x1b0) = 0;
     *(volatile unsigned short *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)latched)->registers.control_base + 0x1b2) = 0;
     *(volatile unsigned short *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)latched)->registers.control_base + 0x1b4) = 0;
-    postmask_spu = (int)((struct SndSpuRegisterBasesStateView *)latched)->registers.control_base;
+    postmask_spu = ((struct SndSpuRegisterBasesStateView *)latched)->registers.control_base;
     MASK_SR_FOR_DMA_CALLBACK(sr, ch, callback);
     *(volatile unsigned short *)(postmask_spu + 0x1b6) = 0;
     *(volatile unsigned short *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)latched)->registers.control_base + 0x1aa) = 0xc000;
     DMACallback(ch, callback);               /* install the real DMA4 (SPU) callback */
     wr_sr(sr);
-    iSNDdmqueue(sndpdsafeloop, 0x1000, 0x10, 1, 0);     /* clear first SPU page */
+    iSNDdmqueue(sndpdsafeloop, (unsigned char *)0x1000, 0x10, 1, 0);     /* clear first SPU page */
 
     i = 0;
     gs = (unsigned char *)sndgs;
@@ -555,7 +555,7 @@ int iSNDinit(void)
     master = 0x3fff;
     *(volatile unsigned short *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)post)->registers.control_base + 0x180) = master;
     *(volatile unsigned short *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)post)->registers.control_base + 0x182) = master;
-    post_ctrl = (int)((struct SndSpuRegisterBasesStateView *)post)->registers.control_base;
+    post_ctrl = ((struct SndSpuRegisterBasesStateView *)post)->registers.control_base;
     *(volatile unsigned short *)(post_ctrl + 0x1aa) =
         *(volatile unsigned short *)(post_ctrl + 0x1aa) | 1;
     iSNDpsxfxinit(*(int *)(post + 4));

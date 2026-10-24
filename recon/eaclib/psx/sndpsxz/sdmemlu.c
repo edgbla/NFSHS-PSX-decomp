@@ -28,7 +28,7 @@
  *   prev entries retain INDEX-form (oracle `sll i,2` in the loop-top delay slot, NOT strength-reduced --
  *   see the gap-reuse comment); `tbl` is a walked SndSpuFreeBlock pointer (oracle `addiu a2,a2,4` in
  *   the loop-back delay slot); both hit-arms assign `best` before `*out`. */
-int SNDmemlargestunused(int *out)
+int SNDmemlargestunused(unsigned char **out)
 {
     int             best, gap, i, end, n;
     unsigned short  count;
@@ -37,7 +37,7 @@ int SNDmemlargestunused(int *out)
     unsigned char  *q;
     unsigned char  *base = sndpd;
 
-    *out = 0x41;
+    *out = (unsigned char *)0x41;
     best = 0;
     count = ((struct SndSpuMemoryStateView *)base)->memory.alloc_count;
     if (!count) {
@@ -74,7 +74,7 @@ int SNDmemlargestunused(int *out)
                     gap = tbl->block - end;
                     if (best < gap) {
                         best = gap;
-                        *out = end;
+                        *out = (unsigned char *)(unsigned int)end;
                     }
                 }
             }
@@ -90,9 +90,9 @@ int SNDmemlargestunused(int *out)
         gap = ((struct SndSpuMemoryStateView *)sndpd)->memory.boundary.view.virtual_previous.size - end;
         if (best < gap) {
             best = gap;
-            *out = end;
+            *out = (unsigned char *)(unsigned int)end;
         }
     }
-    *out = *out << 6;
+    *out = (unsigned char *)((unsigned int)*out << 6);
     return best << 6;
 }

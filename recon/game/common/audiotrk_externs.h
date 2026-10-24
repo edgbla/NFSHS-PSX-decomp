@@ -12,7 +12,7 @@ extern "C" {
 #include "eaclib/psx/eacpsxz/timer.h"
 }
 extern "C" {
-int SNDmemlargestunused(...);
+int SNDmemlargestunused(unsigned char **out);
 int SNDover(...);
 u_short PAD_state(int padID);
 }

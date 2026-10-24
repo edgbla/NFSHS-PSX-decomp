@@ -8,8 +8,8 @@ struct SndSpuRegisterBases {
     volatile unsigned int *dma4_bcr;  /* +0x504 */
     volatile unsigned int *dma4_chcr; /* +0x508 */
     volatile unsigned int *dpcr;      /* +0x50C */
-    unsigned int *voice_base;         /* +0x510 */
-    unsigned int *control_base;       /* +0x514 */
+    volatile unsigned char *voice_base;   /* +0x510: SPU voice-register byte base */
+    volatile unsigned char *control_base; /* +0x514: SPU control-register byte base */
 };
 typedef char SndSpuRegisterBases_size_check[(sizeof(struct SndSpuRegisterBases) == 0x1C) ? 1 : -1];
 

@@ -217,14 +217,14 @@ void iSNDleaveaudio(void)
  *   The count uses its signed view for the array index and unsigned view for the increment-store.
  * MATCH: the named callback array in `SndGlobalServerStateView` emits the retail sll(count*4), addu,
  *   then `sw a0,0x4c(base)` displacement sequence. */
-short *iSNDserveradd100hzclient(void (*cb)(void))
+struct SndGlobalServerStateView *iSNDserveradd100hzclient(void (*cb)(void))
 {
     /* Keep the raw count as the scaled index; do not fold the 0x13-slot prefix into it. The field
      * expression below is a true array member yet retains the retail +0x4c store displacement. */
     struct SndGlobalServerStateView *base = (struct SndGlobalServerStateView *)sndgs;
     base->client_100hz_callbacks[(signed char)base->client_100hz_count.s] = cb;
     base->client_100hz_count.u = base->client_100hz_count.u + 1;
-    return (short *)sndgs;
+    return (struct SndGlobalServerStateView *)sndgs;
 }
 
 /* iSNDserverremove100hzclient @0x800EA620 : unregister a 100 Hz callback, compacting the client list.

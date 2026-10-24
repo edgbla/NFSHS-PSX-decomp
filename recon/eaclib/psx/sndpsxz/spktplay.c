@@ -103,7 +103,7 @@ typedef struct PacketPlayerHeader {
     unsigned short outstanding_frames;     /* +0x0E */
     int pending_bytes;                    /* +0x10 */
     int consumed_bytes;                   /* +0x14 */
-    void *mem_base;                       /* +0x18 */
+    unsigned char *mem_base;              /* +0x18: original byte-addressed player allocation base */
     void (*release_cb)(unsigned char *);    /* +0x1C */
     void (*notify_cb)(int, unsigned int);  /* +0x20 */
     SNDSAMPLEFORMAT rate;                 /* +0x24..+0x27 */
@@ -142,11 +142,11 @@ int SNDPKTPLAY_overhead(int n)
  *   (3) `mem` is DEAD after the offset add (lever #14 in-place mutate): reassigned in place to become
  *       `ppp` and used directly for every subsequent field store; the pre-offset value is saved to
  *       `savedmem` as `void *` (oracle's `$s0`) before the reassignment for the +0x18 `mem_base` store. */
-int SNDPKTPLAY_create(void *mem, int memsize, void (*relcb)(unsigned char *),
+int SNDPKTPLAY_create(unsigned char *mem, int memsize, void (*relcb)(unsigned char *),
                       void (*notifycb)(int, unsigned int))
 {
     int slot, off;
-    void *savedmem;
+    unsigned char *savedmem;
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized)
         return -10;
     for (slot = 0; slot < 1; slot++) {
@@ -185,8 +185,8 @@ found:
  *   decoded 0x14-byte `SndPatchAttributes` record, and params points to `SndStream.start_params`
  *   (`struct SNDPLAYOPTS`, size 0x14). Player, rate, attributes, play options and channel use
  *   PacketPlayerHeader, SNDSAMPLEFORMAT, SndPatchAttributes, SNDPLAYOPTS and private SndChannel layouts. */
-int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hdr,
-                     struct SNDPLAYOPTS *params)
+int SNDPKTPLAY_start(int p, const SNDSAMPLEFORMAT *rate, const struct SndPatchAttributes *hdr,
+                     const struct SNDPLAYOPTS *params)
 {
     PacketPlayerHeader *ppp;
     int note, allocOut, dur, r;
@@ -380,7 +380,7 @@ int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hd
  *   | opacity fence on j 2   (all 93/93).
  * i.e. every form that puts j's evaluation first pays 12, and no fence position buys the order
  * without the colour.  Do not re-run the order sweep. */
-int SNDPKTPLAY_submit(int p, void *frame)
+int SNDPKTPLAY_submit(int p, const union SndPacketSubmitFrameView *frame)
 {
     PacketPlayerHeader *ppp;
     unsigned char *slot;
@@ -395,7 +395,7 @@ int SNDPKTPLAY_submit(int p, void *frame)
                                                              * `slt;bnez room / [fallthrough] j leave`
                                                              * shape, not an if/else. */
         goto room;
-    frame = (void *)(unsigned int)(-0xd);                                         /* MATCH: the oracle reuses `frame`'s OWN
+    frame = (const union SndPacketSubmitFrameView *)(unsigned int)(-0xd);                                         /* MATCH: the oracle reuses `frame`'s OWN
                                                              * register ($s1) as the return-value
                                                              * carrier for the whole fn -- its ONLY
                                                              * use past this point is the dead-param
@@ -411,16 +411,16 @@ room:
             int off = idx * sizeof(PacketFrame) + sizeof(PacketPlayerHeader);
             slot = (unsigned char *)ppp + off;
         }
-        ((PacketFrame *)slot)->size = ((SndPacketSubmitFrameView *)frame)->fields.data_size;                /* size */
+        ((PacketFrame *)slot)->size = frame->fields.data_size;                /* size */
         ((PacketFrame *)slot)->sequence = ppp->submit_sequence;                         /* sequence */
         if (ppp->rate.channels) {                         /* copy the per-channel pointers */
             int j;
-            unsigned char *src;
+            const unsigned char *src;
             do { j = 0; } while (0);              /* MATCH: zero-insn REF INFLATOR on j (see
                                                      * the header receipt) -- j must be born
                                                      * FIRST for reorg's delay-slot steal AND
                                                      * still out-rank src in allocno_compare. */
-            src = (unsigned char *)frame;
+            src = (const unsigned char *)frame;
             do {                                          /* MATCH: walks `slot` itself in place
                                                              * (lever #14) -- `frame` stays intact
                                                              * (re-read below), `slot`/a0 is dead
@@ -432,8 +432,8 @@ room:
             } while (j < ppp->rate.channels);
         }
         ((volatile PacketPlayerHeader *)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)ppp)->outstanding_frames + 1;                /* count++ (plain lhu, no shift) */
-        ((volatile PacketPlayerHeader *)ppp)->pending_bytes = ppp->pending_bytes + ((SndPacketSubmitFrameView *)frame)->fields.data_size;  /* bytes pending += size */
-        frame = (void *)(unsigned int)((volatile PacketPlayerHeader *)ppp)->submit_sequence;               /* MATCH: reuse `frame` (dead after the
+        ((volatile PacketPlayerHeader *)ppp)->pending_bytes = ppp->pending_bytes + frame->fields.data_size;  /* bytes pending += size */
+        frame = (const union SndPacketSubmitFrameView *)(unsigned int)((volatile PacketPlayerHeader *)ppp)->submit_sequence;               /* MATCH: reuse `frame` (dead after the
                                                              * loop) as `seq` -- oracle's `lw s1,4(s0)`
                                                              * right here, same register as the param. */
         ppp->submit_sequence = ((volatile PacketPlayerHeader *)ppp)->submit_sequence + 1;      /* sequence++ */

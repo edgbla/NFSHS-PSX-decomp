@@ -85,9 +85,10 @@ int iSNDplatformresolve(unsigned char *cursor, const unsigned char *bankData, st
     int           size = 0;
     int           count = 1;
     int           offset = size;
-    int          *spuField = (int *)size; /* the 0x8a field that receives the SPU address */
+    unsigned char **spuField = (unsigned char **)size; /* 0x8a stores an SPU byte address */
     int           idx = size;
-    int           blocks, scale, buf, dma;
+    int           blocks, scale, dma;
+    unsigned char *buf;
     struct SNDResolveEntry *e;
     struct SNDResolveEntry *scan;
     struct SNDResolveEntry *cur;
@@ -96,7 +97,7 @@ int iSNDplatformresolve(unsigned char *cursor, const unsigned char *bankData, st
     while (iSNDgettag(&cursor, &id, &val, &ptr) && id != 0xfe) {
         if (id == 0x80)      { /* no-op tag */ }
         else if (id == 0x88) offset   = val;
-        else if (id == 0x8a) spuField = (int *)ptr;
+        else if (id == 0x8a) spuField = (unsigned char **)ptr;
         else if (id == 0x82) count    = val;
         else if (id == 0x85) size     = val;
     }
@@ -143,7 +144,7 @@ found:
         *spuField = scan->spu;
         goto checked;
 resolve:
-        dma = iSNDdmqueuesplit(bankData + offset, (unsigned int)buf, blocks, 1);
+        dma = iSNDdmqueuesplit(bankData + offset, buf, blocks, 1);
         *spuField = buf;
         patch[idx].offset = offset;
         patch[idx].spu = buf;
@@ -159,23 +160,23 @@ int iSNDplatformremove(unsigned char *cursor, struct SNDRemoveEntry *patch)
     unsigned int  id;
     int           val;
     unsigned char *ptr;
-    int          *spuField = 0;
+    unsigned char **spuField = 0;
     int           i;
 
     while (iSNDgettag(&cursor, &id, &val, &ptr) && id != 0xfe) {
         if (id == 0x8a)
-            spuField = (int *)ptr;
+            spuField = (unsigned char **)ptr;
     }
     i = 0;
-    if (patch[0].spu_address != -1) {
+    if (patch[0].spu_address != (unsigned char *)-1) {
         do {
             if (patch[i].spu_address == *spuField)    /* already removed */
                 return 0;
             i++;
-        } while (patch[i].spu_address != -1);
+        } while (patch[i].spu_address != (unsigned char *)-1);
     }
     patch[i].spu_address = *spuField;
     if (*spuField)
-        iSNDpsxfree((void *)*spuField);
+        iSNDpsxfree(*spuField);
     return 0;
 }

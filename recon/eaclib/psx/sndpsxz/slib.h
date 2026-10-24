@@ -2,13 +2,13 @@
 #define _SNDPSXZ_SLIB_H_
 
 extern void iSNDcalcvol(int chan); /* spatkey */
-extern int iSNDpsxkeyon(int mask);
-extern int iSNDpsxkeyoff(int mask); /* spatkey */
+extern volatile unsigned char *iSNDpsxkeyon(int mask);
+extern volatile unsigned char *iSNDpsxkeyoff(int mask); /* spatkey */
 extern unsigned int iSNDpsxeffecton(int mask); /* spatkey */
 extern unsigned int iSNDpsxeffectoff(int mask); /* spatkey */
-extern int iSNDpsxeffectvol(int left, int right); /* spatkey */
+extern volatile unsigned char *iSNDpsxeffectvol(int left, int right); /* spatkey */
 extern void iSNDsetvol(int chan, int left, int right); /* spatkey */
-extern int iSNDsetslot(int chan, int addr, int pitch); /* @0x800FF394 */
+extern int iSNDsetslot(int chan, unsigned char *addr, int pitch); /* @0x800FF394 */
 extern unsigned int iSNDstartvoice(unsigned int chan); /* spatkey */
 extern int iSNDplatformoutputcaps(void); /* @0x800FF5A8 -- oracle explicitly zeroes $v0 before return */
 extern int iSNDplatformoutputset(void); /* @0x800FF600 */

@@ -3,12 +3,12 @@
 
 struct SNDResolveEntry {
     int offset;
-    int spu;
+    unsigned char *spu;
 };
 typedef char SNDResolveEntry_size_check[(sizeof(struct SNDResolveEntry) == 8) ? 1 : -1];
 
 struct SNDRemoveEntry {
-    int spu_address;
+    unsigned char *spu_address;
     int reserved;
 };
 typedef char SNDRemoveEntry_size_check[(sizeof(struct SNDRemoveEntry) == 8) ? 1 : -1];

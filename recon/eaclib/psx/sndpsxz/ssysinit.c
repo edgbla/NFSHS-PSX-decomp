@@ -78,11 +78,11 @@ int SNDSYS_getopts(SNDSYSOPTS *opts)
  *   array-shaped D_80147898 alias lets the callback store fill outputset's jal
  *   delay slot; spelling that store as a direct typed vec assignment regresses
  *   this function while preserving behavior. */
-int SNDSYS_setopts(SNDSYSOPTS *opts)
+int SNDSYS_setopts(const SNDSYSOPTS *opts)
 {
     char *base = (char *)sndgs;
     ((SNDSYSOPTS *)base)->set = opts->set;
-    D_80147898[0] = (int)opts->vec.issurfacelocked;
+    D_80147898[0] = opts->vec.issurfacelocked;
     iSNDplatformoutputset();
     return 0;
 }
@@ -116,7 +116,7 @@ int SNDSYS_init(void *membase, int memsize)
     memset(base->bank_table, 0,
            ((SNDSYSOPTS *)base)->set.maxbanks * sizeof(struct SndBankTableEntry));
     if (!base->server_callback)
-        base->server_callback = (int)iSND100hzserver;
+        base->server_callback = iSND100hzserver;
     SNDI_mutexalloc();
     base->tick_count = 0;
     base->real_ticks = 0;

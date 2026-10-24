@@ -20,7 +20,7 @@ union SndPacketLinkIndexView {
 typedef union SndPacketLinkIndexView SndPacketLinkIndexView;
 typedef char SndPacketLinkIndexView_size_check[(sizeof(SndPacketLinkIndexView) == 1) ? 1 : -1];
 
-typedef union SndPacketSubmitFrameView {
+union SndPacketSubmitFrameView {
     int words[8];
     struct {
         int word_00;
@@ -28,11 +28,12 @@ typedef union SndPacketSubmitFrameView {
         int word_08;
         unsigned char *channel_data[5]; /* +0x0C; variable-length sample-pointer list */
     } fields;
-} SndPacketSubmitFrameView;
+};
+typedef union SndPacketSubmitFrameView SndPacketSubmitFrameView;
 typedef char SndPacketSubmitFrameView_size_check[(sizeof(SndPacketSubmitFrameView) == 0x20) ? 1 : -1];
 
 struct SndPacketVoiceState {
-    int spu_start_address;          /* +0x00: resolved SPU sample start address */
+    unsigned char *spu_start_address; /* +0x00: resolved SPU sample start address */
     int loop_length_param;         /* +0x04: tag 0x85 loop-length value */
     unsigned int position_step;          /* +0x08: per-tick playback-position step set by iSNDplatformpitch */
     int byte_position;                /* +0x0C: SPU play position, 12 fractional bits */
@@ -66,7 +67,7 @@ typedef union SndPacketContextHalfword SndPacketContextHalfword;
 
 /* Proven prefix of each malloc'd per-player SPU context; allocation extends beyond this view. */
 struct SndPacketPlayerContextPrefix {
-    int spu_address;                  /* +0x00 */
+    unsigned char *spu_address;       /* +0x00: allocated SPU byte-address base */
     int spu_size;                     /* +0x04 */
     int source_channel_stride;        /* +0x08 */
     int buffer_bytes;                 /* +0x0C */

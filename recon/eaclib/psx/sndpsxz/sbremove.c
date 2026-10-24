@@ -21,7 +21,7 @@ int iSNDremovepatches(int bank, int count)
     struct SNDRemoveEntry scratch[256];
     struct SNDRemoveEntry *p;
     int i;
-    int neg1 = -1;
+    unsigned char *neg1 = (unsigned char *)-1;
     for (i = 0xFF, p = &scratch[255]; i >= 0; i--, p--) {
         p->spu_address = neg1;
     }
@@ -74,7 +74,7 @@ int cSNDbankremove(int bankId, int recurse)
         entry = (unsigned char *)(bankId * sizeof(struct SndBankTableEntry) +
             (unsigned int)*(struct SndBankTableEntry * volatile *)&base2->bank_table);
         if (((struct SndBankTableEntry *)entry)->platform_allocated.s) {
-            iSNDplatformfree((int)(unsigned int)((struct SndBankTableEntry *)entry)->platform_block);
+            iSNDplatformfree(((struct SndBankTableEntry *)entry)->platform_block);
             sndgs.bank_table[bankId].platform_allocated.u = 0;
         } else
             iSNDremovepatches(bankId, data->patch_count);

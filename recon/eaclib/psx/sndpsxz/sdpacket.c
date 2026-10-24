@@ -337,7 +337,7 @@ success:
          * unchanged and the mechanism (loop.c APPENDS hoisted movables after the straight-line
          * preheader) stands; what is now also known is that the copy CANNOT be turned into a movable
          * from C on this compiler. */
-        *(volatile short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1a4) = (short)(ctx->spu_address + 8 >> 3);
+        *(volatile short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1a4) = (short)(((int)ctx->spu_address + 8) >> 3);
         InterruptCallback(9, iSNDpacketirqcallback);   /* re-arm: 9 == SPU IRQ index, handler = self */
         iSNDpsxenablespuirq();
     }
@@ -758,9 +758,9 @@ queue_dma:
              * chunk==0 (the bnez-delay-slot idiom -- both paths always compute src the same). */
             unsigned int len = pp->block_bytes.u;
             int  stride = pp->source_channel_stride * i;
-            unsigned int src = (unsigned int)pp->spu_address +
-                                (chunk << pp->block_shift) +
-                                stride;
+            unsigned char *src = pp->spu_address +
+                                 (chunk << pp->block_shift) +
+                                 stride;
             /* MATCH (w31): flag as default-0 + conditional OVERWRITE (int, no mask) -- the
              * `&&`-ternary form computed the compare into a temp then copied it into the arg reg
              * (`sltiu v0;addu a0,v0`), oracle overwrites a0 in place (`sltiu a0,s0,1`). */
@@ -852,7 +852,7 @@ int iSNDplatformpacketoverhead(void)
 /* iSNDplatformcalcdatarate @0x801041EC : bytes/second for `sample_format->samplerate` and its
  *   channel count, scaled by 0x92/256 (ADPCM ratio). Keep the promoted fields in signed int here;
  *   an unsigned product changes the final oracle `sra` to `srl` (2 diffs). */
-int iSNDplatformcalcdatarate(SNDSAMPLEFORMAT *sample_format)
+int iSNDplatformcalcdatarate(const SNDSAMPLEFORMAT *sample_format)
 {
     return (sample_format->samplerate * sample_format->channels * 0x92) >> 8;
 }
@@ -896,7 +896,7 @@ void iSNDplatformpacketplaydestroy(int p)
  *   table, derive the SPU block geometry from the player ctx, prime two buffers via iSNDfillspuwithpackets,
  *   install the serve + IRQ hooks, set initial pitch, and key the voice.  9-arg (Ghidra dropped a3..a9); `a9` is passed but unused here. */
 int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
-                                      int pitch, int a6, int fxlevel, SNDSAMPLEFORMAT *hdr, int a9)
+                                      int pitch, int a6, int fxlevel, const SNDSAMPLEFORMAT *hdr, int a9)
 {
     /* MATCH: same base-sharing lever as iSNDfillspuwithpackets/iSNDpacketgetirq -- ONE bare &sndpd
      * (oracle: v1) feeds BOTH the DAT_80147e10[p] load (base+p*4, +0x4F8 as the LOAD DISPLACEMENT,

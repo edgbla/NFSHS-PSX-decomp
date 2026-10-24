@@ -7,7 +7,7 @@ extern "C" {
 int rand(void);
 int SNDover(int);
 int SNDSYS_getopts(SNDSYSOPTS *);
-int SNDSYS_setopts(SNDSYSOPTS *);
+int SNDSYS_setopts(const SNDSYSOPTS *);
 int SNDstop(int);
 int sprintf(char *, const char *, ...);
 }

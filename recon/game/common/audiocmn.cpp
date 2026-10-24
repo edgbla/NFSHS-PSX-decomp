@@ -291,7 +291,10 @@ void AudioCmn_LoadAsyncSfx(int bank,int patch,void *pbank,int size)
    * retail's 0x8005573c. The constant-false call adds no code. */
   if (0) AudioCmn_LoadBank("SimpleMem",0);
   int slot;
-  int check;
+  union {
+    unsigned char *spuStart;
+    int status;
+  } check;
   AudioCmn_tAsyncSfxSlot *s;
 
   slot = 0;
@@ -301,7 +304,7 @@ void AudioCmn_LoadAsyncSfx(int bank,int patch,void *pbank,int size)
     s = &AudioCmn_gSfxSlot[slot];
     if ((patch == s->patch) && (bank == s->bank) && (s->handle == -1)) {
       if (size != 0) {
-        while (SNDmemlargestunused(&check) - 0x1000 < size) {
+        while (SNDmemlargestunused(&check.spuStart) - 0x1000 < size) {
           if (AudioCmn_RemoveOldestAsyncSfx(bank) == -1) {
             if (bank == 2) {
               puts("out of SPU ram on speech!\n");
@@ -311,9 +314,9 @@ void AudioCmn_LoadAsyncSfx(int bank,int patch,void *pbank,int size)
             return;
           }
         }
-        check = SNDbankadd(&s->handle,pbank);
+        check.status = SNDbankadd(&s->handle,pbank);
         /* MATCH P902: native SLD 572 groups success and header allocation. */
-        if ((check == 7) && ((s->header = (char *)reservememadr("SFXHDR",SNDbankheadersize(s->handle),0x10)) != 0)) {
+        if ((check.status == 7) && ((s->header = (char *)reservememadr("SFXHDR",SNDbankheadersize(s->handle),0x10)) != 0)) {
           SNDbankheadercopy(s->header,(u_char *)s->handle);
           s->patch = patch;
           s->ticks = simGlobal.gameTicks;
@@ -323,7 +326,7 @@ void AudioCmn_LoadAsyncSfx(int bank,int patch,void *pbank,int size)
           puts("SNDbankadd failed on speech!\n");
         }
         SNDbankheadersize(s->handle);
-        if (check >= 0) {
+        if (check.status >= 0) {
           SNDbankremove(s->handle);
         }
       }
@@ -521,7 +524,7 @@ void AudioCmn_Reset(void)
     goodtogo = false;
     ticks = gettick() + 0x280;
     while (1) {
-      int check;
+      unsigned char *check;
 
       if (goodtogo) break;
       if (gettick() >= ticks) break;

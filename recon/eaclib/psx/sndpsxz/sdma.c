@@ -255,7 +255,7 @@ void iSNDdmservice(void)
  *   bytes of prio/flag. Reusing the saved Status value and walking sndpd+0x10 fixes the earlier
  *   critical-section and split-storage bugs. Snapshotting the new handle before the verified interrupt-mask
  *   sequence preserves the oracle's load and all three COP0 hazard slots (39->28 detailed diffs). */
-int iSNDdmqueue(const unsigned char *ram_source, unsigned int spu_address, int len, int prio, int flag)
+int iSNDdmqueue(const unsigned char *ram_source, unsigned char *spu_address, int len, int prio, int flag)
 {
     int queuedFlag = flag;
     int i;
@@ -304,7 +304,7 @@ scan:
         handleSnapshot = ((struct SndDmaQueueStateView *)pd)->next_handle;
         ent->ram_source = ram_source;
         ent->handle = handleSnapshot;
-        ent->spu_address_8 = (unsigned short)(spu_address >> 3);
+        ent->spu_address_8 = (unsigned short)((unsigned int)spu_address >> 3);
         ent->len64 = (unsigned char)(len >> 6);
         ent->priority = (unsigned char)prio;
         ent->flag = (unsigned char)queuedFlag;
@@ -325,7 +325,7 @@ scan:
  *   up (>3 in flight). The RAM source advances bytewise; the SPU address remains a scalar device address.
  *   Returns the last chunk's handle. MATCH (54/54): signed queue depth, strict 4 KB chunk selection,
  *   raw integer priority and the pre-tested service loop all follow the oracle. */
-int iSNDdmqueuesplit(const unsigned char *ram_source, unsigned int spu_address, int len, int prio)
+int iSNDdmqueuesplit(const unsigned char *ram_source, unsigned char *spu_address, int len, int prio)
 {
     int r = 0, chunk;
     if (len > 0) {
