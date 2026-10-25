@@ -145,24 +145,25 @@ unsigned int iSNDpsxfxinit(int mode)
      *     while the SPU destination is indexed by the counter -- mixed walk/index, exactly as
      *     retail wrote it; indexing both sides costs 3 extra insns.
      *  4. The per-iteration control-register reload uses the ordinary typed state-view pointer `ctl`,
-     *     with an explicit volatile-int lvalue only on `control_base` (`lw $v1,0x514($a3)`); the
-     *     state displacement remains +0x514 on each iteration. Removing that field-level volatile
-     *     changes 6 instructions, but the pointer itself needs no volatile pointee qualifier. */
+     *     with a volatile pointer lvalue for the stored `control_base` pointer (`lw $v1,0x514($a3)`);
+     *     the state displacement remains +0x514 on each iteration. Removing that field-load volatility
+     *     changes 6 instructions. The control-address expressions elsewhere use byte-pointer arithmetic;
+     *     their existing short lvalue casts are unchanged. */
     n = 0;
-    *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) & 0xff7f;  /* reverb off while loading */
+    *(unsigned short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = *(unsigned short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) & 0xff7f;  /* reverb off while loading */
     {
         struct SndSpuRegisterBasesStateView *ctl = (struct SndSpuRegisterBasesStateView *)pd;
         short *rp = rv;
         for (; n < 0x20; n++) {                           /* 0x20 reverb coefficient regs */
             short v = rp[1];
             rp++;
-            *(unsigned short *)(n * 2 + *(volatile int *)&ctl->registers.control_base + 0x1c0) = (unsigned short)v;
+            *(unsigned short *)(n * 2 + *(volatile unsigned char * volatile *)&ctl->registers.control_base + 0x1c0) = (unsigned short)v;
         }
     }
     work = 0x10000 - (unsigned short)rv[0];
     /* volatile: the oracle does NOT fill the following jal's delay slot with this store (it emits
      * `sh; jal; nop`), which is reorg refusing to move a volatile MEM -- §3.25-3c inverted. */
-    *(volatile short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1a2) = (short)work;        /* reverb work-area start address */
+    *(volatile short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1a2) = (short)work;        /* reverb work-area start address */
 
     blockclear((int)scratch, 0x100);                      /* zero the 256-byte DMA scratch */
     /* 🔴 CORRECTNESS FIX (w32, oracle-proven): the clear loop starts at the reverb WORK-AREA base,
@@ -205,8 +206,8 @@ unsigned int iSNDpsxfxinit(int mode)
      * LESSON for the catalog: "expand-order identity" was a WEAK floor (single mechanism asserted,
      * levers never combined).  Compiler-snapshot invariance across psq43/44/45 proves only that the
      * COMPILER is not the variable -- it says nothing about whether the SOURCE shape is reachable. */
-    ctl = *(unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) | 0x80;   /* reverb enable */
-    *(short *)((int)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = (short)ctl;
+    ctl = *(unsigned short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) | 0x80;   /* reverb enable */
+    *(short *)((unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.control_base + 0x1aa) = (short)ctl;
     return ctl;
 }
 

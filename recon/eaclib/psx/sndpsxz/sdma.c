@@ -132,22 +132,22 @@ void iSNDdmtransfer(void)
         }
     }
     {
-        int gsAddr = (int)sndgs;
+        unsigned char *gsAddr = (unsigned char *)sndgs;
         unsigned char *hwBase = sndpd;
-        int ctrl;
+        volatile unsigned char *ctrl;
         volatile unsigned int *dpcr;
         activeEntry->deadline = *(volatile int *)(gsAddr + 0x44) + 0xf;
-        ctrl = *(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.control_base;
+        ctrl = *(volatile unsigned char * volatile *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.control_base;
         *(volatile unsigned short *)(ctrl + 0x1a6) = activeEntry->spu_address_8;
-        ctrl = *(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.control_base;
+        ctrl = *(volatile unsigned char * volatile *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.control_base;
         *(volatile unsigned short *)(ctrl + 0x1aa) =
             *(volatile unsigned short *)(ctrl + 0x1aa) & 0xffcf | 0x20;
         dpcr = ((struct SndSpuRegisterBasesStateView *)hwBase)->registers.address_4fc;
         *dpcr = *dpcr & 0xf0ffffff | 0x20000000;
-        *(volatile unsigned int *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_madr) = (unsigned int)activeEntry->ram_source;
-        *(volatile unsigned int *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_bcr) =
+        *(volatile unsigned int *)(*(volatile unsigned int * volatile *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_madr) = (unsigned int)activeEntry->ram_source;
+        *(volatile unsigned int *)(*(volatile unsigned int * volatile *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_bcr) =
             (unsigned int)activeEntry->len64 << 0x10 | 0x10;
-        *(volatile unsigned int *)(*(volatile int *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_chcr) = 0x1000201;
+        *(volatile unsigned int *)(*(volatile unsigned int * volatile *)&((struct SndSpuRegisterBasesStateView *)hwBase)->registers.dma4_chcr) = 0x1000201;
     }
     wr_sr(sr);
 }
