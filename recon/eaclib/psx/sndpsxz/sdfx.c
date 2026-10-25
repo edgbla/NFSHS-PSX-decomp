@@ -157,7 +157,7 @@ unsigned int iSNDpsxfxinit(int mode)
         for (; n < 0x20; n++) {                           /* 0x20 reverb coefficient regs */
             short v = rp[1];
             rp++;
-            *(unsigned short *)(n * 2 + *(volatile unsigned char * volatile *)&ctl->registers.control_base + 0x1c0) = (unsigned short)v;
+            *(unsigned short *)(n * 2 + *(unsigned char * volatile *)&ctl->registers.control_base + 0x1c0) = (unsigned short)v;
         }
     }
     work = 0x10000 - (unsigned short)rv[0];

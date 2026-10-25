@@ -70,9 +70,9 @@ int cSNDbankremove(int bankId, int recurse)
             } while (loopbase->channel_count > ++i);
         }
         base2 = &sndgs;
-        /* Preserve the volatile pointer load; use a 32-bit sum only for retail codegen. */
+        /* Keep the 32-bit sum for retail operand order; bank_table is ordinary state, not volatile. */
         entry = (unsigned char *)(bankId * sizeof(struct SndBankTableEntry) +
-            (unsigned int)*(struct SndBankTableEntry * volatile *)&base2->bank_table);
+            (unsigned int)base2->bank_table);
         if (((struct SndBankTableEntry *)entry)->platform_allocated.s) {
             iSNDplatformfree(((struct SndBankTableEntry *)entry)->platform_block);
             sndgs.bank_table[bankId].platform_allocated.u = 0;

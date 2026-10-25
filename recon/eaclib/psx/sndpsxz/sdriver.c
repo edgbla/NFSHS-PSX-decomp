@@ -35,7 +35,7 @@ extern char          DAT_801479f0;     /* +0x00 voice-table base (byte, for hook
 int iSNDstop(unsigned int chan)
 {
     int vt = (int)chan * (int)sizeof(SndPacketVoiceState);
-    volatile unsigned char *base = sndpd + 0xd8;
+    unsigned char *base = sndpd + 0xd8;
     volatile SndPacketVoiceState *slot = (volatile SndPacketVoiceState *)(base + vt);
     unsigned int mask;
 

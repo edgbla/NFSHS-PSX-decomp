@@ -22,7 +22,7 @@ int iSNDplatformcdpanvol(int pan, int vol)
 {
     int *base;
     int outL, outR;
-    volatile unsigned char *ctlL;
+    unsigned char *ctlL;
     int r;
     iSNDpvtolrv(pan, vol, &outL, &outR);
     /* MATCH (byte-exact): three shape facts the oracle dictates, in order.
@@ -37,7 +37,7 @@ int iSNDplatformcdpanvol(int pan, int vol)
      *     store on its own (it would have to prove no alias) -- retail's source read it early.
      *     Reading it any earlier (before the ctlL load) mis-orders the pair; hence this exact spot. */
     base = (int *)sndpd;
-    ctlL = ((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
+    ctlL = (unsigned char *)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
     r = outR;
     ((volatile struct SndSpuCdVolumeRegisterView *)ctlL)->cd_volume_left = (unsigned short)(outL * 0x102 & 0x7fff);
     ((volatile struct SndSpuCdVolumeRegisterView *)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base)->cd_volume_right = (unsigned short)(r * 0x102 & 0x7fff);
