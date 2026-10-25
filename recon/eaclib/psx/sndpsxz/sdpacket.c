@@ -896,7 +896,7 @@ void iSNDplatformpacketplaydestroy(int p)
  *   table, derive the SPU block geometry from the player ctx, prime two buffers via iSNDfillspuwithpackets,
  *   install the serve + IRQ hooks, set initial pitch, and key the voice.  9-arg (Ghidra dropped a3..a9); `a9` is passed but unused here. */
 int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
-                                      int pitch, int a6, int fxlevel, const SNDSAMPLEFORMAT *hdr, int a9)
+                                      int pitch, int a6, int fxlevel, const SNDSAMPLEFORMAT *hdr, const void *a9)
 {
     /* MATCH: same base-sharing lever as iSNDfillspuwithpackets/iSNDpacketgetirq -- ONE bare &sndpd
      * (oracle: v1) feeds BOTH the DAT_80147e10[p] load (base+p*4, +0x4F8 as the LOAD DISPLACEMENT,

@@ -77,7 +77,7 @@ struct SndPacketPlayerContextPrefix {
     int last_new_position;            /* +0x1C */
     int dma_handle;                   /* +0x20 */
     unsigned char *channel_frame_data0; /* +0x24: next sample-byte address */
-    int channel_frame_data1;          /* +0x28 */
+    unsigned char opaque_28_2B[4];   /* +0x28: no typed consumer establishes scalar or address semantics */
     unsigned short *frame_size_table; /* +0x2C: per-chunk 16-bit frame-byte counters */
     SndPacketContextHalfword channel_frame_stride;   /* +0x30 */
     SndPacketContextHalfword source_frame_offset;    /* +0x32 */

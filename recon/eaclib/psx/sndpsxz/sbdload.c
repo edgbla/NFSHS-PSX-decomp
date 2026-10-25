@@ -35,7 +35,7 @@
  *   (4) `i++` moved to the END of the increment run (3 -> PASS) -- see the site.
  *   The residual notes below are kept for their measurement history but their CONCLUSIONS are now
  *   superseded: the function matches under the tree's normal flags. */
-int iSNDdownloadbank(unsigned char *bankData, const unsigned char *patchData)
+int iSNDdownloadbank(struct SndBankDataHeaderPrefix *bankData, const unsigned char *patchData)
 {
     /* SHAPE (from the IDA per-variable register annotations of sub_8010266C, w32):
      *   v3 $s6=ret  v4/v6 $s0=ONE counter shared by the clear loop and the scan loop
@@ -82,7 +82,7 @@ int iSNDdownloadbank(unsigned char *bankData, const unsigned char *patchData)
         do { i--; } while (0);
     } while (i >= 0);
 
-    anchor = bankData;
+    anchor = (unsigned char *)bankData;
     /* MATCH (EAC 2026-10-04, replaces the w50-a7 void-tail `__asm__("" : : "i"(0))` fence):
      * retail issues `addu $fp,$s4,$zero` BEFORE `lhu $v0,6($s4)` and fills the `beqz` slot with
      * `addu $s0,$zero,$zero` (i = 0).  Two gcc facts decide it: sched.c's birthing boost
@@ -93,20 +93,20 @@ int iSNDdownloadbank(unsigned char *bankData, const unsigned char *patchData)
      * (4, copy still sinks), anchor copy wrapped instead (44, its ref weight re-colors s3..fp),
      * guard read through `anchor` (2), anchor copy before the clear loop (4). */
     do { i = 0; } while (0);
-    if (((struct SndBankDataHeaderPrefix *)bankData)->patch_count) {
+    if (bankData->patch_count) {
         type4 = 4;
         off2 = 0xc;
-        cur2 = bankData;
+        cur2 = (unsigned char *)bankData;
         off4 = 0x14;
-        cur4 = bankData;
+        cur4 = (unsigned char *)bankData;
         do {
-            if (((struct SndBankDataHeaderPrefix *)bankData)->type == type4)
+            if (bankData->type == type4)
                 off = ((struct SndBankPatchOffset20CursorView *)cur4)->relative_offset.file_offset;
             else
                 off = ((struct SndBankPatchOffset12CursorView *)cur2)->relative_offset.file_offset;
             if (off) {
-                if (((struct SndBankDataHeaderPrefix *)bankData)->type == type4) {
-                    ((struct SndBankPatchOffset20CursorView *)cur4)->relative_offset.record = (struct SndTaggedPatchRecordPrefixView *)(bankData + off4 + ((struct SndBankPatchOffset20CursorView *)cur4)->relative_offset.file_offset);
+                if (bankData->type == type4) {
+                    ((struct SndBankPatchOffset20CursorView *)cur4)->relative_offset.record = (struct SndTaggedPatchRecordPrefixView *)((unsigned char *)bankData + off4 + ((struct SndBankPatchOffset20CursorView *)cur4)->relative_offset.file_offset);
                     abs = ((struct SndBankPatchOffset20CursorView *)cur4)->relative_offset.record;   /* read-back: cse forwards -> retail's addu copy */
                 } else {
                     ((struct SndBankPatchOffset12CursorView *)cur2)->relative_offset.record = (struct SndTaggedPatchRecordPrefixView *)(anchor + off2 + ((struct SndBankPatchOffset12CursorView *)cur2)->relative_offset.file_offset);
@@ -126,7 +126,7 @@ int iSNDdownloadbank(unsigned char *bankData, const unsigned char *patchData)
              * void fence before the increment, and a void fence after it all measure 3. */
             cur4 += 4;
             i++;
-        } while (i < ((struct SndBankDataHeaderPrefix *)bankData)->patch_count);
+        } while (i < bankData->patch_count);
     }
     /* HISTORICAL RESIDUAL (before the pointer-typed cursor and relocation overlays): this form had
      * 42 diffs at 84/84 insns. The current typed-pointer version above is exact; retain this block

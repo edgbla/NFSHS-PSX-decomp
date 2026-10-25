@@ -118,7 +118,7 @@
  * the new basin: the `i = 0` position sweep (36/36/36/32/28/20/10, optimum still LAST) and
  * hoisting `i = 0` above the count guard (36 -- `i` loses $v1; a do{}while(0) ref inflator on the
  * hoisted init restores the rank and returns to exactly 10, so the hoist is a no-op, not a win). */
-int SNDbankheadercopy(void *dst, int bankId)
+int SNDbankheadercopy(struct SndBankDataHeaderPrefix *dst, int bankId)
 {
     int id;
     unsigned char *dest = (unsigned char *)dst;
@@ -194,7 +194,7 @@ initialized:
         }
         }
     }
-        sndgs.bank_table[id].data_block = dest;
+        sndgs.bank_table[id].data_block = (struct SndBankDataHeaderPrefix *)dest;
         return 0;
     }
 }

@@ -194,14 +194,13 @@ volatile unsigned char *iSNDpsxeffectvol(int left, int right)
  *   carry the a0/a3 webs through the shared tail. */
 void iSNDsetvol(int chan, int left, int right)
 {
-    /* MATCH: keep the byte-shaped base and explicit byte offset. A typed record base plus
-     * typed `voiceBase[chan]` indexing shifts two address-materialization instructions (4 diffs,
-     * still 87 insns). Linked register offsets use the signed volatile link_index.vs view. */
+    /* Keep the driver-state byte base and explicit byte offset; the voice-register cursor is a
+     * pointer, and each SPU halfword access below is volatile MMIO. */
     int            vt = chan * (int)sizeof(SndPacketVoiceState);
     unsigned char *voiceBase = sndpd + 0xd8;
     SndPacketVoiceState *slot = (SndPacketVoiceState *)(voiceBase + vt);
     unsigned char  *pd = (unsigned char *)voiceBase - 0xd8;
-    int            voiceRegs = (int)((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base;
+    unsigned char *voiceRegs = ((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base;
     unsigned short *vreg = (unsigned short *)(voiceRegs + chan * 0x10);
     int            vol;
 
@@ -227,7 +226,7 @@ void iSNDsetvol(int chan, int left, int right)
         if (((struct SndGlobalServerStateView *)sndgs)->output_mode == 2) {
             *vreg   = left * 0x81 & 0x7fff;
             vreg[1] = 0;
-            vreg = (unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base +
+            vreg = (unsigned short *)(((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base +
                     ((volatile SndPacketVoiceState *)slot)->link_index.vs * 0x10);
             *vreg   = 0;
             vreg[1] = right * 0x81 & 0x7fff;
@@ -237,7 +236,7 @@ void iSNDsetvol(int chan, int left, int right)
         *vreg   = vol;
         vreg[1] = vol;
         vol = right * 0x81 >> 1 & 0x7fff;
-        vreg = (unsigned short *)((int)((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base +
+        vreg = (unsigned short *)(((struct SndSpuRegisterBasesStateView *)pd)->registers.voice_base +
                 ((volatile SndPacketVoiceState *)slot)->link_index.vs * 0x10);
     }
     *vreg   = vol;
@@ -250,9 +249,9 @@ void iSNDsetvol(int chan, int left, int right)
  * materialization.  Listing the two variable stores before the constant ADSR stores gives gcc the
  * oracle's early `sra`/base-load schedule; it still emits the hardware writes in oracle order
  * (attack, sustain, pitch, address, level). */
-int iSNDsetslot(int chan, unsigned char *addr, int pitch)
+unsigned char *iSNDsetslot(int chan, unsigned char *addr, int pitch)
 {
-    int r = DAT_80147e28[0] + chan * 0x10;
+    unsigned char *r = (unsigned char *)((struct SndSpuRegisterBasesStateView *)sndpd)->registers.voice_base + chan * 0x10;
     *(short *)(r + 4)  = (short)pitch;               /* sample rate / pitch */
     *(short *)(r + 6)  = (short)((int)addr >> 3);    /* SPU start address (8-byte units) */
     *(short *)(r + 8)  = 0xf;                        /* ADSR attack */
@@ -300,7 +299,7 @@ unsigned int iSNDstartvoice(unsigned int chan)
             a3 = a3 << 4;
         }
         iSNDsetslot(voice->link_index.vs,
-                    (unsigned char *)((unsigned int)voice->spu_start_address + a3), pitch);
+                    voice->spu_start_address + a3, pitch);
         maskLink = voice->link_index.vs;
         vte2->play_state = 2;
         vte2->voice_status = 2;

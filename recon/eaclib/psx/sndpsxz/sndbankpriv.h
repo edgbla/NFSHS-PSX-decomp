@@ -15,8 +15,10 @@ union SndBankPlatformAllocatedView {
 };
 typedef char SndBankPlatformAllocatedView_size_check[(sizeof(union SndBankPlatformAllocatedView) == 1) ? 1 : -1];
 
+struct SndBankDataHeaderPrefix;
+
 struct SndBankTableEntry {
-    unsigned char *data_block;                        /* +0x00: bank-image byte base */
+    struct SndBankDataHeaderPrefix *data_block;       /* +0x00: common bank-image header prefix */
     void *platform_block;                              /* +0x04 */
     union SndBankLoadStateView load_state;             /* +0x08 */
     union SndBankPlatformAllocatedView platform_allocated; /* +0x09 */

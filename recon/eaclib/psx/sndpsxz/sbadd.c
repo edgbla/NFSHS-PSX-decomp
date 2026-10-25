@@ -27,6 +27,6 @@ int SNDbankadd(int *bank_out, void *bank_data)
     e->data_block = bank_data;
     e->platform_block = bank_data;
     ((struct SndGlobalLifecycleHookView *)sndgs)->bank_remove_hook = SNDbankremove;
-    /* Both arguments are bank-image addresses: the first is rebased in place, the second is the RAM DMA source base. */
-    return iSNDdownloadbank((unsigned char *)bank_data, bank_data);
+    /* The first argument views the bank header prefix; the second is the read-only RAM DMA source base. */
+    return iSNDdownloadbank(bank_data, bank_data);
 }

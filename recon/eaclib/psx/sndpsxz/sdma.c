@@ -159,7 +159,8 @@ void iSNDdmcallback(void)
     volatile int i;
     volatile int mult = 13;
     signed char slot;
-    int active, ctrl, wait;
+    int active, wait;
+    unsigned char *ctrl;
     unsigned char *pd;
     void (*hook)(void);
 
@@ -181,12 +182,12 @@ void iSNDdmcallback(void)
      * Falsified at 14 (all 111/111): block-local base alone; + a do{}while(0) wrapper on the
      * masked store; + a named mask temp.  Wrapping the whole block collapses it (106/111, 21). */
     {
-        int base = (int)sndpd;
-        int c;                       /* the 4th qty -- see above; do not fold back into ctrl */
-        c = *(volatile int *)&((struct SndSpuRegisterBasesStateView *)(unsigned int)base)->registers.control_base;
+        unsigned char *base = sndpd;
+        unsigned char *c;   /* the 4th qty -- see above; do not fold back into ctrl */
+        c = (unsigned char *)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
         *(volatile unsigned short *)(c + 0x1aa) =
             *(volatile unsigned short *)(c + 0x1aa) & 0xffcf;
-        ctrl = *(volatile int *)&((struct SndSpuRegisterBasesStateView *)(unsigned int)base)->registers.control_base;
+        ctrl = (unsigned char *)((struct SndSpuRegisterBasesStateView *)base)->registers.control_base;
     }
     wait = 0;
     while ((*(volatile unsigned short *)(ctrl + 0x1aa) & 0x30) != 0) {
