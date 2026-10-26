@@ -16,25 +16,22 @@ int iSNDunsafevol(int handle, int vol)   /* @0x800E69D0 */
     int iter;
     int level;
     SndState *state;
-    if (chan < 0)
-        goto done;
-    iter = -1;
-    state = SND;
-    level = vol << 16;
-    /* MATCH: the shared `done` return and explicit state-base local keep the early-exit delay slot,
-     * voice-table base, and level calculation in the oracle's order. */
-    while (iSNDpatchkey(chan, &iter)) {
-        SndChannel *v = (SndChannel *)&state->voices[iter];
-        if (v->autovol_position.word == level)
-            return 0;                       /* already this level -> done (Ghidra: explicit `return 0;`,
+    if (chan >= 0) {
+        iter = -1;
+        state = SND;
+        level = vol << 16;
+        while (iSNDpatchkey(chan, &iter)) {
+            SndChannel *v = (SndChannel *)&state->voices[iter];
+            if (v->autovol_position.word == level)
+                return 0;                   /* already this level -> done (Ghidra: explicit `return 0;`,
                                               * NOT a break-to-shared-tail -- oracle's beq delay slot sets
                                               * v0=0 here, not v0=chan) */
-        v->autovol_position.word = level;
-        v->autovol_step = 0;                /* sunk into the iSNDcalcvol jal delay slot */
-        iSNDcalcvol(iter);
-        iSNDvol(iter, v->volume);
+            v->autovol_position.word = level;
+            v->autovol_step = 0;            /* sunk into the iSNDcalcvol jal delay slot */
+            iSNDcalcvol(iter);
+            iSNDvol(iter, v->volume);
+        }
     }
-done:
     return chan;
 }
 

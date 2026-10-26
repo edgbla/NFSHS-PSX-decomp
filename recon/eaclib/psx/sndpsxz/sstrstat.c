@@ -26,23 +26,21 @@ int SNDSTRM_requeststatus(unsigned int reqTag, struct SNDREQUESTSTATUS *status)
     if (!sp) return -8;
     iSNDenteraudio();
     rp = iSNDstreamgetrequestptr(reqTag);
-    if (!rp)
-        goto no_request;
-    if (rp->firstqid < 0) {
-        status->state = 0;
+    if (rp) {
+        if (rp->firstqid < 0) {
+            status->state = 0;
+        } else {
+            if (sp->requests == rp) { status->state = 2; div = sp->locked_rate.samplerate; }
+            else                    { status->state = 1; div = sp->current_rate.samplerate; }
+            (void)iSNDmulu64(&q, rp->bytes_consumed, 1000);
+            status->currenttime = iSNDdivu64(q, div);
+            (void)iSNDmulu64(&q, rp->total_size - rp->bytes_consumed, 1000);
+            status->timetoend = iSNDdivu64(q, div);
+            status->timebuffered = rp->remaining_bytes * 1000 / div;
+        }
     } else {
-        if (sp->requests == rp) { status->state = 2; div = sp->locked_rate.samplerate; }
-        else                    { status->state = 1; div = sp->current_rate.samplerate; }
-        (void)iSNDmulu64(&q, rp->bytes_consumed, 1000);
-        status->currenttime = iSNDdivu64(q, div);
-        (void)iSNDmulu64(&q, rp->total_size - rp->bytes_consumed, 1000);
-        status->timetoend = iSNDdivu64(q, div);
-        status->timebuffered = rp->remaining_bytes * 1000 / div;
+        status->state = 3;
     }
-    goto status_done;
-no_request:
-    status->state = 3;
-status_done:
     iSNDleaveaudio();
     return 0;
 }

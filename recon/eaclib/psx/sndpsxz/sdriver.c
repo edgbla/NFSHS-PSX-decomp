@@ -20,6 +20,7 @@
 #include "saetodv.h"
 #include "saetolrv.h"
 #include "sdriver.h"
+#include "sndhookpriv.h"
 #include "sndpacketpriv.h"
 #include "slib.h"
 #include "slib_state.h"
@@ -39,8 +40,8 @@ int iSNDstop(unsigned int chan)
     volatile SndPacketVoiceState *slot = (volatile SndPacketVoiceState *)(base + vt);
     unsigned int mask;
 
-    if ((signed char)slot->voice_done >= 0)            /* voice-done bit clear -> notify */
-        (*(void (**)(struct SndPacketVoiceState *))(base + 0x64c))((struct SndPacketVoiceState *)slot);
+    if ((signed char)slot->voice_done >= 0)            /* voice-done bit clear -> notify via sndpd+0x724 */
+        ((struct SndDriverHookStateView *)sndpd)->hooks.voice_done((struct SndPacketVoiceState *)slot);
     iSNDfreechan(chan);
     slot->voice_status = 3;
     slot->play_state = 0;

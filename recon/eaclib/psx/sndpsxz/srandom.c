@@ -57,20 +57,15 @@ int iSNDrandom(void)
     sum = sum + seed + carry;
     state[0] = sum;
 
-    if ((state[5] = state[5] + 1))
-        goto done;
-    if ((state[4] = state[4] + 1))
-        goto done;
-    if ((state[3] = state[3] + 1))
-        goto done;
-    if ((state[2] = state[2] + 1))
-        goto done;
-    if (!(state[1] = state[1] + 1)) {
+    if (!(state[5] = state[5] + 1) &&
+        !(state[4] = state[4] + 1) &&
+        !(state[3] = state[3] + 1) &&
+        !(state[2] = state[2] + 1) &&
+        !(state[1] = state[1] + 1)) {
         unsigned int final = sum + 1;
         state[0] = final;
         sum = final;
     }
     }
-done:
     return sum;
 }

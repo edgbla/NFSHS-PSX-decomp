@@ -599,8 +599,12 @@ int iSNDfillspuwithpackets(int p, int chunk)
                     result = cursor - pp->serve_position;
                     if (pp->queue_fill_limit.u < result)
                         return result;
-                    if (pp->empty_source_loop_count.u > pp->frame_count)
-                        goto advance;
+                    if (pp->empty_source_loop_count.u > pp->frame_count) {
+                        pp->frame_index.s = chunk;
+                        result = pp->write_position + pp->frames_per_block.u;
+                        pp->write_position = result;
+                        return result;
+                    }
                     if (pp->empty_source_loop_count.u < 2) {     /* mark SPU loop-back */
                         i = 0;
                         if (((volatile SndPacketVoiceState *)voice)->channel_count) {
@@ -639,7 +643,7 @@ int iSNDfillspuwithpackets(int p, int chunk)
                     if (!pp->spu_buffer_offset.u)
                         pp->empty_source_loop_count.s = pp->empty_source_loop_count.s + 1;
                     pp->spu_bytes_remaining.s = 0;
-                    goto queue_dma;
+                    break;
                 }
                 {
                     int chunkSize = frameSize * 4 / 7;   /* ADPCM bytes per chunk */
@@ -678,7 +682,6 @@ int iSNDfillspuwithpackets(int p, int chunk)
             pp->source_frame_remaining.u = pp->source_frame_remaining.s - take;
         } while (((volatile SndPacketPlayerContextPrefix *)pp)->spu_bytes_remaining.u);
     }
-queue_dma:
     if (!chunk) {                            /* first chunk -> set SPU loop-start flag (|4) */
         /* MATCH: loop guard is `chunk < channelcount`, not `channelcount != 0` -- chunk is
          * provably 0 here (just tested), and oracle's guard `slt v0,s5,v0` reuses THAT register
@@ -772,7 +775,6 @@ queue_dma:
             ch += 4; i++;
         } while (i < ((volatile SndPacketVoiceState *)voice)->channel_count);
     }
-advance:
     pp->frame_index.s = chunk;
     result = pp->write_position + pp->frames_per_block.u;
     pp->write_position = result;

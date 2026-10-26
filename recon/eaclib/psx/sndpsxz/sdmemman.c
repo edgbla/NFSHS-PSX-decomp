@@ -715,60 +715,58 @@ nonempty:
         unsigned char *table;
         unsigned char *previous;
         table = (unsigned char *)((struct SndSpuMemoryStateView *)base)->entries;
-        if (idx >= ((struct SndSpuMemoryStateView *)base)->memory.alloc_count)
-            goto scan_done;
-        pd = base;
-        previous = (unsigned char *)&((struct SndSpuMemoryStateView *)pd)->memory.boundary;
-scan:
-        {
-            int scan_off = idx * 4;
-            entry = (unsigned char *)((unsigned int)scan_off +
-                                      (unsigned int)table);
-            if (!idx) {
-                unsigned int block =
-                    ((struct SndSpuMemoryStateView *)pd)->memory.engine_ver;
-                int avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
-                candidateBlock = block;
-                availableBlocks = avail;
-            } else {
-                unsigned int block;
-                int avail;
-                prev = (unsigned short *)(scan_off + (int)previous);
-                block = ((struct SndSpuFreeBlock *)prev)->block +
-                        ((struct SndSpuFreeBlock *)prev)->size;
-                avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
-                candidateBlock = block;
-                availableBlocks = avail;
-            }
-            iSNDpsxmemconstrain(&candidateBlock, &availableBlocks);
-            if (size <= availableBlocks) {
-                blk = ((struct SndSpuMemoryStateView *)pd)->memory.alloc_count;
-                if (idx < (int)blk) {
-                    do {                                   /* shift entries up to open slot `idx` */
-                        struct PackedAllocSlot {
-                            unsigned char pad[0x520];
-                            int word;
-                        } __attribute__((packed));
-                        struct PackedAllocSlot *dst =
-                            (struct PackedAllocSlot *)
-                                ((unsigned int)(blk * 4) + (unsigned int)pd);
-                        src = blk - 1;
-                        __builtin_memcpy(
-                            (void *)&dst->word,
-                            (void *)&((struct PackedAllocSlot *)
-                                          ((unsigned int)(src * 4) +
-                                           (unsigned int)pd))->word,
-                            4);
-                        blk = src;
-                    } while (idx < (int)src);
+        if (idx < ((struct SndSpuMemoryStateView *)base)->memory.alloc_count) {
+            pd = base;
+            previous = (unsigned char *)&((struct SndSpuMemoryStateView *)pd)->memory.boundary;
+            do {
+                {
+                    int scan_off = idx * 4;
+                    entry = (unsigned char *)((unsigned int)scan_off +
+                                              (unsigned int)table);
+                    if (!idx) {
+                        unsigned int block =
+                            ((struct SndSpuMemoryStateView *)pd)->memory.engine_ver;
+                        int avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
+                        candidateBlock = block;
+                        availableBlocks = avail;
+                    } else {
+                        unsigned int block;
+                        int avail;
+                        prev = (unsigned short *)(scan_off + (int)previous);
+                        block = ((struct SndSpuFreeBlock *)prev)->block +
+                                ((struct SndSpuFreeBlock *)prev)->size;
+                        avail = ((struct SndSpuFreeBlock *)entry)->block - (int)block;
+                        candidateBlock = block;
+                        availableBlocks = avail;
+                    }
+                    iSNDpsxmemconstrain(&candidateBlock, &availableBlocks);
+                    if (size <= availableBlocks) {
+                        blk = ((struct SndSpuMemoryStateView *)pd)->memory.alloc_count;
+                        if (idx < (int)blk) {
+                            do {                                   /* shift entries up to open slot `idx` */
+                                struct PackedAllocSlot {
+                                    unsigned char pad[0x520];
+                                    int word;
+                                } __attribute__((packed));
+                                struct PackedAllocSlot *dst =
+                                    (struct PackedAllocSlot *)
+                                        ((unsigned int)(blk * 4) + (unsigned int)pd);
+                                src = blk - 1;
+                                __builtin_memcpy(
+                                    (void *)&dst->word,
+                                    (void *)&((struct PackedAllocSlot *)
+                                                  ((unsigned int)(src * 4) +
+                                                   (unsigned int)pd))->word,
+                                    4);
+                                blk = src;
+                            } while (idx < (int)src);
+                        }
+                        goto commit;
+                    }
                 }
-                goto commit;
-            }
+                idx++;
+            } while (idx < ((struct SndSpuMemoryStateView *)pd)->memory.alloc_count);
         }
-        idx++;
-        if (idx < ((struct SndSpuMemoryStateView *)pd)->memory.alloc_count)
-            goto scan;
-scan_done:
         {
             /* W78: PASS 127/127.  Keep adjusted_off at loop depth 2 and pv
              * at depth 3, but form them in one wrapper with adjusted_off

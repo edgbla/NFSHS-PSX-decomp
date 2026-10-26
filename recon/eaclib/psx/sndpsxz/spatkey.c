@@ -44,13 +44,10 @@ int iSNDpatchkey(int chan, int *tag)
                     return 1;
             }
         }
-        goto no_key;
+    } else if (*tag < 0) {
+        *tag = chan;
+        return 1;
     }
-    if (*tag >= 0)
-        goto no_key;
-    *tag = chan;
-    return 1;
-no_key:
     return 0;
     /* MATCH (65 insns): the state, group-id, and owner-tag tests use SndChannel fields. */
 }

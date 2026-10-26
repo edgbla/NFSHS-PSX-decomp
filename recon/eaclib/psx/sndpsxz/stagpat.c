@@ -214,10 +214,8 @@ int iSNDplaytaggedtimbre(unsigned char *timbre, struct SNDPLAYOPTS *tag, struct 
         pan = vol->pan.word;
         if (vol->pan_range.word)
             pan += randrange(vol->pan_range.word);
-        if (pan < 0x80)
-            goto pan_low;
-        pan = 0x7f;
-pan_low:
+        if (pan >= 0x80)
+            pan = 0x7f;
         if (pan < -0x80)
             pan = -0x80;
         slot->pan = (char)detune;
