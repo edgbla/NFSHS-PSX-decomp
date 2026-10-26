@@ -54,9 +54,8 @@ void iSNDresetpatch(struct SndTimbre *patch)
 unsigned char *iSNDresettimbre(struct SndTimbre *t, struct SndTimbre *buf)
 {
     int i;
-    int *p;
-    for (i = 0x25, p = &buf->pan_scale.word; i > -1; i--, p--)
-        *p = 0;
+    for (i = 0x25; i > -1; i--)
+        ((union SndTimbreBufferView *)buf)->tag_words[i] = 0;
     t->velocity_min.word = 0;
     t->velocity_max.word = 0x7f;
     t->note_min.word = 0;

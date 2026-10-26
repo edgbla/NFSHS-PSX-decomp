@@ -29,4 +29,23 @@ struct SndDmaQueueStateView {
 };
 typedef char SndDmaQueueStateView_size_check[(sizeof(struct SndDmaQueueStateView) == 0x10) ? 1 : -1];
 
+/* The DMA queue begins immediately after the 0x10-byte state prefix. */
+struct SNDDmaEntry {
+    volatile int handle;             /* +0x00: 0 marks a free slot */
+    const unsigned char *ram_source;  /* +0x04: main-RAM source address */
+    unsigned short spu_address_8;     /* +0x08: SPU transfer address / 8 */
+    unsigned char len64;              /* +0x0A: transfer length / 64 */
+    volatile unsigned char priority;  /* +0x0B */
+    unsigned char flag;               /* +0x0C: invoke preload hook */
+    unsigned char pad0d_0f[3];
+    volatile int deadline;            /* +0x10 */
+};
+typedef char SNDDmaEntry_size_check[(sizeof(struct SNDDmaEntry) == 0x14) ? 1 : -1];
+
+struct SndDmaQueueEntriesView {
+    unsigned char prefix_00_0f[0x10];
+    struct SNDDmaEntry entries[10]; /* +0x10..+0xD7, ten 0x14-byte slots */
+};
+typedef char SndDmaQueueEntriesView_size_check[(sizeof(struct SndDmaQueueEntriesView) == 0xD8) ? 1 : -1];
+
 #endif /* _SNDPSXZ_SNDDMAPRIV_H_ */

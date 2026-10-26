@@ -526,7 +526,7 @@ void iSNDfreechan(int chan)
      * both a channel-record address and the scan index. Keep those roles separate: `slot`
      * is the record pointer and `slotIndex` is the scalar index. The typed split remains
      * exact at 110 instructions. */
-    SndChannel *slot = pool + chan;
+    SndChannel *slot = &pool[chan];
     int slotIndex;
     group = slot->group_id;
 
@@ -591,7 +591,7 @@ void iSNDfreechan(int chan)
 
             /* The record-index lookup is a typed SndChannel pointer addition. Keep the separate
              * partnerOffset byte displacement for the legacy int-shaped base-field stores below. */
-            if ((poolv + partner)->state == 2 &&
+            if (poolv[partner].state == 2 &&
                 chan != partner && count == 2) {
                 slot->state = 0;
                 slot->allocation_tick = gs->tick_count;
@@ -651,7 +651,7 @@ int iSNDgetchan(unsigned int tag)
         return -8;
     {
         SndChannel *pool = base->play_records;
-        SndChannel *slot = pool + ch;
+        SndChannel *slot = &pool[ch];
         if (!slot->state || slot->owner_tag != tag)
             ch = 0xfffffff8;
         return ch;

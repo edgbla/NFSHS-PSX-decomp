@@ -718,7 +718,7 @@ nonempty:
         if (idx >= ((struct SndSpuMemoryStateView *)base)->memory.alloc_count)
             goto scan_done;
         pd = base;
-        previous = pd + 0x51c;
+        previous = (unsigned char *)&((struct SndSpuMemoryStateView *)pd)->memory.boundary;
 scan:
         {
             int scan_off = idx * 4;
@@ -860,7 +860,7 @@ int iSNDpsxfree(unsigned char *ptr)
         unsigned char *table = (unsigned char *)((struct SndSpuMemoryStateView *)pd)->entries;
         unsigned char *base = pd;
         do {
-            if (((struct SndSpuFreeBlock *)(table + idx * 4))->block == block) {
+            if (((struct SndSpuFreeBlock *)table)[idx].block == block) {
                 unsigned short remaining =
                     ((struct SndSpuMemoryStateView *)base)->memory.alloc_count - 1;
                 ((struct SndSpuMemoryStateView *)base)->memory.alloc_count = remaining;

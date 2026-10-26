@@ -124,7 +124,7 @@ int iSNDplatformresolve(unsigned char *cursor, unsigned char *bankData, struct S
                           ((unsigned int)scan | ((unsigned int)scan & 3u));
                 if (*(int *)&cur->offset == offset)
                     goto found;
-                scan = cur + 1;
+                scan = &cur[1];
                 idx++;
             } while (*(int *)&cur[1].offset != end);
         }

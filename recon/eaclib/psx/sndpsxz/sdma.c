@@ -19,18 +19,6 @@
 #include "sndhookpriv.h"
 #include "snddmapriv.h"
 
-struct SNDDmaEntry {
-    volatile int handle;             /* +0x00: 0 marks a free slot */
-    const unsigned char *ram_source;  /* +0x04: main-RAM source address loaded into DMA4 MADR */
-    unsigned short spu_address_8;     /* +0x08: SPU transfer address divided by eight */
-    unsigned char len64;              /* +0x0A: transfer length in 64-byte units */
-    volatile unsigned char priority;  /* +0x0B */
-    unsigned char flag;               /* +0x0C: call the preload hook before transfer */
-    unsigned char pad0d_0f[3];
-    volatile int deadline;            /* +0x10 */
-};
-typedef char SNDDmaEntry_size_check[(sizeof(struct SNDDmaEntry) == 0x14) ? 1 : -1];
-
 /* cop0 Status read/write -- the queue mutations run with interrupts masked on target (host: plain).
  * The callback uses one explicit CP0 transaction macro because the R3000 Status write requires three
  * architectural hazard slots.  Keeping that handwritten instruction sequence localized here also
@@ -103,7 +91,7 @@ void iSNDdmtransfer(void)
     ((struct SndDmaQueueStateView *)pd)->transfer_busy.plain = 1;
     i = bestPrio;
     scanBase = pd;
-    scanEntry = (struct SNDDmaEntry *)(scanBase + 0x10);
+    scanEntry = ((struct SndDmaQueueEntriesView *)scanBase)->entries;
     for (; i < 10; i++, scanEntry++) {
         if (scanEntry->handle) {                     /* active entry */
             if (bestPrio < scanEntry->priority) {
@@ -208,7 +196,7 @@ void iSNDdmcallback(void)
      * sndpd lui/addiu temporary coalescing differs). */
     pd = sndpd;
     slot = ((struct SndDmaQueueStateView *)pd)->active_slot.v;
-    active = ((struct SNDDmaEntry *)(pd + 0x10 + slot * (int)sizeof(struct SNDDmaEntry)))->handle;
+    active = ((struct SndDmaQueueEntriesView *)pd)->entries[slot].handle;
     MASK_INTERRUPTS_SR(sr);
     if (active) {        /* active entry present */
         if (((struct SndDmaQueueStateView *)pd)->callback_guard.v) {
@@ -219,7 +207,7 @@ void iSNDdmcallback(void)
         }
         pd = sndpd;
         slot = ((struct SndDmaQueueStateView *)pd)->active_slot.v;
-        ((struct SNDDmaEntry *)(pd + 0x10 + slot * (int)sizeof(struct SNDDmaEntry)))->handle = 0; /* free the slot */
+        ((struct SndDmaQueueEntriesView *)pd)->entries[slot].handle = 0; /* free the slot */
         ((struct SndDmaQueueStateView *)pd)->in_flight_count.plain = ((struct SndDmaQueueStateView *)pd)->in_flight_count.plain - 1;
         if ((int)((unsigned)((struct SndDmaQueueStateView *)pd)->in_flight_count.v << 0x18) < 1) { /* queue now empty */
             ((struct SndDmaQueueStateView *)pd)->transfer_busy.v = 0;
@@ -365,8 +353,8 @@ int iSNDdmcomplete(int handle)
     i = 0;
     if (!(0 < (int)((unsigned)((struct SndDmaQueueStateView *)base)->in_flight_count.plain << 0x18)))
         return 1;
-    for (; i < 10; i++, base += sizeof(struct SNDDmaEntry)) {
-        if (((struct SNDDmaEntry *)(base + 0x10))->handle == handle)
+    for (; i < 10; i++) {
+        if (((struct SndDmaQueueEntriesView *)base)->entries[i].handle == handle)
             return 0;
     }
     return 1;

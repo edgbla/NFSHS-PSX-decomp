@@ -34,7 +34,7 @@ marker:
     return 1;                                   /* marker tag (no data) */
 
 data_tag:
-    len = *(at + 1);
+    len = at[1];
     if (len == 0xff) {                          /* extended 4-byte length */
         *cursor = at + 2;
         len = iSNDgetdata(at + 2, 4);

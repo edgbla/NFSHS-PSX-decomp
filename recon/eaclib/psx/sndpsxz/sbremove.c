@@ -19,11 +19,10 @@
 int iSNDremovepatches(int bank, int count)
 {
     struct SNDRemoveEntry scratch[256];
-    struct SNDRemoveEntry *p;
     int i;
     unsigned char *neg1 = (unsigned char *)-1;
-    for (i = 0xFF, p = &scratch[255]; i >= 0; i--, p--) {
-        p->spu_address = neg1;
+    for (i = 0xFF; i >= 0; i--) {
+        scratch[i].spu_address = neg1;
     }
     for (i = 0; i < count; i++)
         iSNDbankremovepat(bank, i, scratch);
