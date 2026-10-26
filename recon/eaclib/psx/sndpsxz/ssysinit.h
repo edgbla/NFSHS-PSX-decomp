@@ -40,7 +40,7 @@ typedef struct SNDSYSOPTS {
 typedef char SNDSYSOPTS_size_check[(sizeof(SNDSYSOPTS) == 0x3C) ? 1 : -1];
 
 extern int SNDSYS_getopts(SNDSYSOPTS *opts); /* @0x800F1D58 */
-extern int SNDSYS_setopts(const SNDSYSOPTS *opts); /* @0x800F1E14 */
+extern int SNDSYS_setopts(SNDSYSOPTS *opts); /* @0x800F1E14 */
 extern int SNDSYS_init(void *membase, int memsize); /* @0x800F1F10 */
 extern int SNDSYS_restore(void); /* ssysinit exit handler; @0x800F204C */
 

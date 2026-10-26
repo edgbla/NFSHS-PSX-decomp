@@ -93,7 +93,7 @@ unsigned char *iSNDresettimbre(struct SndTimbre *t, struct SndTimbre *buf)
 
 /* iSNDresolveheader @0x80101B7C : fold an override header `out` into the running timbre header `hdr`
  *   (sum the envelope / volume / pitch fields). */
-void iSNDresolveheader(struct SndTimbre *hdr, const struct SndTimbre *out)
+void iSNDresolveheader(struct SndTimbre *hdr, struct SndTimbre *out)
 {
     hdr->final_volume_curve.byte_pointer = out->final_volume_curve.byte_pointer + hdr->final_volume_curve.word;
     hdr->pan_curve.sbyte_pointer = out->pan_curve.sbyte_pointer + hdr->pan_curve.word;
@@ -153,7 +153,7 @@ done:
  *   restores the detune table/scaling path, both PRNG return uses, all four stack arguments, and the
  *   success/failure return contract. MATCH (320/320): modeling the one-word platform-rate storage as
  *   an array element makes gcc split its address materialization around the independent byte load. */
-int iSNDplaytaggedtimbre(unsigned char *timbre, const struct SNDPLAYOPTS *tag, struct SndTimbre *vol, struct SndTimbre *header,
+int iSNDplaytaggedtimbre(unsigned char *timbre, struct SNDPLAYOPTS *tag, struct SndTimbre *vol, struct SndTimbre *header,
                                     int baseNote, int velScale, int pitchOff)
 {
     int b7  = (signed char)tag->pan;
@@ -303,7 +303,7 @@ pan_low:
  *     7-arg call: (timbreData, tag, &builtTimbre, &header, note, vel, pitchOff). pitchOff ($s6) is the
  *     CAPTURED randrange() result of the last 0x24 field tag (0 until one is seen); the group key ($fp)
  *     is the CAPTURED iSNDfindfreekey() return.  BYTE-MATCHES the oracle (verify_asm PASS, 216 insns). */
-int iSNDplaytaggedpatch(struct SndTaggedPatchRecordPrefixView *bank, const struct SNDPLAYOPTS *tag)
+int iSNDplaytaggedpatch(struct SndTaggedPatchRecordPrefixView *bank, struct SNDPLAYOPTS *tag)
 {
     union SndTimbreBufferView bt;                /* built timbre    @sp+0x20  */
     union SndTimbreBufferView hdr;               /* override header @sp+0xB8  */
@@ -405,7 +405,7 @@ fail:
 
 /* iSNDresolvetaggedpatch @0x801024EC : walk a bank's tag stream and resolve its SPU sample data (tag 0xfd
  *   = platform resolve), marking the bank resolved (+3 |= 1).  Returns -1 / resolve result. */
-int iSNDresolvetaggedpatch(struct SndTaggedPatchRecordPrefixView *bank, const unsigned char *bankData, struct SNDResolveEntry *scratch)
+int iSNDresolvetaggedpatch(struct SndTaggedPatchRecordPrefixView *bank, unsigned char *bankData, struct SNDResolveEntry *scratch)
 {
     struct SndTagScanState state;
     int r = -1;

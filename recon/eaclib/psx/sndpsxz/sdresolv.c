@@ -77,7 +77,7 @@
  *   3. STATEMENT ORDER `scan = cur + 1;` BEFORE `idx++;` -- independent-chain issue order is fixed
  *      by luid (catalog w43); with `idx++` first the two tail addiu's come out swapped (4 diffs).
  */
-int iSNDplatformresolve(unsigned char *cursor, const unsigned char *bankData, struct SNDResolveEntry *patch)
+int iSNDplatformresolve(unsigned char *cursor, unsigned char *bankData, struct SNDResolveEntry *patch)
 {
     unsigned int  id;
     int           val;
@@ -144,7 +144,7 @@ found:
         *spuField = scan->spu;
         goto checked;
 resolve:
-        dma = iSNDdmqueuesplit(bankData + offset, buf, blocks, 1);
+        dma = iSNDdmqueuesplit((const unsigned char *)(bankData + offset), buf, blocks, 1);
         *spuField = buf;
         patch[idx].offset = offset;
         patch[idx].spu = buf;

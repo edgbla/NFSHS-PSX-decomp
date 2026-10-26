@@ -132,7 +132,7 @@ int SNDpitchbend(...);   /* (u_int tag, int bend) */
 int SNDpitchmult(...);   /* (int tag, u_int mult) */
 int SNDplay(...);   /* (void *) */
 void SNDplaysetdef(...);   /* (void *) */
-int SNDsetlimits(const void *opts);   /* (const void *opts) */
+int SNDsetlimits(void *opts);   /* (void *opts) */
 int SNDstop(...);   /* (int handle) */
 int SNDtimeremaining(...);   /* (int handle) */
 void SNDvol(...);   /* (int handle, int vol) */

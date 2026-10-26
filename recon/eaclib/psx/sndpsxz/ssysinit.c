@@ -78,7 +78,7 @@ int SNDSYS_getopts(SNDSYSOPTS *opts)
  *   array-shaped D_80147898 alias lets the callback store fill outputset's jal
  *   delay slot; spelling that store as a direct typed vec assignment regresses
  *   this function while preserving behavior. */
-int SNDSYS_setopts(const SNDSYSOPTS *opts)
+int SNDSYS_setopts(SNDSYSOPTS *opts)
 {
     char *base = (char *)sndgs;
     ((SNDSYSOPTS *)base)->set = opts->set;

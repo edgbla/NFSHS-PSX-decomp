@@ -11,10 +11,10 @@ extern int iSNDpacketplayoverhead(int n); /* @0x801028BC */
 extern int SNDPKTPLAY_overhead(int n); /* @0x801028D0 */ /* spktplay */
 extern int SNDPKTPLAY_create(unsigned char *mem, int memsize, void (*relcb)(unsigned char *),
                               void (*notifycb)(int, unsigned int)); /* @0x801028FC */
-extern int SNDPKTPLAY_start(int p, const struct SNDSAMPLEFORMAT *rate,
-                            const struct SndPatchAttributes *hdr,
-                            const struct SNDPLAYOPTS *params); /* @0x80102A10 */
-extern int SNDPKTPLAY_submit(int p, const union SndPacketSubmitFrameView *frame); /* @0x80102CFC */
+extern int SNDPKTPLAY_start(int p, struct SNDSAMPLEFORMAT *rate,
+                            struct SndPatchAttributes *hdr,
+                            struct SNDPLAYOPTS *params); /* @0x80102A10 */
+extern int SNDPKTPLAY_submit(int p, union SndPacketSubmitFrameView *frame); /* @0x80102CFC */
 extern int SNDPKTPLAY_submitspace(int p); /* @0x80102E70 */
 extern int SNDPKTPLAY_unsafeframesoutstanding(int p); /* @0x80102EC4 */ /* spktplay */
 extern int SNDPKTPLAY_framesoutstanding(int p); /* @0x80102EEC */

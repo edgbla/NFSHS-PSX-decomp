@@ -31,7 +31,7 @@ int SNDSTRM_status(int tag, struct SNDSTREAMSTATUS *status);
 int SNDSTRM_vol(...);
 int SNDgetlimits(void *opts);
 void SNDplaysetdef(...);
-int SNDsetlimits(const void *opts);
+int SNDsetlimits(void *opts);
 int sprintf(...);
 unsigned int strlen(...);
 }

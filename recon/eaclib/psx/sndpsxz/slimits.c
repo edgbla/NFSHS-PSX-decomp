@@ -18,11 +18,11 @@ int SNDgetlimits(void *opts)
     return 0;
 }
 /* SNDsetlimits : apply opts[0..4] (SPU ctx size opts[4] rounded down to 0x2000). */
-int SNDsetlimits(const void *opts)
+int SNDsetlimits(void *opts)
 {
     if (!((struct SndGlobalServerStateView *)sndgs)->initialized) return -10;
-    if (((const int *)opts)[4] < 0x2000) return -1;
-    *(struct LimitsBlock *)sndpsxlimits = *(const struct LimitsBlock *)opts;
+    if (((int *)opts)[4] < 0x2000) return -1;
+    *(struct LimitsBlock *)sndpsxlimits = *(struct LimitsBlock *)opts;
     sndpsxlimits[4] &= 0xffffe000;
     return 0;
 }

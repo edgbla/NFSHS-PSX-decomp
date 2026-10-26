@@ -13,10 +13,10 @@ extern int iSNDfillspuwithpackets(int p, int chunk);
 extern void iSNDpacketserve(void);
 extern int iSNDplatformpacketoverhead(void); /* @0x801041B8; sdpacket */
 struct SNDSAMPLEFORMAT;
-extern int iSNDplatformcalcdatarate(const struct SNDSAMPLEFORMAT *sample_format);
+extern int iSNDplatformcalcdatarate(struct SNDSAMPLEFORMAT *sample_format);
 extern int iSNDplatformpacketplaycreate(int p, struct SndPacketPlayerContextPrefix *mem); /* @0x8010421C; sdpacket */
 extern void iSNDplatformpacketplaydestroy(int p); /* @0x801042C0; sdpacket */
-extern int iSNDplatformpacketplay(int p, int note, int volAngle, int level, int pitch, int a6, int fxlevel, const struct SNDSAMPLEFORMAT *hdr, const void *a9); /* @0x80104304; caller ABI has 9 words, final pointer is unused */
+extern int iSNDplatformpacketplay(int p, int note, int volAngle, int level, int pitch, int a6, int fxlevel, struct SNDSAMPLEFORMAT *hdr, void *a9); /* @0x80104304; caller ABI has 9 words, final pointer is unused */
 extern void iSNDpsxpacketstop(struct SndPacketVoiceState *voice);
 
 extern int sndpp[];

@@ -185,8 +185,8 @@ found:
  *   decoded 0x14-byte `SndPatchAttributes` record, and params points to `SndStream.start_params`
  *   (`struct SNDPLAYOPTS`, size 0x14). Player, rate, attributes, play options and channel use
  *   PacketPlayerHeader, SNDSAMPLEFORMAT, SndPatchAttributes, SNDPLAYOPTS and private SndChannel layouts. */
-int SNDPKTPLAY_start(int p, const SNDSAMPLEFORMAT *rate, const struct SndPatchAttributes *hdr,
-                     const struct SNDPLAYOPTS *params)
+int SNDPKTPLAY_start(int p, SNDSAMPLEFORMAT *rate, struct SndPatchAttributes *hdr,
+                     struct SNDPLAYOPTS *params)
 {
     PacketPlayerHeader *ppp;
     int note, allocOut, dur, r;
@@ -380,7 +380,7 @@ int SNDPKTPLAY_start(int p, const SNDSAMPLEFORMAT *rate, const struct SndPatchAt
  *   | opacity fence on j 2   (all 93/93).
  * i.e. every form that puts j's evaluation first pays 12, and no fence position buys the order
  * without the colour.  Do not re-run the order sweep. */
-int SNDPKTPLAY_submit(int p, const union SndPacketSubmitFrameView *frame)
+int SNDPKTPLAY_submit(int p, union SndPacketSubmitFrameView *frame)
 {
     PacketPlayerHeader *ppp;
     unsigned char *slot;
@@ -395,7 +395,7 @@ int SNDPKTPLAY_submit(int p, const union SndPacketSubmitFrameView *frame)
                                                              * `slt;bnez room / [fallthrough] j leave`
                                                              * shape, not an if/else. */
         goto room;
-    frame = (const union SndPacketSubmitFrameView *)(unsigned int)(-0xd);                                         /* MATCH: the oracle reuses `frame`'s OWN
+    frame = (union SndPacketSubmitFrameView *)(unsigned int)(-0xd);                                         /* MATCH: the oracle reuses `frame`'s OWN
                                                              * register ($s1) as the return-value
                                                              * carrier for the whole fn -- its ONLY
                                                              * use past this point is the dead-param
@@ -415,12 +415,12 @@ room:
         ((PacketFrame *)slot)->sequence = ppp->submit_sequence;                         /* sequence */
         if (ppp->rate.channels) {                         /* copy the per-channel pointers */
             int j;
-            const unsigned char *src;
+            unsigned char *src;
             do { j = 0; } while (0);              /* MATCH: zero-insn REF INFLATOR on j (see
                                                      * the header receipt) -- j must be born
                                                      * FIRST for reorg's delay-slot steal AND
                                                      * still out-rank src in allocno_compare. */
-            src = (const unsigned char *)frame;
+            src = (unsigned char *)frame;
             do {                                          /* MATCH: walks `slot` itself in place
                                                              * (lever #14) -- `frame` stays intact
                                                              * (re-read below), `slot`/a0 is dead
@@ -433,7 +433,7 @@ room:
         }
         ((volatile PacketPlayerHeader *)ppp)->outstanding_frames = ((volatile PacketPlayerHeader *)ppp)->outstanding_frames + 1;                /* count++ (plain lhu, no shift) */
         ((volatile PacketPlayerHeader *)ppp)->pending_bytes = ppp->pending_bytes + frame->fields.data_size;  /* bytes pending += size */
-        frame = (const union SndPacketSubmitFrameView *)(unsigned int)((volatile PacketPlayerHeader *)ppp)->submit_sequence;               /* MATCH: reuse `frame` (dead after the
+        frame = (union SndPacketSubmitFrameView *)(unsigned int)((volatile PacketPlayerHeader *)ppp)->submit_sequence;               /* MATCH: reuse `frame` (dead after the
                                                              * loop) as `seq` -- oracle's `lw s1,4(s0)`
                                                              * right here, same register as the param. */
         ppp->submit_sequence = ((volatile PacketPlayerHeader *)ppp)->submit_sequence + 1;      /* sequence++ */
