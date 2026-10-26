@@ -65,13 +65,13 @@ void iSNDmemconstrain(int *block, int *size)
 /* iSNDmeminit @0x801061D4 : (re)initialise the pool over `memsize` bytes at `membase`. */
 SNDMemState *iSNDmeminit(void *membase, int memsize)
 {
-    char *mm;
+    SNDMemState *mm;
     sndmm.base = membase;
-    mm = (char *)&sndmm;
-    *(short *)(mm + 4) = 0;
-    *(short *)(mm + 6) = (short)(memsize >> 2);
-    *(int *)(mm + 8) = 0;
-    return (SNDMemState *)mm;
+    mm = &sndmm;
+    mm->count = 0;
+    mm->poolWords = (unsigned short)(memsize >> 2);
+    mm->highWater = 0;
+    return mm;
 }
 
 /* iSNDmemrestore @0x801061F4 : return pool utilisation percent = high_water*100/poolsize.
@@ -82,9 +82,9 @@ unsigned int iSNDmemrestore(void)
     /* high-water (+8) and poolsize (+6) are fields of the sndmm struct @0x80148780; read both off the
      * single `&sndmm` base (lui;addiu materialized once, CSE'd) to match the oracle's `lw 8(a0)/lhu 6(a0)`
      * rather than two separate absolute DAT_ loads. */
-    char          *mm = (char *)&sndmm;
-    int            hw = *(int *)(mm + 8);
-    unsigned short ps = *(unsigned short *)(mm + 6);
+    SNDMemState   *mm = &sndmm;
+    int            hw = mm->highWater;
+    unsigned short ps = mm->poolWords;
     return (hw * 100) / (unsigned int)ps;
 }
 
@@ -279,8 +279,8 @@ void *iSNDmalloc(int size)
     unsigned short *pv;
     unsigned char  *tab;
     unsigned char  *mm;
-    unsigned char  *base = (unsigned char *)&sndmm;
-    unsigned short  count = *(unsigned short *)(base + 4);
+    SNDMemState    *base = &sndmm;
+    unsigned short  count = base->count;
 
     i = 0;
     if (count >= 0x80)
@@ -289,16 +289,16 @@ void *iSNDmalloc(int size)
     size >>= 2;
     if (!count) {
         block = 0;
-        available = *(unsigned short *)(base + 6);
+        available = base->poolWords;
         iSNDmemconstrain(&block, &available);
         if (size <= available)
             goto commit;
         return 0;
     }
-    if (i < *(unsigned short *)(base + 4)) {
-        tab = base + 0xc;
-        prev = (unsigned short *)(base + 8);
-        mm = base;
+    if (i < base->count) {
+        tab = (unsigned char *)base + 0xc;
+        prev = (unsigned short *)((unsigned char *)base + 8);
+        mm = (unsigned char *)base;
         for (; i < *(unsigned short *)(mm + 4); i++, j = 0) {
             /* the byte offset goes through the MULTIPLY-SET `j` so gcc loop.c never sees a giv
              * (keeps the oracle's per-iteration sll+addu, no strength-reduced walking pointer);

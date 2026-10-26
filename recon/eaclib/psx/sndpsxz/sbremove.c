@@ -55,7 +55,7 @@ int cSNDbankremove(int bankId, int recurse)
     {
         struct SndBankDataHeaderPrefix *data = base->bank_table[bankId].data_block;
         int off;
-        unsigned char *entry;
+        struct SndBankTableEntry *entry;
         struct SNDGlobals *base2;
         i = 0;
         if (base->channel_count) {     /* stop voices owned by this bank */
@@ -70,11 +70,11 @@ int cSNDbankremove(int bankId, int recurse)
             } while (loopbase->channel_count > ++i);
         }
         base2 = &sndgs;
-        /* Keep the 32-bit sum for retail operand order; bank_table is ordinary state, not volatile. */
-        entry = (unsigned char *)(bankId * sizeof(struct SndBankTableEntry) +
+        /* Keep the 32-bit sum for retail operand order, then view its result as the typed table record. */
+        entry = (struct SndBankTableEntry *)(bankId * sizeof(struct SndBankTableEntry) +
             (unsigned int)base2->bank_table);
-        if (((struct SndBankTableEntry *)entry)->platform_allocated.s) {
-            iSNDplatformfree(((struct SndBankTableEntry *)entry)->platform_block);
+        if (entry->platform_allocated.s) {
+            iSNDplatformfree(entry->platform_block);
             sndgs.bank_table[bankId].platform_allocated.u = 0;
         } else
             iSNDremovepatches(bankId, data->patch_count);

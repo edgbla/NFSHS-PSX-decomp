@@ -3,15 +3,16 @@
 
 struct SNDPLAYOPTS;
 struct SndStream;
+struct SndStreamChunkHeaderPrefix;
 
 extern int iSNDstreamdestroyall(void); /* @0x800E8C14 */
 extern struct SndStream *iSNDstreamgetstreamptr(int idx); /* @0x800E8C48 */ /* sst */
 extern void iSNDstreamremoverequest(unsigned int reqid); /* @0x800E8C64 */
 extern void iSNDstreamreleasecallback(unsigned char *sample); /* @0x800E8D90 */
 extern void iSNDstreamnotifycallback(int handle, unsigned int bytes); /* @0x800E8DD4 */
-extern int iSNDstreamparseheader(struct SndStream *S, unsigned char *data); /* @0x800E8E9C */
-extern int iSNDstreamparsenumchunks(struct SndStream *S, unsigned char *data); /* @0x800E9044 */
-extern int iSNDstreamparsedata(struct SndStream *S, unsigned char *chunk); /* @0x800E90AC (oracle: always returns 1) */
+extern int iSNDstreamparseheader(struct SndStream *S, struct SndStreamChunkHeaderPrefix *data); /* @0x800E8E9C */
+extern int iSNDstreamparsenumchunks(struct SndStream *S, struct SndStreamChunkHeaderPrefix *data); /* @0x800E9044 */
+extern int iSNDstreamparsedata(struct SndStream *S, struct SndStreamChunkHeaderPrefix *chunk); /* @0x800E90AC (oracle: always returns 1) */
 extern int iSNDstreamparseend(struct SndStream *S, unsigned char *chunk); /* @0x800E9230 */
 extern int iSNDstreamparsechunk(struct SndStream *S, unsigned char *chunk); /* @0x800E9270 */
 extern int iSNDstreamisheld(struct SndStream *S); /* @0x800E9318 */

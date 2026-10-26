@@ -288,8 +288,9 @@ unsigned int iSNDstartvoice(unsigned int chan)
         if ((signed char)voice->voice_done >= 0) { /* bit7 clear: ptr table at base+0x420 indexed by f27 */
             int f27x4 = (int)(signed char)voice->voice_done * 4;
             unsigned char *table = voiceBase + 0x420;
-            int *pt = *(int **)(table + f27x4);
-            a3 = *(int *)((char *)pt + 8);
+            /* The table yields an address; only the word at byte offset +8 is consumed here. */
+            unsigned char *pt = *(unsigned char **)(table + f27x4);
+            a3 = *(int *)(pt + 8);
         } else {                                     /* bit7 set: index from +0x04 via 1/0x1c reciprocal */
             unsigned int checkNumerator;
             a3 = (unsigned int)voice->loop_length_param / 0x1c;
@@ -468,8 +469,8 @@ int iSNDinit(void)
     unsigned char *wait_spu;
     unsigned char *pd;
     unsigned char *latched;
-    unsigned char *gs;
-    unsigned char *loop_gs;
+    struct SndGlobalServerStateView *gs;
+    struct SndGlobalServerStateView *loop_gs;
     unsigned char *loop_pd;
     unsigned char *post;
     unsigned char *postmask_spu;
@@ -527,8 +528,8 @@ int iSNDinit(void)
     iSNDdmqueue(sndpdsafeloop, (unsigned char *)0x1000, 0x10, 1, 0);     /* clear first SPU page */
 
     i = 0;
-    gs = (unsigned char *)sndgs;
-    if (((struct SndGlobalServerStateView *)gs)->channel_count) {
+    gs = (struct SndGlobalServerStateView *)sndgs;
+    if (gs->channel_count) {
         pitch = 0x200;
         done = -1;
         loop_pd = latched;
@@ -546,7 +547,7 @@ int iSNDinit(void)
             i++;
             *(signed char *)(vp + 0xff) = done;             /* mark voice done */
             vp += (int)sizeof(SndPacketVoiceState);
-        } while (i < ((struct SndGlobalServerStateView *)loop_gs)->channel_count);
+        } while (i < loop_gs->channel_count);
     }
     iSNDpsxkeyon(0xffffff);
     post = sndpd;
@@ -571,9 +572,9 @@ int iSNDinit(void)
  *   release, drop the audio timer, clear the fx, and re-arm the DMA callback. */
 int iSNDrestore(void)
 {
-    unsigned char *guard;
-    unsigned char *gpraw;
-    unsigned char *gp;       /* &sndgs, INDEPENDENTLY re-materialized for the rest of the fn --
+    struct SndGlobalServerStateView *guard;
+    struct SndGlobalServerStateView *gpraw;
+    struct SndGlobalServerStateView *gp;       /* &sndgs, INDEPENDENTLY re-materialized for the rest of the fn --
                                * shared for BOTH the 0x11 channel-count byte AND the 0x44 ticks
                                * int (oracle keeps ONE base reg (s3) for both instead of
                                * re-deriving per access), but is a SEPARATE live range from `p`
@@ -591,15 +592,15 @@ int iSNDrestore(void)
     unsigned int sr;
     int dma;
 
-    guard = (unsigned char *)sndgs;
-    if (((struct SndGlobalServerStateView *)guard)->audio_lock_depth) {
-        unsigned char *waitBase = guard;
+    guard = (struct SndGlobalServerStateView *)sndgs;
+    if (guard->audio_lock_depth) {
+        struct SndGlobalServerStateView *waitBase = guard;
         do {
             iSNDleaveaudio();
-        } while (((struct SndGlobalServerStateView *)waitBase)->audio_lock_depth);
+        } while (waitBase->audio_lock_depth);
     }
-    gpraw = (unsigned char *)sndgs;
-    deadline = (unsigned int)((struct SndGlobalServerStateView *)gpraw)->tick_count + 100;
+    gpraw = (struct SndGlobalServerStateView *)sndgs;
+    deadline = (unsigned int)gpraw->tick_count + 100;
     gp = gpraw;
     base = sndpd;
     do {
@@ -615,9 +616,9 @@ int iSNDrestore(void)
          * USE fence `__asm__("" : : "r"(chan))` after the vp store reaches the identical object,
          * confirming the mechanism is the chan REF COUNT -- but the guard is the honest spelling,
          * so the fence is not used here. */
-        if (chan < ((struct SndGlobalServerStateView *)gp)->channel_count) {
+        if (chan < gp->channel_count) {
             vp = base;
-            for (; chan < ((struct SndGlobalServerStateView *)gp)->channel_count; chan++) {
+            for (; chan < gp->channel_count; chan++) {
                 if (*(volatile unsigned char *)((unsigned char *)vp + 0xf5)) { /* voice still active */
                     if (deadline < ((struct SndGlobalServerStateView *)gp)->tick_count) {
                         iSNDpsxkeyoff(0xffffff);

@@ -118,17 +118,17 @@ void iSNDstreamremoverequest(unsigned int reqid)
     if (0 < (int)((unsigned)S->current_count << 0x18)) {     /* curReqCount > 0 (signed) */
         int rd = 0, wr = 0;
         do {
-            int *src = (int *)((int)(unsigned int)((volatile SndStream *)S)->requests + rd);          /* MATCH: oracle re-reads packetsArray
+            SndStreamReq *src = (SndStreamReq *)((int)(unsigned int)((volatile SndStream *)S)->requests + rd);          /* MATCH: oracle re-reads packetsArray
                         * (S+0) FRESH every loop iteration (and again for the compaction dest below)
                         * rather than caching it once -- same volatile-reread lever as the other
                         * fields in this file. */
-            if (((SndStreamReq *)src)->request_id != reqid) {                 /* keep this request */
+            if (src->request_id != reqid) {                 /* keep this request */
                 if ((((int)(((volatile SndStream *)S)->parse_index) << 24) >> 24) == i)  /* MATCH:
                         * literal shift-chain, not the MSB macro's plain cast (same lever as
                         * iSNDstreamparsenumchunks/isheld/etc -- forces the oracle's lbu+sll+sra
                         * instead of a single lb) -- parseIdx pointed at it -> retarget */
                     S->parse_index = newidx;
-                *(SndStreamReq *)(wr + (int)(unsigned int)((volatile SndStream *)S)->requests) = *(SndStreamReq *)src;
+                *(SndStreamReq *)(wr + (int)(unsigned int)((volatile SndStream *)S)->requests) = *src;
                 wr += sizeof(SndStreamReq);
                 newidx += 1;
             }
@@ -196,14 +196,14 @@ void iSNDstreamnotifycallback(int handle, unsigned int bytes)
 /* iSNDstreamparseheader @0x800E8E9C : 'SChl' chunk -- decode the audio header (rate/format) via
  *   iSNDpatchtohdr, compute the data rate, and lock the format on first sight (a mid-stream change errors
  *   to state 2).  Once locked, (re)start the packet player. */
-int iSNDstreamparseheader(SndStream *S, unsigned char *data)
+int iSNDstreamparseheader(SndStream *S, SndStreamChunkHeaderPrefix *data)
 {
     SndStreamReq *req = S->requests + (signed char)((volatile SndStream *)S)->parse_index;
     int outsize;
 
-    iSNDpatchtohdr(data + 0xc, &S->current_rate, &S->current_header.attributes, &outsize);
+    iSNDpatchtohdr((unsigned char *)data + 0xc, &S->current_rate, &S->current_header.attributes, &outsize);
     ((volatile SndStreamReq *)req)->total_size = outsize;
-    STREAM_release(S->stream_handle, data);
+    STREAM_release(S->stream_handle, (unsigned char *)data);
     ((volatile SndStreamReq *)req)->total_size = ((((volatile SndStreamReq *)req)->total_size + 0x1b) / 0x1c) * 0x1c;    /* round up to 0x1C */
     ((volatile SndStreamReq *)req)->data_rate = iSNDplatformcalcdatarate(&S->current_rate);
 
@@ -231,19 +231,19 @@ int iSNDstreamparseheader(SndStream *S, unsigned char *data)
  * address-sum order. `req` is a SndStreamReq * and the member is accessed directly. A natural typed
  * pointer-add candidate compiled to the same count but reversed the addu destination/source roles
  * (4 ASM diffs); this target-specific address formation is retained for exact codegen. */
-int iSNDstreamparsenumchunks(SndStream *S, unsigned char *data)
+int iSNDstreamparsenumchunks(SndStream *S, SndStreamChunkHeaderPrefix *data)
 {
     SndStreamReq *req;
-    STREAM_release(S->stream_handle, data);
+    STREAM_release(S->stream_handle, (unsigned char *)data);
     req = (SndStreamReq *)((((int)(((volatile SndStream *)S)->parse_index) << 24) >> 24) * (int)sizeof(SndStreamReq) + (int)(unsigned int)S->requests);
-    req->num_chunks = ((SndStreamChunkHeaderPrefix *)data)->value.chunk_count;
+    req->num_chunks = data->value.chunk_count;
     return 1;
 }
 
 /* iSNDstreamparsedata @0x800E90AC : 'SCDl' chunk -- build the per-channel sample descriptor (flat or
  *   interleaved per the format), stamp the chunk with its owning request id (for the release hook), and
  *   submit it to the packet player. */
-int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
+int iSNDstreamparsedata(SndStream *S, SndStreamChunkHeaderPrefix *chunk)
 {
     /* MATCH (oracle re-traced in full, incl. delay slots -- was untouched, 123 diffs):
      * -- the `datalen` local is SPILLED to the stack at fn entry and only reread once, at the
@@ -265,7 +265,7 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
     int i;
     unsigned char *flatPtr;
 
-    desc.fields.data_size = ((SndStreamChunkHeaderPrefix *)chunk)->value.data_size;                     /* stash datalen in an unused desc slot --
+    desc.fields.data_size = chunk->value.data_size;                     /* stash datalen in an unused desc slot --
                                                            * gcc doesn't naturally spill a plain local
                                                            * across the loops (register free the whole
                                                            * time); the oracle's stack round-trip through
@@ -278,7 +278,7 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
         /* The one-trip wrapper is instruction-free, but gives gcc's flow pass the retail
          * reference weight for flatBase; this fixes its preheader/IV allocation (13 -> 9). */
         do {
-            flatBase = chunk + 0x10;
+            flatBase = (unsigned char *)chunk + 0x10;
         } while (0);
         i = step;
         if (i < S->locked_rate.channels) {
@@ -299,7 +299,7 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
             } while (S->locked_rate.channels > ++i);
         }
     } else {                                             /* interleaved: per-channel offset table */
-        int *off = (int *)(chunk + 0x10);
+        int *off = (int *)((unsigned char *)chunk + 0x10);
         unsigned char *base = (unsigned char *)off + S->locked_rate.channels * 4;
         i = 0;
         if (i < S->locked_rate.channels) {
@@ -314,7 +314,7 @@ int iSNDstreamparsedata(SndStream *S, unsigned char *chunk)
     desc.fields.data_size = ((desc.fields.data_size + 0x1b) / 0x1c) * 0x1c;          /* round up to 0x1C -- reload of the spill */
     {
         SndStreamReq *req = S->requests + (signed char)((volatile SndStream *)S)->parse_index;
-        *(unsigned char **)(flatPtr - 4) = chunk;                   /* back-ptr just before the first sample */
+        *(unsigned char **)(flatPtr - 4) = (unsigned char *)chunk; /* back-ptr just before the first sample */
         *(int *)chunk = req->request_id;                      /* request id -> chunk[0] */
         ((volatile SndStreamReq *)req)->remaining_bytes = ((volatile SndStreamReq *)req)->remaining_bytes + desc.fields.data_size;       /* remaining += */
         ((volatile SndStreamReq *)req)->submitted = ((volatile SndStreamReq *)req)->submitted + 1;             /* submitted++ */
@@ -441,13 +441,13 @@ int iSNDstreamparsechunk(SndStream *S, unsigned char *chunk)
     int tag = *(int *)chunk;
     int ret = 1;
     if (tag == 0x6c444353) {                             /* 'SCDl' */
-        ret = iSNDstreamparsedata(S, chunk);
+        ret = iSNDstreamparsedata(S, (SndStreamChunkHeaderPrefix *)chunk);
     } else if (tag == 0x6c484353) {                      /* 'SChl' */
-        ret = iSNDstreamparseheader(S, chunk);
+        ret = iSNDstreamparseheader(S, (SndStreamChunkHeaderPrefix *)chunk);
     } else if (tag == 0x6c454353) {                      /* 'SCEl' */
         ret = iSNDstreamparseend(S, chunk);
     } else if (tag == 0x6c434353) {                      /* 'SCCl' */
-        ret = iSNDstreamparsenumchunks(S, chunk);
+        ret = iSNDstreamparsenumchunks(S, (SndStreamChunkHeaderPrefix *)chunk);
     } else {
         STREAM_release(S->stream_handle, chunk);                 /* unknown -> drop */
     }
@@ -536,7 +536,7 @@ void iSNDstreamhotroddatachunks(void)
                         if (chunk) {
                             int bytes = *(int *)(chunk + 4);
                             total += bytes;
-                            iSNDstreamparsedata(S, chunk);
+                            iSNDstreamparsedata(S, (SndStreamChunkHeaderPrefix *)chunk);
                         }
                     } while (0 < n && total < 0x4000);
                 }

@@ -115,7 +115,7 @@
  *     b   +0x1c (DAT_80147a0c) playstate   b +0x1e (DAT_80147a0e) route   b +0x1f (DAT_80147a0f) channels
  *     b   +0x20 (DAT_80147a10) link        b +0x21 (DAT_80147a11) linkflag  b +0x22/0x23 (a12/a13) lvl/fx
  *     b   +0x27 (DAT_80147a17) voice-done flag (bit7 set == done)
- *   PER-PLAYER ctx (pp = (&DAT_80147e10)[player], malloc'd in create, int-indexed):
+ *   PER-PLAYER ctx (pp = (&DAT_80147e10)[player], malloc'd in create, byte-offset view):
  *     +0x00 spuAddr  +0x04 spuSize  +0x0c bufBytes  +0x14 writePos  +0x18 servePos  +0x1c lastNewPos
  *     +0x20 dmaHandle  +0x2c frameSizeTbl  +0x34..0x46 fill state  +0x42(b) activeNote(-1 idle)
  *     +0x44(u16) blockBytes  +0x46(u16) framesPerBlock  +0x48.. per-channel SPU buffer ptrs
@@ -903,7 +903,8 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
      * not folded into the pointer) and, after +=0xD8, the `voice` table pointer (+vt). */
     unsigned char *base = sndpd;
     unsigned char *slot = base + p * 4;
-    int *pp = (int *)((struct SndPacketContextSlotCursorView *)slot)->context;
+    /* Keep the loaded context as a byte cursor for its fixed/variable byte offsets, alongside the typed field view. */
+    unsigned char *pp = (unsigned char *)((struct SndPacketContextSlotCursorView *)slot)->context;
     SndPacketPlayerContextPrefix *ctx = (SndPacketPlayerContextPrefix *)pp;
     int  vt = note * (int)sizeof(SndPacketVoiceState);
     unsigned char *tablebase = base + 0xD8;
@@ -954,7 +955,7 @@ int iSNDplatformpacketplay(int p, int note, int volAngle, int level,
      * and only the char*-pointer spelling makes cc1 keep the parenthesized association. */
     {
         int ch = voice->channel_count;
-        ctx->channel_buffer0 = (unsigned char *)(pp + 0x14);
+        ctx->channel_buffer0 = pp + 0x50;
         ctx->block_shift = 0xd - ch;
         ctx->channel_buffer1 =
             (unsigned char *)pp + (ctx->block_bytes.u + 0x50);

@@ -44,12 +44,12 @@ int SNDfxmasterlevel(int bus, int level)
     if (!base->initialized)
         return 0;
     for (i = 0; i < ((struct SndGlobalServerStateView *)sndgs)->channel_count; i++) {
-        unsigned char *rec;
+        SndChannel *rec;
         loopBase = (struct SndGlobalServerStateView *)sndgs;
-        rec = (unsigned char *)(i * sizeof(SndChannel) +
+        rec = (SndChannel *)(i * sizeof(SndChannel) +
             (unsigned int)loopBase->play_records);
-        SNDfxlevel(((SndChannel *)rec)->owner_tag,
-                   bus, ((SndChannelPlaybackFxView *)(rec + bus + 0x34))->fx_level_window[1]);
+        SNDfxlevel(rec->owner_tag,
+                   bus, ((SndChannelPlaybackFxView *)((unsigned char *)rec + bus + 0x34))->fx_level_window[1]);
     }
     return 0;
 }

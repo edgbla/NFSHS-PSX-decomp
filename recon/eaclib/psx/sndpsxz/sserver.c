@@ -235,31 +235,32 @@ struct SndGlobalServerStateView *iSNDserveradd100hzclient(void (*cb)(void))
  * (not a REG) so global.c `set_preference` never gives it the $a0 copy preference, and `cb` now dies
  * at the fence so it stops conflicting with the loop index -- `regs_someone_prefers[i]` loses $a0 and
  * the {i,base,cb} = {$a0,$a1,$a2} rotation lands; the `"0"` matching constraint makes reload emit
- * retail's `addu $a2,$a0,$zero` at insn 0 at zero cost.  Full mechanism + the -dg receipt is on the
- * twin in ssysserv.c.  (Retires the w33/w34 `volatile`-param 3-diff floor on BOTH twins.) */
+ * retail's `addu $a2,$a0,$zero` at insn 0 at zero cost.  The state base is a typed view; callback
+ * slot displacements remain byte-based at the cursor boundary. Full mechanism + the -dg receipt is
+ * on the twin in ssysserv.c. (Retires the w33/w34 `volatile`-param 3-diff floor on BOTH twins.) */
 void iSNDserverremove100hzclient(void (*cb)(void))
 {
     int i;
     int j;
     void (*target)(void);
-    char *base;
-    char *p;
+    struct SndGlobalServerStateView *base;
+    struct SndGlobalServerStateView *p;
 
     __asm__("" : "=r"(target) : "0"(cb));
-    p = (char *)sndgs;
-    if (((struct SndGlobalServerStateView *)p)->client_100hz_count.s <= 0)
+    p = (struct SndGlobalServerStateView *)sndgs;
+    if (p->client_100hz_count.s <= 0)
         return;
     i = 0;
     base = p;
 findloop:
-    if (((struct SndServer100HzClientCursorView *)(base + i * 4))->callback == target) {
+    if (((struct SndServer100HzClientCursorView *)((unsigned char *)base + i * 4))->callback == target) {
         ((struct SndGlobalServerStateView *)base)->client_100hz_count.u = ((struct SndGlobalServerStateView *)base)->client_100hz_count.u - 1;
         if (i < ((struct SndGlobalServerStateView *)base)->client_100hz_count.s) {
 shiftloop:
             j = i * 4;
             i++;
             ((struct SndServer100HzClientCursorView *)((unsigned int)j + (unsigned int)base))->callback =
-                ((struct SndServer100HzClientCursorView *)(base + i * 4))->callback;
+                ((struct SndServer100HzClientCursorView *)((unsigned char *)base + i * 4))->callback;
             if (i < ((struct SndGlobalServerStateView *)base)->client_100hz_count.s)
                 goto shiftloop;
         }

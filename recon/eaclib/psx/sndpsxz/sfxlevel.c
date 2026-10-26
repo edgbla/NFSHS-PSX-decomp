@@ -45,8 +45,8 @@ int SNDfxlevel(int tag, int bus, int level)
     if (chanIdx >= 0) {
         cur[0] = -1;
         while (iSNDpatchkey(chanIdx, cur)) {
-            unsigned char *pool = (unsigned char *)((struct SndGlobalServerStateView *)sndgs)->play_records;
-            unsigned char *slot = pool + cur[0] * sizeof(SndChannel) + bus;
+            SndChannel *pool = ((struct SndGlobalServerStateView *)sndgs)->play_records;
+            unsigned char *slot = (unsigned char *)(pool + cur[0]) + bus;
             int scaled = level * ((SndChannelPlaybackFxView *)(slot + 0x34))->fx_level_window[0];
             int fxArg;
             ((SndChannelPlaybackFxView *)(slot + 0x34))->fx_level_window[1] = level;

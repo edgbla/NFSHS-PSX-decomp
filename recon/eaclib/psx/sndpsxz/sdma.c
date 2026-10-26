@@ -120,10 +120,10 @@ void iSNDdmtransfer(void)
 
     {
         unsigned char *tailBase = sndpd;
-        int qbase;
+        unsigned char *qbase;
         activeEntry = (struct SNDDmaEntry *)
             (((((int)((struct SndDmaQueueStateView *)tailBase)->active_slot.v) << 24) >> 24) * (int)sizeof(struct SNDDmaEntry)
-             + (qbase = (int)tailBase + 0x10));
+             + (int)(unsigned int)(qbase = tailBase + 0x10));
         if (activeEntry->flag) {
             void (*hook)(void) = ((struct SndDriverHookStateView *)tailBase)->hooks.preload;
             ((struct SndDmaQueueStateView *)tailBase)->callback_guard.v = 1;
@@ -240,11 +240,12 @@ void iSNDdmservice(void)
     else {
         int *gs = sndgs;
         int slot = ((int)((struct SndDmaQueueStateView *)pd)->active_slot.v << 24) >> 24;
-        int *entry = (int *)(pd + slot * (int)sizeof(struct SNDDmaEntry));
+        /* `entry` is the byte cursor at the slot-relative state base; the record view begins at +0x10. */
+        unsigned char *entry = pd + slot * (int)sizeof(struct SNDDmaEntry);
         /* MATCH: the volatile clock read keeps &sndgs materialized and, named before deadline,
          * fills the oracle's latency window with the two loads in their original order. */
         unsigned int now = *(volatile int *)&gs[0x11];
-        unsigned int deadline = ((struct SNDDmaEntry *)((char *)entry + 0x10))->deadline;
+        unsigned int deadline = ((struct SNDDmaEntry *)(entry + 0x10))->deadline;
         if (deadline <= now)
             iSNDdmcallback();
     }

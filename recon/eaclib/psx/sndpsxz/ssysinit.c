@@ -73,15 +73,15 @@ int SNDSYS_getopts(SNDSYSOPTS *opts)
 /* SNDSYS_setopts @0x800F1E14 : apply the canonical 44-byte opts->set block at
  *   +0x0c and the opts->vec callback at +0x38, then re-derive the output
  *   configuration. SNDSYSSET's two-byte alignment produces the oracle's
- *   inline lwl/lwr-vs-lw/sw alignment-checked copy. Routing the destination
- *   through the sndgs byte base preserves the explicit +0x0c add. The
+ *   inline lwl/lwr-vs-lw/sw alignment-checked copy. The typed `SNDSYSOPTS` view
+ *   rooted at sndgs preserves the explicit +0x0c displacement. The
  *   array-shaped D_80147898 alias lets the callback store fill outputset's jal
  *   delay slot; spelling that store as a direct typed vec assignment regresses
  *   this function while preserving behavior. */
 int SNDSYS_setopts(SNDSYSOPTS *opts)
 {
-    char *base = (char *)sndgs;
-    ((SNDSYSOPTS *)base)->set = opts->set;
+    SNDSYSOPTS *base = (SNDSYSOPTS *)sndgs;
+    base->set = opts->set;
     D_80147898[0] = opts->vec.issurfacelocked;
     iSNDplatformoutputset();
     return 0;

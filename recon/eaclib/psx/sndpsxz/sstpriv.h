@@ -28,7 +28,8 @@ typedef struct SndStreamReq {
 } SndStreamReq;
 typedef char SndStreamReq_size_check[(sizeof(SndStreamReq) == 0x2c) ? 1 : -1];
 
-/* At +0x0C the common SCCl/SCDl prefix carries different typed values. */
+/* The common chunk prefix is 0x10 bytes; parser APIs use this view only for its shared header/value fields,
+ * then switch to byte pointers for variable payload offsets. At +0x0C, SCCl/SCDl carry different values. */
 typedef union SndStreamChunkValue {
     int chunk_count; /* SCCl */
     int data_size;   /* SCDl */
